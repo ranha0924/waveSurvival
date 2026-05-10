@@ -351,10 +351,13 @@
       return;
     }
 
-    // Camera shake
+    // Camera shake — round to integer pixels so the canvas translate stays
+    // pixel-aligned. Otherwise sub-pixel offsets each frame cause edge anti-
+    // aliasing along walls and the horizon, which reads as flicker or partial
+    // transparency on low structures during shooting.
     const ctx = game.ctx;
-    const shakeX = (Math.random() - 0.5) * game.player.shake;
-    const shakeY = (Math.random() - 0.5) * game.player.shake;
+    const shakeX = Math.round((Math.random() - 0.5) * game.player.shake);
+    const shakeY = Math.round((Math.random() - 0.5) * game.player.shake);
     ctx.save();
     ctx.translate(shakeX, shakeY);
 
