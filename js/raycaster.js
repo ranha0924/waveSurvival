@@ -30,15 +30,10 @@ const Raycaster = (() => {
     theme = theme || Environment.themeForWave(1);
 
     drawSky(theme, horizonOffset);
-    drawClouds(player, theme, horizonOffset);
-    drawSkyline(player, theme, horizonOffset);
     drawFloor(theme, horizonOffset);
 
     castWalls(player, horizonOffset, theme);
 
-    drawSmokeColumns(player, theme, horizonOffset);
-
-    // Sprite pass: enemies, particles, dust.
     const sprites = [];
     for (const e of enemies) {
       if (!e.alive) continue;
@@ -49,30 +44,11 @@ const Raycaster = (() => {
       const dx = p.x - player.x, dy = p.y - player.y;
       sprites.push({ x: p.x, y: p.y, dist: dx * dx + dy * dy, type: 'particle', ref: p });
     }
-    const dust = Environment.getDust();
-    for (const d of dust) {
-      const dx = d.x - player.x, dy = d.y - player.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 > 400) continue;
-      sprites.push({ x: d.x, y: d.y, dist: d2, type: 'dust', ref: d });
-    }
     sprites.sort((a, b) => b.dist - a.dist);
 
     for (const s of sprites) {
       if (s.type === 'enemy') drawEnemySprite(player, s.ref, horizonOffset, theme);
-      else if (s.type === 'particle') drawParticle(player, s.ref, horizonOffset, theme);
-      else drawDust(player, s.ref, horizonOffset, theme);
-    }
-
-    // Lightning + global darkness pass.
-    const lf = Environment.getLightningFlash();
-    if (lf > 0) {
-      ctx.fillStyle = `rgba(220, 230, 255, ${Math.min(0.55, lf * 0.5)})`;
-      ctx.fillRect(0, 0, W, H);
-    }
-    if (theme.darkness > 0 && lf < 0.4) {
-      ctx.fillStyle = `rgba(0, 0, 8, ${theme.darkness * 0.55})`;
-      ctx.fillRect(0, 0, W, H);
+      else drawParticle(player, s.ref, horizonOffset, theme);
     }
   }
 
@@ -95,63 +71,6 @@ const Raycaster = (() => {
     grad.addColorStop(1, theme.floorNear);
     ctx.fillStyle = grad;
     ctx.fillRect(0, horizon, W, H - horizon);
-  }
-
-  function drawClouds(player, theme, horizonOffset) {
-    const horizon = H / 2 + horizonOffset;
-    const clouds = Environment.getClouds();
-    const halfFov = FOV / 2;
-    const c = theme.cloudColor;
-    for (const cloud of clouds) {
-      // Angular distance from camera direction, normalized to [-π, π]
-      let da = cloud.angle - player.angle;
-      while (da > Math.PI) da -= Math.PI * 2;
-      while (da < -Math.PI) da += Math.PI * 2;
-      if (Math.abs(da) > halfFov + cloud.width) continue;
-      const screenX = W / 2 + (da / halfFov) * (W / 2);
-      const cloudW = (cloud.width / halfFov) * (W / 2);
-      const cloudH = cloud.height * H;
-      const cy = horizon - cloud.height * H * 1.2 - cloudH / 2;
-      const grad = ctx.createRadialGradient(screenX, cy, 4, screenX, cy, cloudW);
-      const alpha = theme.cloudAlpha * cloud.opacityJitter;
-      grad.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${alpha})`);
-      grad.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.ellipse(screenX, cy, cloudW, cloudH, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function drawSkyline(player, theme, horizonOffset) {
-    const horizon = H / 2 + horizonOffset;
-    if (horizon <= 0) return;
-    const halfFov = FOV / 2;
-    // Far mountain layer
-    ctx.fillStyle = theme.skylineFar;
-    ctx.beginPath();
-    ctx.moveTo(0, horizon);
-    for (let x = 0; x <= W; x += 4) {
-      const a = player.angle + ((x / W) - 0.5) * FOV;
-      const h = Environment.silhouetteHeightFar(a);
-      ctx.lineTo(x, horizon - h);
-    }
-    ctx.lineTo(W, horizon);
-    ctx.closePath();
-    ctx.fill();
-
-    // Mid ruins / antennae layer
-    ctx.fillStyle = theme.skylineMid;
-    ctx.beginPath();
-    ctx.moveTo(0, horizon);
-    for (let x = 0; x <= W; x += 3) {
-      const a = player.angle + ((x / W) - 0.5) * FOV;
-      const h = Environment.silhouetteHeightMid(a);
-      ctx.lineTo(x, horizon - h);
-    }
-    ctx.lineTo(W, horizon);
-    ctx.closePath();
-    ctx.fill();
   }
 
   function castWalls(player, horizonOffset, theme) {
@@ -287,32 +206,20 @@ const Raycaster = (() => {
       }
     }
 
-    // Eyes — boosted glow on dark themes for visibility.
-    const eyeBoost = theme.darkness > 0.4 ? 1.0 : 0.0;
-    if (proj.dist < 16 && !flash) {
-      const eyeSize = Math.max(2, spriteH * (0.04 + eyeBoost * 0.04));
+    if (proj.dist < 12 && !flash) {
+      const eyeSize = Math.max(2, spriteH * 0.04);
       const eyeY = drawStartY + spriteH * 0.12;
       const eyeOffsetX = spriteW * 0.1;
       const ex1 = proj.screenX - eyeOffsetX;
       const ex2 = proj.screenX + eyeOffsetX;
       const eyeColor = def.eyeColor || '#ff2222';
-      const drawEye = (cx) => {
-        if (cx < 0 || cx >= W) return;
-        if (zBuffer[Math.floor(cx)] <= proj.dist) return;
-        if (eyeBoost > 0) {
-          ctx.save();
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.fillStyle = eyeColor;
-          ctx.beginPath();
-          ctx.arc(cx, eyeY, eyeSize * 1.6, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
-        ctx.fillStyle = eyeColor;
-        ctx.fillRect(cx - eyeSize / 2, eyeY, eyeSize, eyeSize);
-      };
-      drawEye(ex1);
-      drawEye(ex2);
+      ctx.fillStyle = eyeColor;
+      if (zBuffer[Math.floor(ex1)] > proj.dist) {
+        ctx.fillRect(ex1 - eyeSize / 2, eyeY, eyeSize, eyeSize);
+      }
+      if (zBuffer[Math.floor(ex2)] > proj.dist) {
+        ctx.fillRect(ex2 - eyeSize / 2, eyeY, eyeSize, eyeSize);
+      }
     }
 
     if (e.hp < e.maxHp && proj.dist < 24) {
@@ -343,45 +250,6 @@ const Raycaster = (() => {
     const fog = Math.min(1, proj.dist / theme.fogDist);
     ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.life * (1 - fog * 0.5)})`;
     ctx.fillRect(drawX - sz / 2, drawY - sz / 2, sz, sz);
-  }
-
-  function drawDust(player, d, horizonOffset, theme) {
-    const proj = projectSprite(player, d.x, d.y);
-    if (!proj) return;
-    const horizon = H / 2 + horizonOffset;
-    const cx = Math.floor(proj.screenX);
-    if (cx < 0 || cx >= W) return;
-    if (zBuffer[cx] < proj.dist) return;
-    const sz = Math.max(1, Math.floor(2 * d.size / proj.dist * 4));
-    const drawY = Math.floor(horizon + (Math.sin(d.life * 4) * 0.15) * H / proj.dist);
-    const fog = Math.min(1, proj.dist / theme.fogDist);
-    const a = 0.25 * (1 - fog) * theme.ambient;
-    ctx.fillStyle = `rgba(220, 200, 170, ${a})`;
-    ctx.fillRect(proj.screenX - sz / 2, drawY - sz / 2, sz, sz);
-  }
-
-  function drawSmokeColumns(player, theme, horizonOffset) {
-    const horizon = H / 2 + horizonOffset;
-    const halfFov = FOV / 2;
-    const cols = Environment.getSmokeColumns();
-    for (const sm of cols) {
-      let da = sm.worldAngle - player.angle;
-      while (da > Math.PI) da -= Math.PI * 2;
-      while (da < -Math.PI) da += Math.PI * 2;
-      if (Math.abs(da) > halfFov + 0.3) continue;
-      const screenX = W / 2 + (da / halfFov) * (W / 2);
-      // Smoke column rises from horizon up. Width ~ 30-50px, height ~ H * 0.3.
-      const colH = H * 0.32 * sm.intensity;
-      const colW = 32 + 24 * sm.intensity;
-      const c = sm.color;
-      const grad = ctx.createLinearGradient(screenX, horizon, screenX, horizon - colH);
-      grad.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]}, ${0.55 * theme.ambient})`);
-      grad.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]}, 0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.ellipse(screenX, horizon - colH * 0.5, colW * 0.7, colH * 0.6, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
   }
 
   function getDimensions() { return { W, H }; }
