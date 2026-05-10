@@ -222,107 +222,91 @@ const UI = (() => {
   }
   function hideUpgradeMenu() { $('upgrade-screen').classList.add('hidden'); }
 
-  // Render the player's gun in 1st person (overlay on canvas)
+  // First-person gun sprite (M4-style pixel art)
+  const gunImage = new Image();
+  let gunImageLoaded = false;
+  gunImage.onload = () => { gunImageLoaded = true; };
+  gunImage.src = 'assets/gun.png';
+
+  // Muzzle position normalized to gun image dimensions (front sight / barrel tip)
+  const MUZZLE_NORM = { x: 0.20, y: 0.10 };
+  const GUN_HEIGHT_FRAC = 0.55;
+
+  // Render the player's gun in 1st person + muzzle flash + tracer to crosshair
   function renderGun(ctx, player) {
     const W = ctx.canvas.width;
     const H = ctx.canvas.height;
-    const w = Player.getWeapon(player);
     const kick = player.kickback;
     const bob = player.bobOffset;
 
-    // Position at bottom center
-    const gunW = W * 0.32;
-    const gunH = H * 0.30;
-    const cx = W / 2 + Math.cos(player.bobPhase * 0.5) * 6 - 5;
-    const cy = H - gunH * 0.6 + bob * 0.5 + kick * 1.2;
+    if (!gunImageLoaded) return;
 
-    ctx.save();
-    ctx.translate(cx, cy);
+    const aspect = gunImage.width / gunImage.height;
+    const drawnH = H * GUN_HEIGHT_FRAC;
+    const drawnW = drawnH * aspect;
 
-    // Different shape per weapon
-    if (w.id === 'pistol') {
-      drawPistol(ctx, gunW, gunH, w.color);
-    } else if (w.id === 'shotgun') {
-      drawShotgun(ctx, gunW * 1.1, gunH, w.color);
-    } else if (w.id === 'machinegun') {
-      drawMachinegun(ctx, gunW * 1.15, gunH, w.color);
-    } else {
-      drawSniper(ctx, gunW * 1.3, gunH, w.color);
-    }
+    // Anchor bottom-right with sway / bob / kickback offset
+    const swayX = Math.cos(player.bobPhase * 0.5) * 6;
+    const swayY = Math.sin(player.bobPhase) * 3;
+    const drawX = W - drawnW + swayX;
+    const drawY = H - drawnH + bob * 0.6 + kick * 1.4 + swayY;
 
-    // Muzzle flash
+    // Preserve pixel-art crispness
+    const prevSmoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(gunImage, drawX, drawY, drawnW, drawnH);
+    ctx.imageSmoothingEnabled = prevSmoothing;
+
+    // Muzzle position on screen
+    const muzzleX = drawX + MUZZLE_NORM.x * drawnW;
+    const muzzleY = drawY + MUZZLE_NORM.y * drawnH;
+
+    // Crosshair target (screen center) — bullets always go here
+    const cx = W / 2;
+    const cy = H / 2;
+
+    // Muzzle flash + tracer line from muzzle to crosshair
     if (player.muzzleFlash > 0) {
-      ctx.fillStyle = `rgba(255, 220, 100, ${player.muzzleFlash})`;
+      const fl = player.muzzleFlash;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      // Tracer line: muzzle → screen-center crosshair
+      const grad = ctx.createLinearGradient(muzzleX, muzzleY, cx, cy);
+      grad.addColorStop(0, `rgba(255, 240, 160, ${fl})`);
+      grad.addColorStop(1, `rgba(255, 255, 220, 0)`);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.arc(0, -gunH * 0.45, 18 + Math.random() * 10, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = `rgba(255, 255, 200, ${player.muzzleFlash * 0.8})`;
+      ctx.moveTo(muzzleX, muzzleY);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = `rgba(255, 255, 240, ${fl})`;
       ctx.beginPath();
-      ctx.arc(0, -gunH * 0.45, 8 + Math.random() * 4, 0, Math.PI * 2);
+      ctx.moveTo(muzzleX, muzzleY);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+
+      // Muzzle flash burst
+      const flashR = 30 + Math.random() * 14;
+      ctx.fillStyle = `rgba(255, 200, 80, ${fl * 0.9})`;
+      ctx.beginPath();
+      ctx.arc(muzzleX, muzzleY, flashR, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillStyle = `rgba(255, 240, 180, ${fl})`;
+      ctx.beginPath();
+      ctx.arc(muzzleX, muzzleY, flashR * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255, 255, 240, ${fl})`;
+      ctx.beginPath();
+      ctx.arc(muzzleX, muzzleY, flashR * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
     }
-    ctx.restore();
-  }
-
-  function drawPistol(ctx, w, h, color) {
-    // Body
-    ctx.fillStyle = '#222';
-    ctx.fillRect(-w * 0.25, -h * 0.1, w * 0.5, h * 0.5);
-    ctx.fillStyle = color;
-    ctx.fillRect(-w * 0.22, -h * 0.07, w * 0.44, h * 0.44);
-    // Barrel
-    ctx.fillStyle = '#111';
-    ctx.fillRect(-w * 0.07, -h * 0.5, w * 0.14, h * 0.45);
-    ctx.fillStyle = '#333';
-    ctx.fillRect(-w * 0.05, -h * 0.5, w * 0.1, h * 0.43);
-    // Grip
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(-w * 0.18, h * 0.35, w * 0.36, h * 0.3);
-  }
-
-  function drawShotgun(ctx, w, h, color) {
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(-w * 0.3, h * 0.0, w * 0.6, h * 0.4);
-    ctx.fillStyle = color;
-    ctx.fillRect(-w * 0.07, -h * 0.6, w * 0.14, h * 0.7);
-    ctx.fillStyle = '#222';
-    ctx.fillRect(-w * 0.1, -h * 0.6, w * 0.2, h * 0.1);
-    // Pump
-    ctx.fillStyle = '#5a3a1a';
-    ctx.fillRect(-w * 0.13, -h * 0.15, w * 0.26, h * 0.18);
-  }
-
-  function drawMachinegun(ctx, w, h, color) {
-    ctx.fillStyle = '#222';
-    ctx.fillRect(-w * 0.3, -h * 0.1, w * 0.6, h * 0.5);
-    ctx.fillStyle = color;
-    ctx.fillRect(-w * 0.27, -h * 0.07, w * 0.54, h * 0.44);
-    ctx.fillStyle = '#111';
-    ctx.fillRect(-w * 0.06, -h * 0.65, w * 0.12, h * 0.6);
-    // Magazine
-    ctx.fillStyle = '#181818';
-    ctx.fillRect(-w * 0.08, h * 0.4, w * 0.16, h * 0.3);
-    // Stock
-    ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(-w * 0.45, 0, w * 0.18, h * 0.35);
-  }
-
-  function drawSniper(ctx, w, h, color) {
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(-w * 0.4, -h * 0.05, w * 0.8, h * 0.4);
-    ctx.fillStyle = color;
-    ctx.fillRect(-w * 0.05, -h * 0.7, w * 0.1, h * 0.7);
-    // Scope
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(-w * 0.12, -h * 0.25, w * 0.24, h * 0.15);
-    ctx.beginPath();
-    ctx.fillStyle = '#000';
-    ctx.arc(0, -h * 0.18, h * 0.06, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(80,200,255,0.4)';
-    ctx.beginPath();
-    ctx.arc(0, -h * 0.18, h * 0.04, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   return {

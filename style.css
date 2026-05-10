@@ -143,17 +143,18 @@ html, body {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   transform: translate(-50%, -50%);
   pointer-events: none;
+  z-index: 20;
 }
 
 #crosshair::before, #crosshair::after {
   content: '';
   position: absolute;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 1), 0 0 6px rgba(255, 255, 255, 0.4);
 }
 
 #crosshair::before {
@@ -170,6 +171,21 @@ html, body {
   width: 2px;
   height: 100%;
   transform: translateX(-50%);
+}
+
+/* Center dot for precise aim */
+#crosshair-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: #ff5544;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 1), 0 0 8px rgba(255, 80, 60, 0.8);
+  pointer-events: none;
+  z-index: 21;
 }
 
 #hud-bottom-right {
