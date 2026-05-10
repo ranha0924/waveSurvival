@@ -366,12 +366,29 @@ const Player = (() => {
     p.reloading = false;
   }
 
+  const WEAPON_ORDER = ['pistol', 'shotgun', 'machinegun', 'sniper'];
+
   function switchWeapon(p, key) {
-    const order = ['pistol', 'shotgun', 'machinegun', 'sniper'];
     const idx = parseInt(key) - 1;
-    if (idx < 0 || idx >= order.length) return;
-    const target = order[idx];
-    if (!p.loadout[target].unlocked) return;
+    if (idx < 0 || idx >= WEAPON_ORDER.length) return;
+    swapTo(p, WEAPON_ORDER[idx]);
+  }
+
+  // Cycle to the next unlocked weapon in WEAPON_ORDER. Used by the mobile
+  // swap button — the desktop has 1-4 keys for direct selection.
+  function cycleWeapon(p) {
+    const cur = WEAPON_ORDER.indexOf(p.currentWeapon);
+    for (let i = 1; i <= WEAPON_ORDER.length; i++) {
+      const next = WEAPON_ORDER[(cur + i) % WEAPON_ORDER.length];
+      if (p.loadout[next] && p.loadout[next].unlocked && next !== p.currentWeapon) {
+        swapTo(p, next);
+        return;
+      }
+    }
+  }
+
+  function swapTo(p, target) {
+    if (!p.loadout[target] || !p.loadout[target].unlocked) return;
     if (p.currentWeapon === target) return;
     p.currentWeapon = target;
     p.reloading = false;
@@ -387,6 +404,6 @@ const Player = (() => {
   }
 
   return {
-    create, update, turn, shoot, startReload, switchWeapon, takeDamage, getWeapon
+    create, update, turn, shoot, startReload, switchWeapon, cycleWeapon, takeDamage, getWeapon
   };
 })();

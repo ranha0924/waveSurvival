@@ -85,6 +85,7 @@
       onShoot: (down) => { game.mouseDown = down; },
       onRun:   (down) => { game.keys['shift'] = down; },
       onReload: () => { if (game.state === STATE.PLAYING) Player.startReload(game.player); },
+      onSwap:   () => { if (game.state === STATE.PLAYING) Player.cycleWeapon(game.player); },
       onPause:  () => {
         if (game.state === STATE.PLAYING) pauseGame();
         else if (game.state === STATE.PAUSED) { UI.hidePause(); resumeGame(); }

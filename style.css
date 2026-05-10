@@ -799,6 +799,17 @@ html, body {
   font-size: calc(var(--ctrl-unit) * 3);
 }
 
+/* Weapon-swap button — sits to the left of reload, same row, slightly
+   smaller. Cycles through unlocked weapons on the player. */
+#btn-swap {
+  bottom: calc(var(--ctrl-unit) * 28);
+  right: calc(var(--ctrl-unit) * 22);
+  width: calc(var(--ctrl-unit) * 14);
+  height: calc(var(--ctrl-unit) * 14);
+  font-size: calc(var(--ctrl-unit) * 2.4);
+  line-height: 1.1;
+}
+
 #btn-pause {
   top: calc(var(--ctrl-unit) * 2);
   right: calc(var(--ctrl-unit) * 2);
@@ -843,9 +854,10 @@ html, body {
   #enemy-count, #score-info { font-size: calc(var(--ctrl-unit) * 1.8); margin-top: 2px; }
   #combo-info { font-size: calc(var(--ctrl-unit) * 2); margin-top: 2px; }
 
-  /* Weapon panel: lift well above the fire / run / reload cluster. */
+  /* Weapon panel: lift above the reload + swap row so ammo is always
+     readable while the right thumb hovers over the action buttons. */
   #hud-bottom-right {
-    bottom: calc(var(--ctrl-unit) * 30);
+    bottom: calc(var(--ctrl-unit) * 46);
     right: calc(var(--ctrl-unit) * 2);
     padding: calc(var(--ctrl-unit) * 1.2) calc(var(--ctrl-unit) * 1.8);
   }
