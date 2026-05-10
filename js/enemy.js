@@ -296,18 +296,55 @@ const Enemies = (() => {
   }
 
   // Splitter death: spawn `splitCount` smaller children around the corpse.
-  function spawnSplitChildren(parent, enemies) {
+  // Each child gets 24 candidate positions (3 rings × 8 angles); valid means
+  // walkable AND not inside the player's hitbox (otherwise children deal
+  // unavoidable melee damage on the next frame). Falls back to parent's tile
+  // if every candidate fails so the split mechanic never silently no-ops.
+  function spawnSplitChildren(parent, enemies, player) {
     const childType = parent.type.splitsInto;
     if (!childType || !types[childType]) return;
     const count = parent.type.splitCount || 2;
     const childRadius = types[childType].radius;
+    const playerSafeDist = (player ? player.radius : 0.25) + childRadius + 0.1;
+    const psd2 = playerSafeDist * playerSafeDist;
+
+    function isValid(x, y) {
+      if (!GameMap.canMove(x, y, childRadius)) return false;
+      if (player) {
+        const pdx = x - player.x, pdy = y - player.y;
+        if (pdx * pdx + pdy * pdy < psd2) return false;
+      }
+      return true;
+    }
+
+    const ringDistances = [
+      parent.type.radius + childRadius + 0.05,
+      parent.type.radius + childRadius - 0.05,
+      childRadius + 0.05
+    ];
+
     for (let i = 0; i < count; i++) {
-      const a = (i / count) * Math.PI * 2 + Math.random() * 0.6;
-      const r = parent.type.radius + childRadius + 0.05;
-      const x = parent.x + Math.cos(a) * r;
-      const y = parent.y + Math.sin(a) * r;
-      if (GameMap.canMove(x, y, childRadius)) {
-        const child = create(childType, x, y, parent.damageMult);
+      const baseAngle = (i / count) * Math.PI * 2;
+      let placed = false;
+      for (const r of ringDistances) {
+        for (let j = 0; j < 8 && !placed; j++) {
+          const a = baseAngle + (j / 8) * Math.PI * 2 + Math.random() * 0.2;
+          const x = parent.x + Math.cos(a) * r;
+          const y = parent.y + Math.sin(a) * r;
+          if (isValid(x, y)) {
+            const child = create(childType, x, y, parent.damageMult);
+            child.isChild = true;
+            enemies.push(child);
+            placed = true;
+          }
+        }
+        if (placed) break;
+      }
+      // Last-resort: spawn on the parent's tile. Enemy collision separation
+      // (in update()) will push it out on the next frame. Better than the
+      // splitter giving the player full score with no follow-up threat.
+      if (!placed) {
+        const child = create(childType, parent.x, parent.y, parent.damageMult);
         child.isChild = true;
         enemies.push(child);
       }
@@ -324,7 +361,7 @@ const Enemies = (() => {
       e.alive = true;
       detonateBomber(e, player, enemies, particles);
     } else if (e.type.splitsInto) {
-      spawnSplitChildren(e, enemies);
+      spawnSplitChildren(e, enemies, player);
     }
   }
 
