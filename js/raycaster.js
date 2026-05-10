@@ -157,13 +157,14 @@ const Raycaster = (() => {
       // Short walls render half-height (sitting on the floor), far→near so
       // closer barricades overdraw farther ones.
       let nearestShortVisible = Infinity;
+      const shortTopY = Math.floor(horizon);
       for (let i = shortHits.length - 1; i >= 0; i--) {
         const h = shortHits[i];
         if (tallHit && h.perpDist >= tallHit.perpDist) continue;
         if (h.perpDist < nearestShortVisible) nearestShortVisible = h.perpDist;
         const halfH = Math.floor(H / h.perpDist / 2);
-        const drawStart = horizon;
-        const drawEnd = horizon + halfH;
+        const drawStart = shortTopY;
+        const drawEnd = drawStart + halfH;
         const wallU = h.side === 0
           ? (player.y + h.perpDist * rayDirY)
           : (player.x + h.perpDist * rayDirX);
