@@ -16,6 +16,10 @@ const Raycaster = (() => {
     ctx = canvas.getContext('2d');
     resize();
     window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', resize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', resize);
+    }
   }
 
   function resize() {
@@ -23,32 +27,16 @@ const Raycaster = (() => {
     const winH = window.innerHeight;
     const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
-    if (isTouch) {
-      // Cap aspect at 16:9 so portrait phones don't inflate the vertical FOV
-      // (wallH = H/dist) and turn walls into giant slabs. Letterbox the
-      // unused area; cap pixel width for performance.
-      const maxAspect = 16 / 9;
-      let fitW, fitH;
-      if (winW / winH < maxAspect) {
-        fitW = winW;
-        fitH = winW / maxAspect;
-      } else {
-        fitH = Math.min(winH, winW / maxAspect);
-        fitW = fitH * maxAspect;
-      }
-      const maxRenderW = 960;
-      const scale = Math.min(1, maxRenderW / fitW);
-      canvas.width = Math.floor(fitW * scale);
-      canvas.height = Math.floor(fitH * scale);
-      canvas.style.width = Math.round(fitW) + 'px';
-      canvas.style.height = Math.round(fitH) + 'px';
-    } else {
-      // Desktop: keep filling the viewport like before.
-      canvas.width = Math.min(winW, 1280);
-      canvas.height = Math.min(winH, 800);
-      canvas.style.width = winW + 'px';
-      canvas.style.height = winH + 'px';
-    }
+    // Always fill the viewport — no letterboxing. Cap internal pixel size for
+    // performance; mobile renders at a lower internal resolution and CSS
+    // upscales it.
+    const maxW = isTouch ? 960 : 1280;
+    const maxH = isTouch ? 540 : 800;
+    const scale = Math.min(1, maxW / winW, maxH / winH);
+    canvas.width = Math.max(1, Math.floor(winW * scale));
+    canvas.height = Math.max(1, Math.floor(winH * scale));
+    canvas.style.width = winW + 'px';
+    canvas.style.height = winH + 'px';
 
     W = canvas.width;
     H = canvas.height;
