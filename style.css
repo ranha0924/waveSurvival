@@ -483,6 +483,51 @@ html, body {
   font-weight: normal;
 }
 
+/* Daily-challenge panel — sits next to the all-time best, themed teal so
+   the eye reads the two leaderboards as separate things. */
+#daily-records {
+  margin: clamp(4px, 1vmin, 10px) 0 clamp(8px, 2vmin, 16px);
+  padding: clamp(6px, 1.6vmin, 14px) clamp(12px, 3vmin, 24px);
+  background: rgba(60, 200, 220, 0.06);
+  border: 1px solid rgba(80, 200, 220, 0.35);
+  border-radius: 8px;
+  max-width: 90vw;
+}
+.daily-records-title {
+  color: #6ee0ff;
+  font-size: clamp(13px, 2.4vmin, 17px);
+  letter-spacing: 2px;
+  margin-bottom: clamp(4px, 1.2vmin, 10px);
+  text-align: center;
+}
+.daily-records-title .daily-date {
+  color: #aaa;
+  font-size: 0.85em;
+  letter-spacing: 1px;
+  margin-left: 6px;
+}
+.daily-records-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: clamp(4px, 1vmin, 10px) clamp(14px, 3vmin, 28px);
+}
+.daily-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: clamp(12px, 2.1vmin, 15px);
+}
+.daily-row .label { color: #888; font-weight: bold; letter-spacing: 1.5px; }
+.daily-row .value { color: #fff; font-weight: bold; }
+.daily-row .value .empty { color: #555; font-weight: normal; }
+.daily-records-note {
+  margin-top: clamp(4px, 1vmin, 8px);
+  font-size: clamp(10px, 1.7vmin, 12px);
+  color: #777;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
 #nick-row {
   display: flex;
   align-items: center;

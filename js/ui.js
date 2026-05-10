@@ -154,17 +154,29 @@ const UI = (() => {
     _recordBannerTimer = setTimeout(() => wrap.classList.add('hidden'), 3000);
   }
 
-  // Title-screen best display + nickname input helpers.
-  function updateTitleRecords(records) {
+  // Title-screen best display + nickname input helpers. Renders both the
+  // all-time records and the daily-seed records (which auto-reset every day).
+  function updateTitleRecords(records, daily) {
     const wrap = $('best-records');
-    if (!wrap) return;
-    const fmt = (rec) => rec && rec.value > 0
-      ? `${rec.value.toLocaleString()}<span class="by"> by ${escapeHtml(rec.name || '익명')}</span>`
-      : '<span class="empty">기록 없음</span>';
-    $('best-wave-title').innerHTML  = fmt(records.bestWave);
-    $('best-score-title').innerHTML = fmt(records.bestScore);
-    $('best-kills-title').innerHTML = fmt(records.bestKills);
-    $('best-combo-title').innerHTML = fmt(records.bestCombo);
+    if (wrap) {
+      const fmt = (rec) => rec && rec.value > 0
+        ? `${rec.value.toLocaleString()}<span class="by"> by ${escapeHtml(rec.name || '익명')}</span>`
+        : '<span class="empty">기록 없음</span>';
+      $('best-wave-title').innerHTML  = fmt(records.bestWave);
+      $('best-score-title').innerHTML = fmt(records.bestScore);
+      $('best-kills-title').innerHTML = fmt(records.bestKills);
+      $('best-combo-title').innerHTML = fmt(records.bestCombo);
+    }
+    const dailyWrap = $('daily-records');
+    if (dailyWrap && daily) {
+      const dr = daily.records || {};
+      const fmtDaily = (rec) => rec && rec.value > 0
+        ? rec.value.toLocaleString()
+        : '<span class="empty">—</span>';
+      $('daily-date').textContent = daily.date || '';
+      $('daily-wave').innerHTML  = fmtDaily(dr.bestWave);
+      $('daily-score').innerHTML = fmtDaily(dr.bestScore);
+    }
   }
   function getNickInput() {
     const el = $('nick-input');
@@ -323,8 +335,9 @@ const UI = (() => {
     // Pick 3 random unique
     const picks = [];
     const usedIdx = new Set();
+    // Seeded so the daily run gets the same upgrade card pool at each wave.
     while (picks.length < 3 && usedIdx.size < pool.length) {
-      const idx = Math.floor(Math.random() * pool.length);
+      const idx = Random.int(pool.length);
       if (usedIdx.has(idx)) continue;
       usedIdx.add(idx);
       picks.push(pool[idx]);

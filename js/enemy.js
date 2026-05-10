@@ -44,6 +44,38 @@ const Enemies = (() => {
       eyeColor: '#ff00ff', bloodColor: [180, 40, 200],
       isBoss: true,
       summonCooldown: 6.0
+    },
+    // Suicide bomber. Low HP, fast, explodes on death OR when it gets too
+    // close to the player. Damages player + nearby enemies (chain potential).
+    bomber: {
+      id: 'bomber', name: '자폭형',
+      hp: 25, speed: 2.6, damage: 35, score: 220,
+      attackRange: 0.6, attackCooldown: 0.5,
+      ranged: false, radius: 0.32,
+      color: '#cc6611', headColor: '#882200',
+      eyeColor: '#ffee44', bloodColor: [255, 180, 60],
+      explodeRadius: 1.8,
+      explodeOnContact: true
+    },
+    // Splitter. Medium stats; on death spawns 2 smaller, faster children
+    // that do not split again (capped at one generation).
+    splitter: {
+      id: 'splitter', name: '분열형',
+      hp: 50, speed: 1.7, damage: 12, score: 250,
+      attackRange: 0.7, attackCooldown: 1.0,
+      ranged: false, radius: 0.4,
+      color: '#7733aa', headColor: '#441166',
+      eyeColor: '#dd66ff', bloodColor: [180, 60, 220],
+      splitsInto: 'splitterChild',
+      splitCount: 2
+    },
+    splitterChild: {
+      id: 'splitterChild', name: '분열체',
+      hp: 14, speed: 2.6, damage: 7, score: 80,
+      attackRange: 0.55, attackCooldown: 0.9,
+      ranged: false, radius: 0.22,
+      color: '#9955cc', headColor: '#552288',
+      eyeColor: '#ee99ff', bloodColor: [180, 60, 220]
     }
   };
 
@@ -79,6 +111,14 @@ const Enemies = (() => {
     const hasLOS = GameMap.hasLineOfSight(e.x, e.y, player.x, player.y, 25);
 
     if (hasLOS) e.seenPlayer = true;
+
+    // Bomber: detonate when in melee range. No score awarded (the player
+    // didn't earn the kill — they ate the explosion). Returns early so the
+    // rest of the AI doesn't run on a corpse.
+    if (e.type.explodeOnContact && dist < e.type.attackRange + 0.4 && hasLOS) {
+      detonateBomber(e, player, enemies, particles);
+      return;
+    }
 
     let moveX = 0, moveY = 0;
     if (dist > 0.001) {
@@ -223,6 +263,71 @@ const Enemies = (() => {
     }
   }
 
+  // Bomber explosion. Damages player + nearby enemies; spawns visual burst.
+  // Used both for "killed by bullet" and "got too close" code paths.
+  function detonateBomber(e, player, enemies, particles) {
+    if (!e.alive) return;
+    e.alive = false;
+    Player.spawnExplosion(particles, e.x, e.y);
+    Audio.shootShotgun();
+    const r = e.type.explodeRadius;
+    const r2 = r * r;
+    const dmg = e.type.damage * e.damageMult;
+    const dx = player.x - e.x, dy = player.y - e.y;
+    if (dx * dx + dy * dy < r2) {
+      Player.takeDamage(player, dmg);
+      UI.flashHit();
+    }
+    // Chain damage other enemies. We deal raw HP only — secondary deaths
+    // don't trigger their own onDeath effects, otherwise a tight clump of
+    // bombers would cascade across the map.
+    for (const o of enemies) {
+      if (o === e || !o.alive) continue;
+      const ox = o.x - e.x, oy = o.y - e.y;
+      if (ox * ox + oy * oy < r2) {
+        o.hp -= dmg * 0.7;
+        o.hitFlash = 0.1;
+        if (o.hp <= 0) {
+          o.alive = false;
+          Audio.enemyDeath();
+        }
+      }
+    }
+  }
+
+  // Splitter death: spawn `splitCount` smaller children around the corpse.
+  function spawnSplitChildren(parent, enemies) {
+    const childType = parent.type.splitsInto;
+    if (!childType || !types[childType]) return;
+    const count = parent.type.splitCount || 2;
+    const childRadius = types[childType].radius;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.6;
+      const r = parent.type.radius + childRadius + 0.05;
+      const x = parent.x + Math.cos(a) * r;
+      const y = parent.y + Math.sin(a) * r;
+      if (GameMap.canMove(x, y, childRadius)) {
+        const child = create(childType, x, y, parent.damageMult);
+        child.isChild = true;
+        enemies.push(child);
+      }
+    }
+  }
+
+  // Called from player.js after a bullet kill resolves. Lets enemy types
+  // run their own death side-effects (split, explode) without coupling
+  // player.js to specific type ids.
+  function onKilled(e, player, enemies, particles) {
+    if (e.type.explodeOnContact) {
+      // Bullet-killed bomber still detonates. alive is already false; reset
+      // so detonateBomber's guard passes, then immediately set false again.
+      e.alive = true;
+      detonateBomber(e, player, enemies, particles);
+    } else if (e.type.splitsInto) {
+      spawnSplitChildren(e, enemies);
+    }
+  }
+
   // Wave composition logic
   function buildWave(waveNum) {
     // Returns array of {type, scale}
@@ -244,7 +349,9 @@ const Enemies = (() => {
       ];
     }
 
-    // Wave 6+: mix all enemy types, scaling
+    // Wave 6+: mix all enemy types, scaling. Uses Random (seeded) so daily
+    // runs face the same composition order — that's the whole point of the
+    // daily-seed challenge.
     const total = Math.min(20, 8 + Math.floor((waveNum - 5) * 1.5));
     const isBossWave = waveNum % 5 === 0;
 
@@ -255,16 +362,18 @@ const Enemies = (() => {
 
     const remaining = total - (isBossWave ? 1 : 0);
     for (let i = 0; i < remaining; i++) {
-      const r = Math.random();
+      const r = Random.next();
       let t;
-      if (r < 0.40) t = 'grunt';
-      else if (r < 0.65) t = 'rusher';
-      else if (r < 0.85) t = 'tank';
-      else t = 'ranger';
+      if (r < 0.30) t = 'grunt';
+      else if (r < 0.50) t = 'rusher';
+      else if (r < 0.65) t = 'tank';
+      else if (r < 0.78) t = 'ranger';
+      else if (r < 0.90) t = 'bomber';
+      else t = 'splitter';
       out.push({ type: t, scale });
     }
     return out;
   }
 
-  return { types, create, update, updateProjectiles, buildWave };
+  return { types, create, update, updateProjectiles, buildWave, onKilled };
 })();

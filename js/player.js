@@ -186,7 +186,7 @@ const Player = (() => {
     for (const c of candidates) {
       if (hits >= maxHits) break;
       const dmg = c.headshot ? damage * 2 : damage;
-      damageEnemy(p, c.e, dmg, c.headshot, particles, scoreCallback);
+      damageEnemy(p, c.e, dmg, c.headshot, particles, enemies, scoreCallback);
       // Spawn impact particles at hit point
       const ix = p.x + dirX * c.proj;
       const iy = p.y + dirY * c.proj;
@@ -216,14 +216,14 @@ const Player = (() => {
         const d2 = dx * dx + dy * dy;
         if (d2 < r * r) {
           const splash = damage * 0.6;
-          damageEnemy(p, e, splash, false, particles, scoreCallback);
+          damageEnemy(p, e, splash, false, particles, enemies, scoreCallback);
         }
       }
       spawnExplosion(particles, impactX, impactY);
     }
   }
 
-  function damageEnemy(p, e, dmg, headshot, particles, scoreCallback) {
+  function damageEnemy(p, e, dmg, headshot, particles, enemies, scoreCallback) {
     e.hp -= dmg;
     e.hitFlash = 0.1;
     Audio.hit();
@@ -250,6 +250,8 @@ const Player = (() => {
       for (let i = 0; i < 14; i++) {
         spawnDeathParticle(particles, e.x, e.y, e.type.bloodColor || [180, 30, 30]);
       }
+      // Type-specific on-death side effects (bomber detonate, splitter spawn).
+      if (enemies && Enemies.onKilled) Enemies.onKilled(e, p, enemies, particles);
     }
   }
 
@@ -404,6 +406,7 @@ const Player = (() => {
   }
 
   return {
-    create, update, turn, shoot, startReload, switchWeapon, cycleWeapon, takeDamage, getWeapon
+    create, update, turn, shoot, startReload, switchWeapon, cycleWeapon, takeDamage, getWeapon,
+    spawnExplosion
   };
 })();
