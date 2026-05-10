@@ -130,7 +130,6 @@ const Player = (() => {
     p.shootCooldown = w.fireRate / p.fireRateMult;
     p.kickback = w.kickback;
     p.muzzleFlash = 1.0;
-    p.shake = w.kickback * 0.4;
     Audio[w.sound]();
 
     const damage = w.damage * p.damageMult;

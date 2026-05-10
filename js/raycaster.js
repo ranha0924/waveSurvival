@@ -5,6 +5,10 @@ const Raycaster = (() => {
   let canvas, ctx;
   let W, H;
   let zBuffer;
+  // Per-column distance to the nearest short (see-over) wall, used by sprites
+  // to clip their lower body so enemies behind a sandbag are obscured below
+  // the wall's top while remaining visible above it.
+  let shortDist;
   const FOV = Math.PI / 3; // 60deg
 
   function init(canvasEl) {
@@ -24,6 +28,7 @@ const Raycaster = (() => {
     W = canvas.width;
     H = canvas.height;
     zBuffer = new Float32Array(W);
+    shortDist = new Float32Array(W);
   }
 
   function render(player, enemies, particles, horizonOffset, theme) {
@@ -80,6 +85,8 @@ const Raycaster = (() => {
     const fogDist = theme.fogDist;
     const ambient = theme.ambient;
     const horizon = H / 2 + horizonOffset;
+
+    for (let i = 0; i < W; i++) shortDist[i] = Infinity;
 
     for (let x = 0; x < W; x++) {
       const cameraX = 2 * x / W - 1;
@@ -145,9 +152,11 @@ const Raycaster = (() => {
 
       // Short walls render half-height (sitting on the floor), far→near so
       // closer barricades overdraw farther ones.
+      let nearestShortVisible = Infinity;
       for (let i = shortHits.length - 1; i >= 0; i--) {
         const h = shortHits[i];
         if (tallHit && h.perpDist >= tallHit.perpDist) continue;
+        if (h.perpDist < nearestShortVisible) nearestShortVisible = h.perpDist;
         const halfH = Math.floor(H / h.perpDist / 2);
         const drawStart = horizon;
         const drawEnd = horizon + halfH;
@@ -156,6 +165,7 @@ const Raycaster = (() => {
           : (player.x + h.perpDist * rayDirX);
         drawWallColumn(x, drawStart, drawEnd, h.wallType, h.side, h.perpDist, wallU, fogDist, ambient);
       }
+      shortDist[x] = nearestShortVisible;
     }
   }
 
@@ -216,12 +226,19 @@ const Raycaster = (() => {
       if (fromCenter > 0.95) continue;
 
       const bodyTop = drawStartY + spriteH * 0.3;
-      const bodyBottom = drawStartY + spriteH;
+      let bodyBottom = drawStartY + spriteH;
       const headTop = drawStartY;
       const headBottom = drawStartY + spriteH * 0.3;
 
+      // If a short (see-over) wall stands between the player and this sprite
+      // in this column, clip the body at the horizon line — only the upper
+      // body should peek above the barricade.
+      if (proj.dist > shortDist[x]) bodyBottom = Math.min(bodyBottom, horizon);
+
       ctx.fillStyle = flash ? '#ffffff' : bodyColor;
-      if (fromCenter < 0.85) ctx.fillRect(x, bodyTop, 1, bodyBottom - bodyTop);
+      if (fromCenter < 0.85 && bodyBottom > bodyTop) {
+        ctx.fillRect(x, bodyTop, 1, bodyBottom - bodyTop);
+      }
       if (fromCenter < 0.5) {
         ctx.fillStyle = flash ? '#ffffff' : headColor;
         ctx.fillRect(x, headTop, 1, headBottom - headTop);
@@ -269,6 +286,7 @@ const Raycaster = (() => {
     const cx = Math.floor(drawX);
     if (cx < 0 || cx >= W) return;
     if (zBuffer[cx] < proj.dist) return;
+    if (proj.dist > shortDist[cx] && drawY > horizon) return;
     const fog = Math.min(1, proj.dist / theme.fogDist);
     ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.life * (1 - fog * 0.5)})`;
     ctx.fillRect(drawX - sz / 2, drawY - sz / 2, sz, sz);
