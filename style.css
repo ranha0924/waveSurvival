@@ -911,4 +911,67 @@ html, body {
 
   /* Stamina bar narrower so it doesn't dominate. */
   #stamina-container { height: 4px; }
+
+  /* ----- Game-over screen compaction -----
+     The full-fat layout (NEW RECORD header + 4-row result + 4-row record
+     compare + button) is taller than a phone in landscape. Center-aligning
+     it pushes the top off-screen even with overflow-y:auto. Anchor to the
+     top edge and shrink everything ~30%. */
+  #gameover-screen {
+    justify-content: flex-start;
+    padding-top: calc(var(--ctrl-unit) * 2);
+    padding-bottom: calc(var(--ctrl-unit) * 2);
+    gap: calc(var(--ctrl-unit) * 0.5);
+  }
+  #gameover-screen h2 {
+    font-size: calc(var(--ctrl-unit) * 4.5);
+    letter-spacing: 2px;
+    margin-bottom: calc(var(--ctrl-unit) * 1);
+  }
+  #gameover-screen #new-record-header {
+    margin: calc(var(--ctrl-unit) * 0.5) 0;
+  }
+  #gameover-screen #new-record-header .nr-title {
+    font-size: calc(var(--ctrl-unit) * 4.2);
+    letter-spacing: 2px;
+    /* Avoid the 1.05 scale clipping the title at the top edge on small
+       viewports — keep the pulse subtle. */
+    animation: nr-pulse-mobile 1.4s ease-in-out infinite;
+  }
+  #gameover-screen #new-record-header .nr-by {
+    font-size: calc(var(--ctrl-unit) * 2);
+    letter-spacing: 1px;
+  }
+  #gameover-screen .result {
+    margin: calc(var(--ctrl-unit) * 1) 0;
+    line-height: 1.5;
+  }
+  #gameover-screen .result-row { font-size: calc(var(--ctrl-unit) * 2.4); gap: 8px; }
+  #gameover-screen .result-row.sub {
+    font-size: calc(var(--ctrl-unit) * 1.7);
+    margin-top: calc(var(--ctrl-unit) * 0.5);
+  }
+  #gameover-screen .record-compare {
+    margin: calc(var(--ctrl-unit) * 1) 0;
+    padding: calc(var(--ctrl-unit) * 1.2) calc(var(--ctrl-unit) * 2);
+    min-width: 0;
+    width: min(90vw, 360px);
+  }
+  #gameover-screen .cmp-title {
+    font-size: calc(var(--ctrl-unit) * 1.8);
+    margin-bottom: calc(var(--ctrl-unit) * 0.5);
+  }
+  #gameover-screen .cmp-row { font-size: calc(var(--ctrl-unit) * 2); padding: 1px 0; }
+  #gameover-screen .cmp-row .new-pill { padding: 1px 6px; font-size: 0.7em; }
+  #gameover-screen .big-btn {
+    margin-top: calc(var(--ctrl-unit) * 1);
+    font-size: calc(var(--ctrl-unit) * 2.6);
+    padding: calc(var(--ctrl-unit) * 1.2) calc(var(--ctrl-unit) * 4);
+  }
+}
+
+/* Subtler pulse for mobile so the title doesn't visually clip the top edge. */
+@keyframes nr-pulse-mobile {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.02); }
 }
