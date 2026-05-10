@@ -19,12 +19,37 @@ const Raycaster = (() => {
   }
 
   function resize() {
-    const targetW = Math.min(window.innerWidth, 1280);
-    const targetH = Math.min(window.innerHeight, 800);
-    canvas.width = Math.floor(targetW);
-    canvas.height = Math.floor(targetH);
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+    if (isTouch) {
+      // Cap aspect at 16:9 so portrait phones don't inflate the vertical FOV
+      // (wallH = H/dist) and turn walls into giant slabs. Letterbox the
+      // unused area; cap pixel width for performance.
+      const maxAspect = 16 / 9;
+      let fitW, fitH;
+      if (winW / winH < maxAspect) {
+        fitW = winW;
+        fitH = winW / maxAspect;
+      } else {
+        fitH = Math.min(winH, winW / maxAspect);
+        fitW = fitH * maxAspect;
+      }
+      const maxRenderW = 960;
+      const scale = Math.min(1, maxRenderW / fitW);
+      canvas.width = Math.floor(fitW * scale);
+      canvas.height = Math.floor(fitH * scale);
+      canvas.style.width = Math.round(fitW) + 'px';
+      canvas.style.height = Math.round(fitH) + 'px';
+    } else {
+      // Desktop: keep filling the viewport like before.
+      canvas.width = Math.min(winW, 1280);
+      canvas.height = Math.min(winH, 800);
+      canvas.style.width = winW + 'px';
+      canvas.style.height = winH + 'px';
+    }
+
     W = canvas.width;
     H = canvas.height;
     zBuffer = new Float32Array(W);
