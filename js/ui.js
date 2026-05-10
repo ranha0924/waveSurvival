@@ -165,14 +165,21 @@ const UI = (() => {
 
   function getWeaponUnlockUpgrades(player) {
     const out = [];
+    const swap = (p, weapon) => {
+      p.loadout[weapon].unlocked = true;
+      p.currentWeapon = weapon;
+      p.reloading = false;
+      p.reloadTimer = 0;
+      p.shootCooldown = 0.2;
+    };
     if (!player.loadout.shotgun.unlocked) {
-      out.push({ cat: 'utility', icon: '💣', title: '샷건 해금', desc: '근거리 광역 무기 (키 2)', apply: (p) => { p.loadout.shotgun.unlocked = true; p.currentWeapon = 'shotgun'; } });
+      out.push({ cat: 'utility', icon: '💣', title: '샷건 해금', desc: '근거리 광역 무기 (키 2)', apply: (p) => swap(p, 'shotgun') });
     }
     if (!player.loadout.machinegun.unlocked) {
-      out.push({ cat: 'utility', icon: '🔥', title: '기관총 해금', desc: '연사력 높은 무기 (키 3)', apply: (p) => { p.loadout.machinegun.unlocked = true; p.currentWeapon = 'machinegun'; } });
+      out.push({ cat: 'utility', icon: '🔥', title: '기관총 해금', desc: '연사력 높은 무기 (키 3)', apply: (p) => swap(p, 'machinegun') });
     }
     if (!player.loadout.sniper.unlocked) {
-      out.push({ cat: 'utility', icon: '🎯', title: '저격총 해금', desc: '원거리 고데미지 (키 4)', apply: (p) => { p.loadout.sniper.unlocked = true; p.currentWeapon = 'sniper'; } });
+      out.push({ cat: 'utility', icon: '🎯', title: '저격총 해금', desc: '원거리 고데미지 (키 4)', apply: (p) => swap(p, 'sniper') });
     }
     return out;
   }

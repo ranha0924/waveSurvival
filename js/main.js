@@ -66,18 +66,35 @@
     });
   }
 
+  // Map physical key codes to canonical names used by the game.
+  // Uses e.code (layout / IME independent) so Korean IME, Dvorak, etc. work.
+  function codeToName(code) {
+    if (code.startsWith('Key')) return code.slice(3).toLowerCase();   // KeyW -> 'w'
+    if (code.startsWith('Digit')) return code.slice(5);               // Digit1 -> '1'
+    if (code === 'ShiftLeft' || code === 'ShiftRight') return 'shift';
+    if (code === 'ControlLeft' || code === 'ControlRight') return 'control';
+    if (code === 'Escape') return 'escape';
+    if (code === 'Space') return 'space';
+    if (code === 'ArrowUp') return 'arrowup';
+    if (code === 'ArrowDown') return 'arrowdown';
+    if (code === 'ArrowLeft') return 'arrowleft';
+    if (code === 'ArrowRight') return 'arrowright';
+    return null;
+  }
+
   function setupInput() {
     window.addEventListener('keydown', (e) => {
-      const k = e.key.toLowerCase();
+      const k = codeToName(e.code);
+      if (!k) return;
+      // Ignore auto-repeat for one-shot actions
+      const isRepeat = e.repeat;
       game.keys[k] = true;
 
-      if (game.state === STATE.PLAYING) {
+      if (game.state === STATE.PLAYING && !isRepeat) {
         if (k === 'r') Player.startReload(game.player);
         if (k >= '1' && k <= '4') Player.switchWeapon(game.player, k);
-        if (k === 'escape') {
-          pauseGame();
-        }
-      } else if (game.state === STATE.PAUSED) {
+        if (k === 'escape') pauseGame();
+      } else if (game.state === STATE.PAUSED && !isRepeat) {
         if (k === 'escape') {
           UI.hidePause();
           requestPointerLock();
@@ -85,9 +102,12 @@
       }
     });
     window.addEventListener('keyup', (e) => {
-      const k = e.key.toLowerCase();
+      const k = codeToName(e.code);
+      if (!k) return;
       game.keys[k] = false;
     });
+    // Clear keys when window loses focus to avoid stuck-key state
+    window.addEventListener('blur', () => { game.keys = {}; game.mouseDown = false; });
 
     document.addEventListener('mousemove', (e) => {
       if (game.state === STATE.PLAYING && game.pointerLocked) {
@@ -113,10 +133,16 @@
 
     document.addEventListener('pointerlockchange', () => {
       game.pointerLocked = document.pointerLockElement === game.canvas;
-      if (!game.pointerLocked && game.state === STATE.PLAYING) {
+      if (game.pointerLocked) {
+        UI.hideLockPrompt();
+      } else if (game.state === STATE.PLAYING) {
         // Auto-pause when pointer lock lost
         pauseGame();
       }
+    });
+    // If pointer-lock request errors (browser denies it), show prompt
+    document.addEventListener('pointerlockerror', () => {
+      if (game.state === STATE.PLAYING) UI.showLockPrompt();
     });
   }
 
@@ -139,8 +165,15 @@
     game.particles = [];
     game.score = { score: 0 };
     game.wave = { number: 0, enemiesAlive: 0, queue: [], spawnTimer: 0, spawnInterval: 0.6 };
+    // Clear any stale input state from previous run / menu interaction
+    game.keys = {};
+    game.mouseDown = false;
+    game.lastTime = performance.now();
 
     UI.hideTitle();
+    UI.hideGameOver();
+    UI.hidePause();
+    UI.hideUpgradeMenu();
     UI.showHud();
     game.state = STATE.PLAYING;
 

@@ -81,33 +81,31 @@ const Enemies = (() => {
     if (hasLOS) e.seenPlayer = true;
 
     let moveX = 0, moveY = 0;
-    if (e.seenPlayer && dist > 0.001) {
+    if (dist > 0.001) {
       if (e.type.ranged) {
-        // Ranged: maintain preferred distance
+        // Ranged: maintain preferred distance from player
         const target = e.type.preferredDist;
         if (Math.abs(dist - target) > 0.4) {
           const dir = dist > target ? 1 : -1;
           moveX = (dx / dist) * dir;
           moveY = (dy / dist) * dir;
         }
-        // Attack
+        // Attack only when LoS and in range
         if (hasLOS && dist < e.type.attackRange && e.attackTimer <= 0) {
           fireProjectile(e, player, projectiles);
           e.attackTimer = e.type.attackCooldown;
         }
       } else {
-        // Melee: chase
-        if (dist > e.type.attackRange) {
+        // Melee: ALWAYS chase player. Walls handled by tryMove sliding.
+        if (dist > e.type.attackRange * 0.85) {
           moveX = dx / dist;
           moveY = dy / dist;
         }
-        if (dist < e.type.attackRange && e.attackTimer <= 0) {
-          // Attack player
-          if (hasLOS) {
-            Player.takeDamage(player, e.type.damage * e.damageMult);
-            UI.flashHit();
-            e.attackTimer = e.type.attackCooldown;
-          }
+        // Attack only with LoS so they don't hit you through walls
+        if (dist < e.type.attackRange && hasLOS && e.attackTimer <= 0) {
+          Player.takeDamage(player, e.type.damage * e.damageMult);
+          UI.flashHit();
+          e.attackTimer = e.type.attackCooldown;
         }
       }
 
@@ -119,15 +117,6 @@ const Enemies = (() => {
           e.summonTimer = e.type.summonCooldown;
         }
       }
-    } else {
-      // Wander
-      e.wanderTimer -= dt;
-      if (e.wanderTimer <= 0) {
-        e.wanderAngle = Math.random() * Math.PI * 2;
-        e.wanderTimer = 1 + Math.random() * 2;
-      }
-      moveX = Math.cos(e.wanderAngle) * 0.4;
-      moveY = Math.sin(e.wanderAngle) * 0.4;
     }
 
     // Avoid overlap with other enemies
@@ -150,9 +139,9 @@ const Enemies = (() => {
     const moved = GameMap.tryMove(e.x, e.y, dxs, dys, e.type.radius);
     e.x = moved.x; e.y = moved.y;
 
-    // Stuck detection: if barely moved towards target
+    // Stuck detection: if barely moved towards target, sidestep
     const movedDist = Math.sqrt((e.x - e.lastX) ** 2 + (e.y - e.lastY) ** 2);
-    if (movedDist < 0.02 && e.seenPlayer) {
+    if (movedDist < 0.02 && (moveX !== 0 || moveY !== 0)) {
       e.stuckTimer += dt;
       if (e.stuckTimer > 0.5) {
         // Try sidestep
