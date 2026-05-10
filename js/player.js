@@ -45,11 +45,16 @@ const Player = (() => {
   function getWeapon(p) { return p.loadout[p.currentWeapon]; }
 
   function update(p, dt, input) {
-    // Movement
+    // Movement — keys feed digital fwd/right; an optional analog `input.move`
+    // (from a virtual joystick) overrides them when present.
     let dx = 0, dy = 0;
-    const fwd = (input.keys['w'] ? 1 : 0) - (input.keys['s'] ? 1 : 0);
-    const right = (input.keys['d'] ? 1 : 0) - (input.keys['a'] ? 1 : 0);
-    const running = !!input.keys['shift'] && p.stamina > 0 && fwd !== 0;
+    let fwd = (input.keys['w'] ? 1 : 0) - (input.keys['s'] ? 1 : 0);
+    let right = (input.keys['d'] ? 1 : 0) - (input.keys['a'] ? 1 : 0);
+    if (input.move && (input.move.fwd !== 0 || input.move.right !== 0)) {
+      fwd = input.move.fwd;
+      right = input.move.right;
+    }
+    const running = !!input.keys['shift'] && p.stamina > 0 && Math.abs(fwd) > 0.1;
 
     let speed = (running ? p.runSpeed : p.moveSpeed) * p.moveSpeedMult;
 
