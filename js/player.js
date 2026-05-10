@@ -38,7 +38,10 @@ const Player = (() => {
       lastKillTime: -10,
       comboCount: 0,
       // Stats
-      kills: 0
+      kills: 0,
+      headshots: 0,
+      bossKills: 0,
+      maxComboReached: 0
     };
   }
 
@@ -235,11 +238,14 @@ const Player = (() => {
         p.comboCount = 0;
       }
       p.lastKillTime = t;
+      if (p.comboCount > p.maxComboReached) p.maxComboReached = p.comboCount;
       const comboMult = [1, 1.5, 2, 3][p.comboCount] || 1;
       const headMult = headshot ? 2 : 1;
       const score = Math.floor(e.type.score * comboMult * headMult);
       scoreCallback(score, e);
       p.kills++;
+      if (headshot) p.headshots++;
+      if (e.type.isBoss) p.bossKills++;
       // Death particles
       for (let i = 0; i < 14; i++) {
         spawnDeathParticle(particles, e.x, e.y, e.type.bloodColor || [180, 30, 30]);

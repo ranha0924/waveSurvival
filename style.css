@@ -272,6 +272,60 @@ html, body {
   animation: banner-fade 2.5s ease-out forwards;
 }
 
+/* "신기록" banner — bigger, golden-red glow, pinned higher than wave banner. */
+#record-banner {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  z-index: 30;
+}
+#record-banner-title {
+  font-size: clamp(28px, 8vmin, 64px);
+  font-weight: 900;
+  color: #ffd84a;
+  text-shadow: 0 0 20px rgba(255, 200, 40, 0.95),
+               0 0 40px rgba(255, 80, 30, 0.6),
+               0 0 6px #000;
+  letter-spacing: clamp(2px, 0.8vmin, 6px);
+}
+#record-banner-sub {
+  margin-top: clamp(4px, 1vmin, 10px);
+  font-size: clamp(16px, 3.6vmin, 28px);
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 200, 40, 0.6), 0 0 4px #000;
+  letter-spacing: 2px;
+}
+
+@keyframes record-banner-fade {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); filter: blur(8px); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); filter: blur(0); }
+  30%  { transform: translate(-50%, -50%) scale(1.0); }
+  80%  { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+/* Small "BEST 12" tag next to wave/score in the HUD. */
+.best-tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  color: #ffd84a;
+  letter-spacing: 1px;
+  vertical-align: middle;
+  opacity: 0.85;
+  font-weight: normal;
+}
+.best-tag:empty { display: none; }
+
+/* When current wave/score passes the snapshot best, glow it. */
+#wave-num.beat-best, #score.beat-best {
+  color: #ffd84a;
+  text-shadow: 0 0 12px rgba(255, 216, 74, 0.9);
+}
+
 @keyframes banner-fade {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
   20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -379,6 +433,86 @@ html, body {
   box-shadow: 0 6px 0 #111;
 }
 
+/* Title screen: best-records panel + nickname input row. */
+#best-records {
+  margin: clamp(6px, 1.5vmin, 14px) 0 clamp(8px, 2vmin, 20px);
+  padding: clamp(8px, 2vmin, 18px) clamp(14px, 3.5vmin, 28px);
+  background: rgba(255, 200, 40, 0.06);
+  border: 1px solid rgba(255, 200, 40, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(255, 170, 60, 0.15) inset;
+  max-width: 90vw;
+}
+.best-records-title {
+  color: #ffd84a;
+  font-size: clamp(14px, 2.6vmin, 18px);
+  letter-spacing: 2px;
+  margin-bottom: clamp(6px, 1.4vmin, 12px);
+  text-align: center;
+}
+.best-records-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: clamp(4px, 1vmin, 10px) clamp(14px, 3vmin, 28px);
+}
+.best-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: clamp(12px, 2.2vmin, 16px);
+}
+.best-row .label {
+  color: #aaa;
+  letter-spacing: 1.5px;
+  font-weight: bold;
+}
+.best-row .value {
+  color: #fff;
+  font-weight: bold;
+}
+.best-row .value .by {
+  color: #ffaa44;
+  font-weight: normal;
+  margin-left: 4px;
+  font-size: 0.85em;
+}
+.best-row .value .empty {
+  color: #666;
+  font-style: italic;
+  font-weight: normal;
+}
+
+#nick-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.5vmin, 12px);
+  margin-bottom: clamp(8px, 2vmin, 16px);
+}
+#nick-row label {
+  color: #ffaa44;
+  font-size: clamp(12px, 2.2vmin, 15px);
+  letter-spacing: 2px;
+  font-weight: bold;
+}
+#nick-input {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 200, 40, 0.4);
+  color: #fff;
+  font-size: clamp(13px, 2.4vmin, 17px);
+  padding: clamp(6px, 1.2vmin, 10px) clamp(10px, 2vmin, 16px);
+  border-radius: 4px;
+  outline: none;
+  width: clamp(160px, 30vmin, 240px);
+  font-family: inherit;
+  letter-spacing: 1px;
+}
+#nick-input:focus {
+  border-color: #ffd84a;
+  box-shadow: 0 0 10px rgba(255, 216, 74, 0.4);
+}
+#nick-input::placeholder { color: #777; }
+
 .controls-help {
   margin-top: clamp(10px, 3vmin, 30px);
   background: rgba(255, 255, 255, 0.05);
@@ -466,13 +600,99 @@ html, body {
 
 .result {
   font-size: clamp(14px, 2.8vmin, 22px);
-  margin: clamp(10px, 2vmin, 20px) 0 clamp(14px, 3vmin, 30px);
+  margin: clamp(10px, 2vmin, 20px) 0 clamp(14px, 3vmin, 24px);
   line-height: 1.8;
+  text-align: center;
+}
+
+.result-row {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+.result-row.sub {
+  font-size: clamp(11px, 1.9vmin, 14px);
+  color: #aaa;
+  margin-top: clamp(4px, 1vmin, 10px);
+  letter-spacing: 1px;
 }
 
 .result span {
   color: #ffaa44;
   font-weight: bold;
+}
+
+/* GAME OVER — NEW RECORD header */
+#new-record-header {
+  margin: clamp(4px, 1vmin, 10px) 0 clamp(8px, 2vmin, 16px);
+  text-align: center;
+}
+#new-record-header .nr-title {
+  font-size: clamp(22px, 6vmin, 44px);
+  font-weight: 900;
+  color: #ffd84a;
+  letter-spacing: clamp(2px, 0.8vmin, 6px);
+  text-shadow: 0 0 18px rgba(255, 200, 40, 0.95),
+               0 0 30px rgba(255, 80, 30, 0.6),
+               0 0 4px #000;
+  animation: nr-pulse 1.4s ease-in-out infinite;
+}
+#new-record-header .nr-by {
+  margin-top: 4px;
+  font-size: clamp(12px, 2.4vmin, 18px);
+  color: #fff;
+  letter-spacing: 2px;
+}
+#new-record-header .nr-by span { color: #ffaa44; font-weight: bold; }
+
+@keyframes nr-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+
+/* GAME OVER — record comparison block */
+.record-compare {
+  margin: clamp(6px, 1.5vmin, 14px) 0 clamp(12px, 3vmin, 24px);
+  padding: clamp(8px, 2vmin, 16px) clamp(14px, 3vmin, 24px);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  min-width: clamp(260px, 50vmin, 420px);
+}
+.cmp-title {
+  color: #ffaa44;
+  font-size: clamp(12px, 2.2vmin, 15px);
+  letter-spacing: 2px;
+  text-align: center;
+  margin-bottom: clamp(4px, 1vmin, 10px);
+}
+.cmp-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: clamp(13px, 2.4vmin, 17px);
+  color: #ddd;
+  letter-spacing: 1px;
+  padding: 2px 0;
+}
+.cmp-row.broke { color: #ffd84a; }
+.cmp-row .cur { color: #fff; font-weight: bold; }
+.cmp-row .prev { color: #888; font-size: 0.85em; margin-left: 4px; }
+.cmp-row .diff { color: #66dd88; font-weight: bold; margin-left: 6px; font-size: 0.9em; }
+.cmp-row .need { color: #aa6655; margin-left: 6px; font-size: 0.85em; font-style: italic; }
+.cmp-row .new-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  background: linear-gradient(180deg, #ffd84a, #cc8822);
+  color: #1a1a1a;
+  font-size: 0.75em;
+  font-weight: 900;
+  letter-spacing: 1px;
+  border-radius: 10px;
+  vertical-align: middle;
+  box-shadow: 0 0 8px rgba(255, 200, 40, 0.6);
 }
 
 #lock-prompt {
