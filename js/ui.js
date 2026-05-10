@@ -14,9 +14,7 @@ const UI = (() => {
 
   function updateHud(player, wave, scoreState) {
     // HP
-    const hpPct = (player.hp / player.maxHp) * 100;
-    $('hp-bar').style.width = hpPct + '%';
-    $('hp-text').textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
+    $('hp-text').textContent = Math.ceil(player.hp);
 
     // Stamina
     $('stamina-bar').style.width = (player.stamina / player.maxStamina * 100) + '%';
