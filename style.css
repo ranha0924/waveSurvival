@@ -26,12 +26,12 @@ html, body {
 
 #game-canvas {
   display: block;
-  width: 100vw;
-  height: 100vh;
   cursor: none;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: #000;
+  /* Width / height are set inline by Raycaster.resize() to maintain a
+     landscape aspect ratio on mobile while filling the viewport on desktop. */
 }
 
 .hidden {
@@ -487,30 +487,40 @@ html, body {
   display: none;
 }
 
+/* All control sizes scale off the smaller viewport edge so phones in any
+   orientation get appropriately sized buttons. svmin = 1% of the smaller
+   viewport edge; with fallback to vmin for older mobile browsers. */
+:root {
+  --ctrl-unit: 1vmin;
+}
+@supports (top: 1svmin) {
+  :root { --ctrl-unit: 1svmin; }
+}
+
 #joystick {
   position: absolute;
-  bottom: 40px;
-  left: 40px;
-  width: 150px;
-  height: 150px;
+  bottom: calc(var(--ctrl-unit) * 4);
+  left: calc(var(--ctrl-unit) * 4);
+  width: calc(var(--ctrl-unit) * 28);
+  height: calc(var(--ctrl-unit) * 28);
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.35);
-  border: 3px solid rgba(255, 255, 255, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.35);
   pointer-events: auto;
   touch-action: none;
 }
 
 #joystick-thumb {
   position: absolute;
-  width: 70px;
-  height: 70px;
+  width: calc(var(--ctrl-unit) * 12);
+  height: calc(var(--ctrl-unit) * 12);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.45);
   border: 2px solid rgba(255, 255, 255, 0.6);
   left: 50%;
   top: 50%;
-  margin-left: -35px;
-  margin-top: -35px;
+  margin-left: calc(var(--ctrl-unit) * -6);
+  margin-top: calc(var(--ctrl-unit) * -6);
   transform: translate(0, 0);
   pointer-events: none;
 }
@@ -519,7 +529,7 @@ html, body {
   position: absolute;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.4);
-  border: 3px solid rgba(255, 255, 255, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.4);
   color: #fff;
   font-weight: bold;
   display: flex;
@@ -535,46 +545,36 @@ html, body {
 }
 
 #btn-fire {
-  bottom: 50px;
-  right: 40px;
-  width: 130px;
-  height: 130px;
-  font-size: 24px;
+  bottom: calc(var(--ctrl-unit) * 5);
+  right: calc(var(--ctrl-unit) * 4);
+  width: calc(var(--ctrl-unit) * 22);
+  height: calc(var(--ctrl-unit) * 22);
+  font-size: calc(var(--ctrl-unit) * 4);
   background: rgba(220, 60, 60, 0.45);
   border-color: rgba(255, 120, 120, 0.7);
 }
 
 #btn-run {
-  bottom: 80px;
-  right: 195px;
-  width: 95px;
-  height: 95px;
-  font-size: 18px;
+  bottom: calc(var(--ctrl-unit) * 8);
+  right: calc(var(--ctrl-unit) * 28);
+  width: calc(var(--ctrl-unit) * 16);
+  height: calc(var(--ctrl-unit) * 16);
+  font-size: calc(var(--ctrl-unit) * 3.2);
 }
 
 #btn-reload {
-  bottom: 200px;
-  right: 50px;
-  width: 90px;
-  height: 90px;
-  font-size: 18px;
+  bottom: calc(var(--ctrl-unit) * 28);
+  right: calc(var(--ctrl-unit) * 5);
+  width: calc(var(--ctrl-unit) * 15);
+  height: calc(var(--ctrl-unit) * 15);
+  font-size: calc(var(--ctrl-unit) * 3);
 }
 
 #btn-pause {
-  top: 20px;
-  right: 20px;
-  width: 50px;
-  height: 50px;
-  font-size: 22px;
+  top: calc(var(--ctrl-unit) * 2);
+  right: calc(var(--ctrl-unit) * 2);
+  width: calc(var(--ctrl-unit) * 9);
+  height: calc(var(--ctrl-unit) * 9);
+  font-size: calc(var(--ctrl-unit) * 4);
   letter-spacing: 2px;
-}
-
-/* On narrow phones, shrink controls a bit */
-@media (max-height: 500px), (max-width: 700px) {
-  #joystick { width: 120px; height: 120px; bottom: 20px; left: 20px; }
-  #joystick-thumb { width: 56px; height: 56px; margin-left: -28px; margin-top: -28px; }
-  #btn-fire { width: 100px; height: 100px; bottom: 30px; right: 25px; font-size: 20px; }
-  #btn-run { width: 80px; height: 80px; bottom: 50px; right: 145px; font-size: 16px; }
-  #btn-reload { width: 75px; height: 75px; bottom: 150px; right: 35px; font-size: 16px; }
-  #btn-pause { width: 44px; height: 44px; top: 12px; right: 12px; font-size: 18px; }
 }
