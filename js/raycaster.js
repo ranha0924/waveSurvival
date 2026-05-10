@@ -59,23 +59,27 @@ const Raycaster = (() => {
 
   function drawSky(theme, horizonOffset) {
     const horizon = H / 2 + horizonOffset;
-    const top = Math.max(0, horizon - H);
+    // Over-paint past the canvas edges so the camera-shake translate never
+    // exposes uncleared pixels along the borders.
+    const M = 64;
+    const top = -M;
     const grad = ctx.createLinearGradient(0, top, 0, horizon);
     grad.addColorStop(0, theme.skyTop);
     grad.addColorStop(0.6, theme.skyMid);
     grad.addColorStop(1, theme.skyBottom);
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, Math.max(0, horizon));
+    ctx.fillRect(-M, -M, W + 2 * M, Math.max(0, horizon) + M);
   }
 
   function drawFloor(theme, horizonOffset) {
     const horizon = H / 2 + horizonOffset;
     if (horizon >= H) return;
-    const grad = ctx.createLinearGradient(0, horizon, 0, H);
+    const M = 64;
+    const grad = ctx.createLinearGradient(0, horizon, 0, H + M);
     grad.addColorStop(0, theme.floorFar);
     grad.addColorStop(1, theme.floorNear);
     ctx.fillStyle = grad;
-    ctx.fillRect(0, horizon, W, H - horizon);
+    ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
   }
 
   function castWalls(player, horizonOffset, theme) {
