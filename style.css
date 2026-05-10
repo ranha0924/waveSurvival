@@ -18,6 +18,7 @@ html, body {
   position: relative;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,12 +27,13 @@ html, body {
 
 #game-canvas {
   display: block;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   cursor: none;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: #000;
-  /* Width / height are set inline by Raycaster.resize() to maintain a
-     landscape aspect ratio on mobile while filling the viewport on desktop. */
 }
 
 .hidden {
@@ -55,7 +57,7 @@ html, body {
 #hp-display {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: clamp(4px, 1.2vmin, 12px);
   font-weight: bold;
   line-height: 1;
 }
@@ -584,4 +586,52 @@ html, body {
   height: calc(var(--ctrl-unit) * 9);
   font-size: calc(var(--ctrl-unit) * 4);
   letter-spacing: 2px;
+}
+
+/* ===== Touch-device HUD overrides =====
+   Repacks the HUD so nothing overlaps the on-screen joystick / action
+   buttons / minimap on phones. Uses pointer:coarse so it only triggers on
+   touch devices, leaving desktop layout untouched. */
+@media (pointer: coarse) {
+  /* Smaller minimap so it doesn't dominate the bottom-left quadrant. */
+  #minimap {
+    width: calc(var(--ctrl-unit) * 22);
+    height: calc(var(--ctrl-unit) * 22);
+    bottom: calc(var(--ctrl-unit) * 36);
+    left: calc(var(--ctrl-unit) * 2);
+  }
+
+  /* HP moved to top-left corner so it never sits over the gun / fire btn. */
+  #hud-bottom-left {
+    bottom: auto;
+    top: calc(var(--ctrl-unit) * 2);
+    left: calc(var(--ctrl-unit) * 2);
+  }
+  #hp-display { gap: calc(var(--ctrl-unit) * 1); }
+  #hp-display .hp-heart { font-size: calc(var(--ctrl-unit) * 5); }
+  #hp-display .hp-label { font-size: calc(var(--ctrl-unit) * 2.6); letter-spacing: 1px; }
+  #hp-display #hp-text { font-size: calc(var(--ctrl-unit) * 4.6); }
+
+  /* Wave / score panel: shrink and tuck in beside the pause button. */
+  #hud-top-right {
+    top: calc(var(--ctrl-unit) * 2);
+    right: calc(var(--ctrl-unit) * 14);
+    padding: calc(var(--ctrl-unit) * 1.2) calc(var(--ctrl-unit) * 1.6);
+    min-width: 0;
+  }
+  #wave-info { font-size: calc(var(--ctrl-unit) * 2.6); letter-spacing: 1px; }
+  #enemy-count, #score-info { font-size: calc(var(--ctrl-unit) * 1.8); margin-top: 2px; }
+  #combo-info { font-size: calc(var(--ctrl-unit) * 2); margin-top: 2px; }
+
+  /* Weapon panel: lift well above the fire / run / reload cluster. */
+  #hud-bottom-right {
+    bottom: calc(var(--ctrl-unit) * 30);
+    right: calc(var(--ctrl-unit) * 2);
+    padding: calc(var(--ctrl-unit) * 1.2) calc(var(--ctrl-unit) * 1.8);
+  }
+  #weapon-name { font-size: calc(var(--ctrl-unit) * 2); }
+  #ammo-text { font-size: calc(var(--ctrl-unit) * 3); }
+
+  /* Stamina bar narrower so it doesn't dominate. */
+  #stamina-container { height: 4px; }
 }
