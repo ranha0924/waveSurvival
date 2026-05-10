@@ -98,9 +98,14 @@ const Raycaster = (() => {
       if (rayDirY < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
       else { stepY = 1; sideDistY = (mapY + 1.0 - player.y) * deltaDistY; }
 
-      let hit = 0, side = 0, wallType = 1;
+      // Walk the ray. Short walls (type 5 sandbags) are recorded but do not
+      // terminate the cast — the world behind them must still render so the
+      // player can see over the barricade.
+      const shortHits = [];
+      let tallHit = null;
+      let side = 0;
       let safety = 96;
-      while (!hit && safety-- > 0) {
+      while (safety-- > 0) {
         if (sideDistX < sideDistY) {
           sideDistX += deltaDistX;
           mapX += stepX;
@@ -111,29 +116,46 @@ const Raycaster = (() => {
           side = 1;
         }
         const t = GameMap.getTile(mapX, mapY);
-        if (t >= 1 && t <= 8) { hit = 1; wallType = t; }
+        if (t < 1 || t > 8) continue;
+        let perpDist;
+        if (side === 0) perpDist = (mapX - player.x + (1 - stepX) / 2) / (rayDirX || 1e-9);
+        else perpDist = (mapY - player.y + (1 - stepY) / 2) / (rayDirY || 1e-9);
+        perpDist = Math.max(0.0001, perpDist);
+        if (t === 5) {
+          shortHits.push({ wallType: t, perpDist, side });
+        } else {
+          tallHit = { wallType: t, perpDist, side };
+          break;
+        }
       }
-      if (!hit) { zBuffer[x] = 1e6; continue; }
 
-      let perpDist;
-      if (side === 0) perpDist = (mapX - player.x + (1 - stepX) / 2) / (rayDirX || 1e-9);
-      else perpDist = (mapY - player.y + (1 - stepY) / 2) / (rayDirY || 1e-9);
-      perpDist = Math.max(0.0001, perpDist);
+      // Sprites should be visible over short walls, so the z-buffer tracks
+      // only the nearest opaque (tall) wall.
+      zBuffer[x] = tallHit ? tallHit.perpDist : 1e6;
 
-      zBuffer[x] = perpDist;
+      if (tallHit) {
+        const lineH = Math.floor(H / tallHit.perpDist);
+        const drawStart = Math.floor(horizon - lineH / 2);
+        const drawEnd = drawStart + lineH;
+        const wallU = tallHit.side === 0
+          ? (player.y + tallHit.perpDist * rayDirY)
+          : (player.x + tallHit.perpDist * rayDirX);
+        drawWallColumn(x, drawStart, drawEnd, tallHit.wallType, tallHit.side, tallHit.perpDist, wallU, fogDist, ambient);
+      }
 
-      // Sandbag walls render at half height for a low-cover look.
-      const heightScale = wallType === 5 ? 0.55 : 1.0;
-      const lineH = Math.floor(H / perpDist) * heightScale;
-      const drawStart = Math.floor(horizon - lineH / 2 + (1 - heightScale) * (H / perpDist) / 2);
-      const drawEnd = drawStart + lineH;
-
-      // World-space coordinate along the wall surface, used for texture sampling.
-      const wallU = side === 0
-        ? (player.y + perpDist * rayDirY)
-        : (player.x + perpDist * rayDirX);
-
-      drawWallColumn(x, drawStart, drawEnd, wallType, side, perpDist, wallU, fogDist, ambient);
+      // Short walls render half-height (sitting on the floor), far→near so
+      // closer barricades overdraw farther ones.
+      for (let i = shortHits.length - 1; i >= 0; i--) {
+        const h = shortHits[i];
+        if (tallHit && h.perpDist >= tallHit.perpDist) continue;
+        const halfH = Math.floor(H / h.perpDist / 2);
+        const drawStart = horizon;
+        const drawEnd = horizon + halfH;
+        const wallU = h.side === 0
+          ? (player.y + h.perpDist * rayDirY)
+          : (player.x + h.perpDist * rayDirX);
+        drawWallColumn(x, drawStart, drawEnd, h.wallType, h.side, h.perpDist, wallU, fogDist, ambient);
+      }
     }
   }
 
