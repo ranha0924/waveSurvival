@@ -10,6 +10,43 @@
     WAVE_INTERMISSION: 'wave_intermission'
   };
 
+  // Persistent best records keyed in localStorage. Each "best" stat is paired
+  // with the nickname that set it, so the title screen can show who holds it.
+  const Records = {
+    KEY: 'wavesurvival_records_v1',
+    NICK_KEY: 'wavesurvival_nick_v1',
+    empty() {
+      return {
+        bestWave:  { value: 0, name: '' },
+        bestScore: { value: 0, name: '' },
+        bestKills: { value: 0, name: '' },
+        bestCombo: { value: 0, name: '' },
+        totalRuns: 0
+      };
+    },
+    load() {
+      try {
+        const raw = localStorage.getItem(Records.KEY);
+        if (!raw) return Records.empty();
+        const r = JSON.parse(raw);
+        return Object.assign(Records.empty(), r);
+      } catch (e) { return Records.empty(); }
+    },
+    save(r) {
+      try { localStorage.setItem(Records.KEY, JSON.stringify(r)); } catch (e) {}
+    },
+    loadNick() {
+      try { return localStorage.getItem(Records.NICK_KEY) || ''; } catch (e) { return ''; }
+    },
+    saveNick(n) {
+      try { localStorage.setItem(Records.NICK_KEY, n); } catch (e) {}
+    },
+    sanitizeNick(n) {
+      const s = String(n || '').trim().slice(0, 12);
+      return s || '익명';
+    }
+  };
+
   const game = {
     state: STATE.TITLE,
     player: null,
@@ -23,7 +60,13 @@
     canvas: null,
     ctx: null,
     keys: {},
-    mouseDown: false
+    mouseDown: false,
+    // Snapshot of records taken at run start. HUD compares against this so the
+    // BEST display stays stable mid-run; live records are saved at game-over.
+    runBest: null,
+    // One-shot triggers per run for the "신기록" banner.
+    recordFired: { score: false, wave: false },
+    nick: ''
   };
 
   function init() {
@@ -51,6 +94,9 @@
       }
     });
 
+    game.nick = Records.loadNick();
+    UI.setNickInput(game.nick);
+    UI.updateTitleRecords(Records.load());
     UI.showTitle();
     requestAnimationFrame(loop);
   }
@@ -65,6 +111,7 @@
     document.getElementById('start-btn').addEventListener('click', () => {
       Audio.resume();
       Audio.uiClick();
+      captureNick();
       startGame();
     });
     document.getElementById('restart-btn').addEventListener('click', () => {
@@ -83,9 +130,17 @@
       UI.hidePause();
       UI.hideHud();
       if (game.touchMode) Mobile.hideControls();
+      UI.updateTitleRecords(Records.load());
       UI.showTitle();
       game.state = STATE.TITLE;
     });
+  }
+
+  function captureNick() {
+    const raw = UI.getNickInput();
+    game.nick = Records.sanitizeNick(raw);
+    Records.saveNick(game.nick);
+    UI.setNickInput(game.nick);
   }
 
   // Map physical key codes to canonical names used by the game.
@@ -193,6 +248,12 @@
     game.mouseDown = false;
     game.lastTime = performance.now();
 
+    // Snapshot best records at run start so HUD/banners compare against a
+    // stable baseline. We persist updated records only on game-over.
+    game.runBest = Records.load();
+    game.recordFired = { score: false, wave: false };
+    UI.setHudBest(game.runBest);
+
     UI.hideTitle();
     UI.hideGameOver();
     UI.hidePause();
@@ -217,6 +278,15 @@
 
     UI.showWaveBanner(`WAVE ${game.wave.number}`);
     Audio.waveStart();
+
+    // Wave-record banner fires once when the player reaches a wave higher
+    // than their previous best (or any wave > 0 if there's no record yet).
+    const prevBestWave = game.runBest ? game.runBest.bestWave.value : 0;
+    if (!game.recordFired.wave && game.wave.number > prevBestWave && prevBestWave > 0) {
+      game.recordFired.wave = true;
+      setTimeout(() => UI.showRecordBanner('🏆 BEST WAVE 갱신!', `WAVE ${game.wave.number}`), 1200);
+      Audio.waveClear();
+    }
   }
 
   // Find a position near (px, py) where a circle of `radius` fits.
@@ -273,6 +343,13 @@
 
   function onScore(amount, enemy) {
     game.score.score += amount;
+    // Score-record banner fires once when score crosses previous best.
+    const prevBestScore = game.runBest ? game.runBest.bestScore.value : 0;
+    if (!game.recordFired.score && prevBestScore > 0 && game.score.score > prevBestScore) {
+      game.recordFired.score = true;
+      UI.showRecordBanner('🔥 NEW RECORD 🔥', `${game.score.score.toLocaleString()}점`);
+      Audio.waveClear();
+    }
   }
 
   function checkWaveComplete() {
@@ -434,11 +511,37 @@
     if (game.touchMode) Mobile.hideControls();
     Audio.gameOver();
     UI.hideHud();
-    UI.showGameOver({
-      wave: game.wave.number,
-      score: game.score.score,
-      kills: game.player.kills
-    });
+
+    const stats = {
+      wave:      game.wave.number,
+      score:     game.score.score,
+      kills:     game.player.kills,
+      headshots: game.player.headshots,
+      bossKills: game.player.bossKills,
+      maxCombo:  game.player.maxComboReached
+    };
+
+    // Compare against the snapshot taken at run start, then merge into the
+    // persisted records (each best is independent — you can break one without
+    // breaking the others).
+    const prev = game.runBest || Records.empty();
+    const updated = Records.load();
+    const broken = { wave: false, score: false, kills: false, combo: false };
+
+    function bump(field, value, statName) {
+      if (value > updated[field].value) {
+        updated[field] = { value, name: game.nick || '익명' };
+        broken[statName] = true;
+      }
+    }
+    bump('bestWave',  stats.wave,     'wave');
+    bump('bestScore', stats.score,    'score');
+    bump('bestKills', stats.kills,    'kills');
+    bump('bestCombo', stats.maxCombo, 'combo');
+    updated.totalRuns = (updated.totalRuns || 0) + 1;
+    Records.save(updated);
+
+    UI.showGameOver(stats, prev, broken, game.nick);
   }
 
   // Boot

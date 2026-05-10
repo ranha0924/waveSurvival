@@ -24,6 +24,18 @@ const UI = (() => {
     $('enemies-left').textContent = wave.enemiesAlive;
     $('score').textContent = scoreState.score.toLocaleString();
 
+    // Highlight when current value passes the snapshot best for the run.
+    const wb = $('wave-best');
+    if (wb && wb.dataset.value) {
+      const bv = +wb.dataset.value;
+      $('wave-num').classList.toggle('beat-best', bv > 0 && wave.number > bv);
+    }
+    const sb = $('score-best');
+    if (sb && sb.dataset.value) {
+      const bv = +sb.dataset.value;
+      $('score').classList.toggle('beat-best', bv > 0 && scoreState.score > bv);
+    }
+
     // Combo
     if (player.comboCount > 0) {
       const mults = [1, 1.5, 2, 3];
@@ -126,6 +138,67 @@ const UI = (() => {
     setTimeout(() => b.classList.add('hidden'), 2500);
   }
 
+  // "신기록!" banner — bigger and more celebratory than the wave banner.
+  // Shown when the player breaks their previous best mid-run.
+  let _recordBannerTimer = 0;
+  function showRecordBanner(title, subtitle) {
+    const wrap = $('record-banner');
+    if (!wrap) return;
+    $('record-banner-title').textContent = title;
+    $('record-banner-sub').textContent = subtitle || '';
+    wrap.classList.remove('hidden');
+    wrap.style.animation = 'none';
+    void wrap.offsetWidth;
+    wrap.style.animation = 'record-banner-fade 3.0s ease-out forwards';
+    clearTimeout(_recordBannerTimer);
+    _recordBannerTimer = setTimeout(() => wrap.classList.add('hidden'), 3000);
+  }
+
+  // Title-screen best display + nickname input helpers.
+  function updateTitleRecords(records) {
+    const wrap = $('best-records');
+    if (!wrap) return;
+    const fmt = (rec) => rec && rec.value > 0
+      ? `${rec.value.toLocaleString()}<span class="by"> by ${escapeHtml(rec.name || '익명')}</span>`
+      : '<span class="empty">기록 없음</span>';
+    $('best-wave-title').innerHTML  = fmt(records.bestWave);
+    $('best-score-title').innerHTML = fmt(records.bestScore);
+    $('best-kills-title').innerHTML = fmt(records.bestKills);
+    $('best-combo-title').innerHTML = fmt(records.bestCombo);
+  }
+  function getNickInput() {
+    const el = $('nick-input');
+    return el ? el.value : '';
+  }
+  function setNickInput(v) {
+    const el = $('nick-input');
+    if (el) el.value = v || '';
+  }
+
+  // HUD BEST tags: small text next to wave/score showing the snapshot to beat.
+  function setHudBest(records) {
+    const wb = $('wave-best');
+    const sb = $('score-best');
+    if (wb) {
+      const v = records.bestWave.value;
+      wb.dataset.value = v;
+      wb.textContent = v > 0 ? `BEST ${v}` : '';
+    }
+    if (sb) {
+      const v = records.bestScore.value;
+      sb.dataset.value = v;
+      sb.textContent = v > 0 ? `BEST ${v.toLocaleString()}` : '';
+    }
+    $('wave-num') && $('wave-num').classList.remove('beat-best');
+    $('score') && $('score').classList.remove('beat-best');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
   function flashHit() {
     const flash = $('hit-flash');
     const vig = $('damage-vignette');
@@ -143,10 +216,54 @@ const UI = (() => {
   function showLockPrompt() { $('lock-prompt').classList.remove('hidden'); }
   function hideLockPrompt() { $('lock-prompt').classList.add('hidden'); }
 
-  function showGameOver(stats) {
-    $('final-wave').textContent = stats.wave;
+  // showGameOver(stats, prevRecords, broken, nick)
+  //   stats:    { wave, score, kills, headshots, bossKills, maxCombo }
+  //   prevRecords: snapshot taken at run start (so the comparison reflects
+  //                what THIS player had to beat, not what they just set).
+  //   broken:   { wave, score, kills, combo } — booleans for what this run beat.
+  //   nick:     player's nickname for the "NEW RECORD by X" line.
+  function showGameOver(stats, prevRecords, broken, nick) {
+    broken = broken || {};
+    const anyNew = broken.wave || broken.score || broken.kills || broken.combo;
+
+    $('final-wave').textContent  = stats.wave;
     $('final-score').textContent = stats.score.toLocaleString();
     $('final-kills').textContent = stats.kills;
+    $('final-headshots').textContent = stats.headshots || 0;
+    $('final-boss').textContent  = stats.bossKills || 0;
+    $('final-combo').textContent = `×${[1,1.5,2,3][stats.maxCombo || 0]}`;
+
+    // NEW RECORD header.
+    const hdr = $('new-record-header');
+    if (anyNew) {
+      hdr.classList.remove('hidden');
+      $('new-record-by').textContent = nick || '익명';
+    } else {
+      hdr.classList.add('hidden');
+    }
+
+    // Per-stat comparison rows show prev → new with deltas, and a NEW pill
+    // when this run beat that specific record.
+    const rows = [
+      { id: 'cmp-wave',  prev: prevRecords.bestWave.value,  cur: stats.wave,     broke: broken.wave,  fmt: (n) => n },
+      { id: 'cmp-score', prev: prevRecords.bestScore.value, cur: stats.score,    broke: broken.score, fmt: (n) => n.toLocaleString() },
+      { id: 'cmp-kills', prev: prevRecords.bestKills.value, cur: stats.kills,    broke: broken.kills, fmt: (n) => n },
+      { id: 'cmp-combo', prev: prevRecords.bestCombo.value, cur: stats.maxCombo, broke: broken.combo, fmt: (n) => `×${[1,1.5,2,3][n] || 1}` }
+    ];
+    for (const r of rows) {
+      const el = $(r.id);
+      if (!el) continue;
+      const cur = r.fmt(r.cur);
+      const prev = r.prev > 0 ? r.fmt(r.prev) : '—';
+      const pill = r.broke ? `<span class="new-pill">NEW</span>` : '';
+      const diffStr = (typeof r.cur === 'number' && typeof r.prev === 'number' && r.prev > 0 && r.cur > r.prev)
+        ? `<span class="diff">+${r.fmt(r.cur - r.prev)}</span>` : '';
+      const need = (!r.broke && typeof r.cur === 'number' && typeof r.prev === 'number' && r.prev > r.cur)
+        ? `<span class="need">−${r.fmt(r.prev - r.cur)} 부족</span>` : '';
+      el.innerHTML = `<span class="cur">${cur}</span> <span class="prev">/ BEST ${prev}</span> ${diffStr}${need}${pill}`;
+      el.classList.toggle('broke', !!r.broke);
+    }
+
     $('gameover-screen').classList.remove('hidden');
   }
   function hideGameOver() { $('gameover-screen').classList.add('hidden'); }
@@ -335,6 +452,8 @@ const UI = (() => {
     showLockPrompt, hideLockPrompt,
     showGameOver, hideGameOver,
     showUpgradeMenu, hideUpgradeMenu,
-    renderGun
+    renderGun,
+    showRecordBanner, updateTitleRecords, setHudBest,
+    getNickInput, setNickInput
   };
 })();

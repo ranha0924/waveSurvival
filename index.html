@@ -25,9 +25,9 @@
       </div>
 
       <div id="hud-top-right">
-        <div id="wave-info">WAVE <span id="wave-num">1</span></div>
+        <div id="wave-info">WAVE <span id="wave-num">1</span> <span id="wave-best" class="best-tag"></span></div>
         <div id="enemy-count">남은 적: <span id="enemies-left">0</span></div>
-        <div id="score-info">SCORE: <span id="score">0</span></div>
+        <div id="score-info">SCORE: <span id="score">0</span> <span id="score-best" class="best-tag"></span></div>
         <div id="combo-info" class="hidden">COMBO ×<span id="combo-mult">1</span></div>
       </div>
 
@@ -42,6 +42,10 @@
       <canvas id="minimap" width="200" height="200"></canvas>
 
       <div id="wave-banner" class="hidden"></div>
+      <div id="record-banner" class="hidden">
+        <div id="record-banner-title"></div>
+        <div id="record-banner-sub"></div>
+      </div>
       <div id="hit-flash"></div>
       <div id="damage-vignette"></div>
     </div>
@@ -50,6 +54,22 @@
     <div id="title-screen" class="overlay">
       <h1>WAVE SURVIVAL</h1>
       <p class="subtitle">웨이브 서바이벌 FPS</p>
+
+      <div id="best-records">
+        <div class="best-records-title">🏆 최고 기록</div>
+        <div class="best-records-grid">
+          <div class="best-row"><span class="label">WAVE</span> <span id="best-wave-title" class="value"></span></div>
+          <div class="best-row"><span class="label">SCORE</span> <span id="best-score-title" class="value"></span></div>
+          <div class="best-row"><span class="label">KILLS</span> <span id="best-kills-title" class="value"></span></div>
+          <div class="best-row"><span class="label">COMBO</span> <span id="best-combo-title" class="value"></span></div>
+        </div>
+      </div>
+
+      <div id="nick-row">
+        <label for="nick-input">닉네임</label>
+        <input id="nick-input" type="text" maxlength="12" placeholder="이름을 입력 (최대 12자)" autocomplete="off" />
+      </div>
+
       <button id="start-btn" class="big-btn">게임 시작</button>
       <div class="controls-help">
         <h3>조작법</h3>
@@ -82,12 +102,28 @@
     <!-- Game Over Screen -->
     <div id="gameover-screen" class="overlay hidden">
       <h2>GAME OVER</h2>
-      <div class="result">
-        <div>도달 웨이브: <span id="final-wave">1</span></div>
-        <div>최종 스코어: <span id="final-score">0</span></div>
-        <div>처치한 적: <span id="final-kills">0</span></div>
+
+      <div id="new-record-header" class="hidden">
+        <div class="nr-title">🏆 NEW RECORD 🏆</div>
+        <div class="nr-by">by <span id="new-record-by">익명</span></div>
       </div>
-      <button id="restart-btn" class="big-btn">다시 시작</button>
+
+      <div class="result">
+        <div class="result-row">도달 웨이브 <span id="final-wave">1</span></div>
+        <div class="result-row">최종 스코어 <span id="final-score">0</span></div>
+        <div class="result-row">처치한 적 <span id="final-kills">0</span></div>
+        <div class="result-row sub">헤드샷 <span id="final-headshots">0</span> · 보스 처치 <span id="final-boss">0</span> · 최대 콤보 <span id="final-combo">×1</span></div>
+      </div>
+
+      <div class="record-compare">
+        <div class="cmp-title">기록 비교</div>
+        <div class="cmp-row">WAVE <span id="cmp-wave"></span></div>
+        <div class="cmp-row">SCORE <span id="cmp-score"></span></div>
+        <div class="cmp-row">KILLS <span id="cmp-kills"></span></div>
+        <div class="cmp-row">COMBO <span id="cmp-combo"></span></div>
+      </div>
+
+      <button id="restart-btn" class="big-btn">다시 도전</button>
     </div>
 
     <!-- Click to lock prompt -->
