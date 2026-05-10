@@ -12,9 +12,12 @@
 
   // Persistent best records keyed in localStorage. Each "best" stat is paired
   // with the nickname that set it, so the title screen can show who holds it.
+  // Daily records use a separate slot that auto-resets when the date changes,
+  // so the daily-seed leaderboard is fresh each day.
   const Records = {
-    KEY: 'wavesurvival_records_v1',
-    NICK_KEY: 'wavesurvival_nick_v1',
+    KEY:       'wavesurvival_records_v1',
+    DAILY_KEY: 'wavesurvival_daily_v1',
+    NICK_KEY:  'wavesurvival_nick_v1',
     empty() {
       return {
         bestWave:  { value: 0, name: '' },
@@ -24,16 +27,32 @@
         totalRuns: 0
       };
     },
+    emptyDaily() {
+      return { date: Random.todayString(), records: Records.empty() };
+    },
     load() {
       try {
         const raw = localStorage.getItem(Records.KEY);
         if (!raw) return Records.empty();
-        const r = JSON.parse(raw);
-        return Object.assign(Records.empty(), r);
+        return Object.assign(Records.empty(), JSON.parse(raw));
       } catch (e) { return Records.empty(); }
     },
     save(r) {
       try { localStorage.setItem(Records.KEY, JSON.stringify(r)); } catch (e) {}
+    },
+    loadDaily() {
+      try {
+        const raw = localStorage.getItem(Records.DAILY_KEY);
+        if (!raw) return Records.emptyDaily();
+        const d = JSON.parse(raw);
+        // Auto-reset when the calendar day rolls over.
+        if (d.date !== Random.todayString()) return Records.emptyDaily();
+        d.records = Object.assign(Records.empty(), d.records || {});
+        return d;
+      } catch (e) { return Records.emptyDaily(); }
+    },
+    saveDaily(d) {
+      try { localStorage.setItem(Records.DAILY_KEY, JSON.stringify(d)); } catch (e) {}
     },
     loadNick() {
       try { return localStorage.getItem(Records.NICK_KEY) || ''; } catch (e) { return ''; }
@@ -97,7 +116,7 @@
 
     game.nick = Records.loadNick();
     UI.setNickInput(game.nick);
-    UI.updateTitleRecords(Records.load());
+    UI.updateTitleRecords(Records.load(), Records.loadDaily());
     UI.showTitle();
     requestAnimationFrame(loop);
   }
@@ -131,7 +150,7 @@
       UI.hidePause();
       UI.hideHud();
       if (game.touchMode) Mobile.hideControls();
-      UI.updateTitleRecords(Records.load());
+      UI.updateTitleRecords(Records.load(), Records.loadDaily());
       UI.showTitle();
       game.state = STATE.TITLE;
     });
@@ -255,6 +274,10 @@
     game.recordFired = { score: false, wave: false };
     UI.setHudBest(game.runBest);
 
+    // Reseed every run so the daily challenge is identical regardless of
+    // how many times you retry today.
+    Random.seedToday();
+
     UI.hideTitle();
     UI.hideGameOver();
     UI.hidePause();
@@ -317,11 +340,12 @@
     const next = game.wave.queue.shift();
     const radius = (Enemies.types[next.type] && Enemies.types[next.type].radius) || 0.4;
 
-    // Pick spawn point farthest-ish from player among random subset
+    // Pick spawn point farthest-ish from player among random subset.
+    // Seeded so the daily run picks the same gates in the same order.
     let bestPt = spawnPoints[0];
     let bestScore = -1;
     for (let i = 0; i < 4; i++) {
-      const pt = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
+      const pt = spawnPoints[Random.int(spawnPoints.length)];
       const dx = pt.x - game.player.x, dy = pt.y - game.player.y;
       const d = dx * dx + dy * dy;
       if (d > bestScore) { bestScore = d; bestPt = pt; }
@@ -529,18 +553,26 @@
     const updated = Records.load();
     const broken = { wave: false, score: false, kills: false, combo: false };
 
-    function bump(field, value, statName) {
-      if (value > updated[field].value) {
-        updated[field] = { value, name: game.nick || '익명' };
-        broken[statName] = true;
+    function bumpInto(target, field, value, statName, brokenOut) {
+      if (value > target[field].value) {
+        target[field] = { value, name: game.nick || '익명' };
+        if (brokenOut) brokenOut[statName] = true;
       }
     }
-    bump('bestWave',  stats.wave,     'wave');
-    bump('bestScore', stats.score,    'score');
-    bump('bestKills', stats.kills,    'kills');
-    bump('bestCombo', stats.maxCombo, 'combo');
+    bumpInto(updated, 'bestWave',  stats.wave,     'wave',  broken);
+    bumpInto(updated, 'bestScore', stats.score,    'score', broken);
+    bumpInto(updated, 'bestKills', stats.kills,    'kills', broken);
+    bumpInto(updated, 'bestCombo', stats.maxCombo, 'combo', broken);
     updated.totalRuns = (updated.totalRuns || 0) + 1;
     Records.save(updated);
+
+    // Daily records — independent leaderboard for the day's seed.
+    const daily = Records.loadDaily();
+    bumpInto(daily.records, 'bestWave',  stats.wave,     null, null);
+    bumpInto(daily.records, 'bestScore', stats.score,    null, null);
+    bumpInto(daily.records, 'bestKills', stats.kills,    null, null);
+    bumpInto(daily.records, 'bestCombo', stats.maxCombo, null, null);
+    Records.saveDaily(daily);
 
     UI.showGameOver(stats, prev, broken, game.nick);
   }

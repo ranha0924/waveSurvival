@@ -65,6 +65,15 @@
         </div>
       </div>
 
+      <div id="daily-records">
+        <div class="daily-records-title">📅 오늘의 도전 <span id="daily-date" class="daily-date"></span></div>
+        <div class="daily-records-grid">
+          <div class="daily-row"><span class="label">WAVE</span> <span id="daily-wave" class="value"></span></div>
+          <div class="daily-row"><span class="label">SCORE</span> <span id="daily-score" class="value"></span></div>
+        </div>
+        <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
+      </div>
+
       <div id="nick-row">
         <label for="nick-input">닉네임</label>
         <input id="nick-input" type="text" maxlength="12" placeholder="이름을 입력 (최대 12자)" autocomplete="off" />
@@ -145,6 +154,7 @@
   </div>
 
   <script src="js/audio.js"></script>
+  <script src="js/random.js"></script>
   <script src="js/map.js"></script>
   <script src="js/environment.js"></script>
   <script src="js/raycaster.js"></script>
