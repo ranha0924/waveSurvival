@@ -38,8 +38,27 @@
     setupInput();
     setupUIButtons();
 
+    game.touchMode = Mobile.init({
+      onShoot: (down) => { game.mouseDown = down; },
+      onRun:   (down) => { game.keys['shift'] = down; },
+      onReload: () => { if (game.state === STATE.PLAYING) Player.startReload(game.player); },
+      onPause:  () => {
+        if (game.state === STATE.PLAYING) pauseGame();
+        else if (game.state === STATE.PAUSED) { UI.hidePause(); resumeGame(); }
+      },
+      onTurn: (dx, dy) => {
+        if (game.state === STATE.PLAYING) Player.turn(game.player, dx, dy);
+      }
+    });
+
     UI.showTitle();
     requestAnimationFrame(loop);
+  }
+
+  function resumeGame() {
+    game.state = STATE.PLAYING;
+    game.lastTime = performance.now();
+    if (game.touchMode) Mobile.showControls();
   }
 
   function setupUIButtons() {
@@ -56,12 +75,14 @@
     document.getElementById('resume-btn').addEventListener('click', () => {
       Audio.uiClick();
       UI.hidePause();
-      requestPointerLock();
+      if (game.touchMode) resumeGame();
+      else requestPointerLock();
     });
     document.getElementById('quit-btn').addEventListener('click', () => {
       Audio.uiClick();
       UI.hidePause();
       UI.hideHud();
+      if (game.touchMode) Mobile.hideControls();
       UI.showTitle();
       game.state = STATE.TITLE;
     });
@@ -118,36 +139,37 @@
 
     game.canvas.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
+      if (game.touchMode) return; // touch input owns the canvas on mobile
       if (game.state === STATE.PLAYING) {
         if (!game.pointerLocked) {
           requestPointerLock();
           return;
         }
         game.mouseDown = true;
-      } else if (game.state === STATE.PAUSED && !document.getElementById('pause-screen').classList.contains('hidden')) {
-        // ignore clicks when pause shown
       }
     });
     window.addEventListener('mouseup', (e) => {
-      if (e.button === 0) game.mouseDown = false;
+      if (e.button === 0 && !game.touchMode) game.mouseDown = false;
     });
 
     document.addEventListener('pointerlockchange', () => {
       game.pointerLocked = document.pointerLockElement === game.canvas;
       if (game.pointerLocked) {
         UI.hideLockPrompt();
-      } else if (game.state === STATE.PLAYING) {
-        // Auto-pause when pointer lock lost
+      } else if (game.state === STATE.PLAYING && !game.touchMode) {
         pauseGame();
       }
     });
-    // If pointer-lock request errors (browser denies it), show prompt
     document.addEventListener('pointerlockerror', () => {
-      if (game.state === STATE.PLAYING) UI.showLockPrompt();
+      if (game.state === STATE.PLAYING && !game.touchMode) UI.showLockPrompt();
     });
   }
 
   function requestPointerLock() {
+    if (game.touchMode) {
+      if (game.state === STATE.PAUSED) resumeGame();
+      return;
+    }
     game.canvas.requestPointerLock = game.canvas.requestPointerLock ||
                                      game.canvas.mozRequestPointerLock;
     if (game.canvas.requestPointerLock) {
@@ -181,6 +203,7 @@
     Environment.init();
 
     startNextWave();
+    if (game.touchMode) Mobile.showControls();
     requestPointerLock();
   }
 
@@ -243,7 +266,8 @@
   function pauseGame() {
     if (game.state !== STATE.PLAYING) return;
     game.state = STATE.PAUSED;
-    document.exitPointerLock();
+    if (!game.touchMode) document.exitPointerLock();
+    if (game.touchMode) Mobile.hideControls();
     UI.showPause();
   }
 
@@ -263,12 +287,14 @@
       game.enemies = game.enemies.filter(e => e.alive);
 
       game.state = STATE.UPGRADE;
-      document.exitPointerLock();
+      if (!game.touchMode) document.exitPointerLock();
+      if (game.touchMode) Mobile.hideControls();
       setTimeout(() => {
         UI.showUpgradeMenu(game.player, game.wave.number, () => {
           UI.hideUpgradeMenu();
           startNextWave();
           game.state = STATE.PLAYING;
+          if (game.touchMode) Mobile.showControls();
           requestPointerLock();
         });
       }, 800);
@@ -295,13 +321,15 @@
 
     if (game.state === STATE.PLAYING) {
       // Auto-shoot if held + auto weapons
-      if (game.mouseDown && game.pointerLocked) {
+      const inputReady = game.pointerLocked || game.touchMode;
+      if (game.mouseDown && inputReady) {
         Player.shoot(game.player, game.enemies, game.particles, onScore);
       }
 
       // Update player input mapping
       mapKeysToInput();
-      Player.update(game.player, dt, { keys: game.keys });
+      const move = game.touchMode ? Mobile.getMove() : null;
+      Player.update(game.player, dt, { keys: game.keys, move });
 
       // Update enemies
       for (const e of game.enemies) {
@@ -402,7 +430,8 @@
 
   function gameOver() {
     game.state = STATE.GAMEOVER;
-    document.exitPointerLock();
+    if (!game.touchMode) document.exitPointerLock();
+    if (game.touchMode) Mobile.hideControls();
     Audio.gameOver();
     UI.hideHud();
     UI.showGameOver({
