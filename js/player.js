@@ -4,6 +4,7 @@ const Player = (() => {
     return {
       x: 12, y: 12,
       angle: 0,
+      pitch: 0,
       hp: 100, maxHp: 100,
       stamina: 100, maxStamina: 100,
       moveSpeed: 3.0,
@@ -100,11 +101,19 @@ const Player = (() => {
     }
   }
 
-  function turn(p, deltaX) {
+  function turn(p, deltaX, deltaY) {
     p.angle += deltaX * 0.0025;
     // Normalize
     if (p.angle > Math.PI * 2) p.angle -= Math.PI * 2;
     if (p.angle < 0) p.angle += Math.PI * 2;
+
+    if (typeof deltaY === 'number' && deltaY !== 0) {
+      const { H } = Raycaster.getDimensions();
+      p.pitch -= deltaY * 1.0;
+      const maxPitch = H * 0.45;
+      if (p.pitch > maxPitch) p.pitch = maxPitch;
+      if (p.pitch < -maxPitch) p.pitch = -maxPitch;
+    }
   }
 
   function shoot(p, enemies, particles, scoreCallback) {
@@ -141,6 +150,8 @@ const Player = (() => {
     const wallDist = raycastWall(p.x, p.y, dirX, dirY, maxRange);
 
     // Check enemies — sort by distance
+    const { H } = Raycaster.getDimensions();
+    const verticalOffset = p.bobOffset + p.pitch;
     const candidates = [];
     for (const e of enemies) {
       if (!e.alive) continue;
@@ -153,11 +164,11 @@ const Player = (() => {
       const perpX = ex - dirX * proj;
       const perpY = ey - dirY * proj;
       const perpDist = Math.sqrt(perpX * perpX + perpY * perpY);
-      if (perpDist < e.type.radius) {
-        // Headshot if perpDist small AND we hit "head" plane (we just give 25% chance based on aim accuracy)
-        const headshot = perpDist < e.type.radius * 0.35;
-        candidates.push({ e, proj, headshot });
-      }
+      if (perpDist >= e.type.radius) continue;
+      const hitFrac = 0.5 - (verticalOffset * proj) / H;
+      if (hitFrac < 0 || hitFrac > 1) continue; // aim above/below the body
+      const headshot = hitFrac < 0.3;
+      candidates.push({ e, proj, headshot });
     }
     candidates.sort((a, b) => a.proj - b.proj);
 

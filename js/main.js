@@ -111,7 +111,7 @@
 
     document.addEventListener('mousemove', (e) => {
       if (game.state === STATE.PLAYING && game.pointerLocked) {
-        Player.turn(game.player, e.movementX);
+        Player.turn(game.player, e.movementX, e.movementY);
       }
     });
 
@@ -354,7 +354,7 @@
     ctx.save();
     ctx.translate(shakeX, shakeY);
 
-    Raycaster.render(game.player, game.enemies, game.particles, game.player.bobOffset);
+    Raycaster.render(game.player, game.enemies, game.particles, game.player.bobOffset + game.player.pitch);
 
     // Draw projectiles as glowing dots (simple)
     drawProjectiles();
@@ -380,7 +380,7 @@
       if (tx <= 0.05) continue;
       const screenX = (W / 2) * (1 + ty / (tx * Math.tan(FOV / 2)));
       const sz = Math.max(3, 12 / tx);
-      const screenY = H / 2 + game.player.bobOffset;
+      const screenY = H / 2 + game.player.bobOffset + game.player.pitch;
       ctx.fillStyle = 'rgba(120, 200, 255, 0.9)';
       ctx.beginPath();
       ctx.arc(screenX, screenY, sz, 0, Math.PI * 2);
