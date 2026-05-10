@@ -193,6 +193,24 @@
     Audio.waveStart();
   }
 
+  // Find a position near (px, py) where a circle of `radius` fits.
+  // Tries the original point first, then nudges along 8 directions up to 1.5 tiles.
+  function findValidSpawn(px, py, radius) {
+    if (GameMap.canMove(px, py, radius)) return { x: px, y: py };
+    const dirs = [
+      [1, 0], [0, 1], [-1, 0], [0, -1],
+      [1, 1], [1, -1], [-1, 1], [-1, -1]
+    ];
+    for (let step = 0.25; step <= 1.5; step += 0.25) {
+      for (const [dx, dy] of dirs) {
+        const nx = px + dx * step;
+        const ny = py + dy * step;
+        if (GameMap.canMove(nx, ny, radius)) return { x: nx, y: ny };
+      }
+    }
+    return { x: px, y: py };
+  }
+
   function spawnFromQueue(dt) {
     if (game.wave.queue.length === 0) return;
     game.wave.spawnTimer -= dt;
@@ -200,6 +218,7 @@
 
     const spawnPoints = GameMap.getSpawnPoints();
     const next = game.wave.queue.shift();
+    const radius = (Enemies.types[next.type] && Enemies.types[next.type].radius) || 0.4;
 
     // Pick spawn point farthest-ish from player among random subset
     let bestPt = spawnPoints[0];
@@ -211,7 +230,9 @@
       if (d > bestScore) { bestScore = d; bestPt = pt; }
     }
 
-    const e = Enemies.create(next.type, bestPt.x, bestPt.y, next.scale || 1);
+    // Ensure the chosen point can actually fit this enemy's body
+    const pos = findValidSpawn(bestPt.x, bestPt.y, radius);
+    const e = Enemies.create(next.type, pos.x, pos.y, next.scale || 1);
     game.enemies.push(e);
     game.wave.spawnTimer = game.wave.spawnInterval;
   }

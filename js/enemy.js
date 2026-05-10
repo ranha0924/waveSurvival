@@ -38,8 +38,8 @@ const Enemies = (() => {
     boss: {
       id: 'boss', name: '보스',
       hp: 350, speed: 1.1, damage: 25, score: 1000,
-      attackRange: 1.2, attackCooldown: 1.6,
-      ranged: false, radius: 0.6,
+      attackRange: 1.4, attackCooldown: 1.6,
+      ranged: false, radius: 0.45,
       color: '#440044', headColor: '#220022',
       eyeColor: '#ff00ff', bloodColor: [180, 40, 200],
       isBoss: true,
