@@ -222,14 +222,20 @@ const UI = (() => {
   }
   function hideUpgradeMenu() { $('upgrade-screen').classList.add('hidden'); }
 
-  // First-person gun sprite (M4-style pixel art)
-  const gunImage = new Image();
-  let gunImageLoaded = false;
-  gunImage.onload = () => { gunImageLoaded = true; };
-  gunImage.src = 'assets/gun.png';
-
-  // Muzzle position normalized to gun image dimensions (front sight / barrel tip)
-  const MUZZLE_NORM = { x: 0.20, y: 0.10 };
+  // First-person gun sprites — one per weapon. Sniper falls back to the M4.
+  const GUN_SPRITES = {
+    pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.21, y: 0.06 } },
+    shotgun:    { src: 'assets/shotgun.png',  muzzle: { x: 0.23, y: 0.05 } },
+    machinegun: { src: 'assets/gun.png',      muzzle: { x: 0.20, y: 0.10 } },
+    sniper:     { src: 'assets/gun.png',      muzzle: { x: 0.20, y: 0.10 } }
+  };
+  for (const w in GUN_SPRITES) {
+    const def = GUN_SPRITES[w];
+    def.img = new Image();
+    def.loaded = false;
+    def.img.onload = () => { def.loaded = true; };
+    def.img.src = def.src;
+  }
   const GUN_HEIGHT_FRAC = 0.55;
 
   // Render the player's gun in 1st person + muzzle flash + tracer to crosshair
@@ -239,9 +245,11 @@ const UI = (() => {
     const kick = player.kickback;
     const bob = player.bobOffset;
 
-    if (!gunImageLoaded) return;
+    const def = GUN_SPRITES[player.currentWeapon] || GUN_SPRITES.pistol;
+    if (!def.loaded) return;
+    const img = def.img;
 
-    const aspect = gunImage.width / gunImage.height;
+    const aspect = img.width / img.height;
     const drawnH = H * GUN_HEIGHT_FRAC;
     const drawnW = drawnH * aspect;
 
@@ -254,12 +262,12 @@ const UI = (() => {
     // Preserve pixel-art crispness
     const prevSmoothing = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(gunImage, drawX, drawY, drawnW, drawnH);
+    ctx.drawImage(img, drawX, drawY, drawnW, drawnH);
     ctx.imageSmoothingEnabled = prevSmoothing;
 
     // Muzzle position on screen
-    const muzzleX = drawX + MUZZLE_NORM.x * drawnW;
-    const muzzleY = drawY + MUZZLE_NORM.y * drawnH;
+    const muzzleX = drawX + def.muzzle.x * drawnW;
+    const muzzleY = drawY + def.muzzle.y * drawnH;
 
     // Crosshair target (screen center) — bullets always go here
     const cx = W / 2;
