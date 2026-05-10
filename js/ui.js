@@ -227,7 +227,7 @@ const UI = (() => {
     pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.21, y: 0.06 } },
     shotgun:    { src: 'assets/shotgun.png',  muzzle: { x: 0.23, y: 0.05 } },
     machinegun: { src: 'assets/gun.png',      muzzle: { x: 0.20, y: 0.10 } },
-    sniper:     { src: 'assets/gun.png',      muzzle: { x: 0.20, y: 0.10 } }
+    sniper:     { src: 'assets/sniper.png',   muzzle: { x: 0.19, y: 0.05 } }
   };
   for (const w in GUN_SPRITES) {
     const def = GUN_SPRITES[w];
