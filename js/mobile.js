@@ -26,6 +26,7 @@ const Mobile = (() => {
     bindButton('btn-fire',   () => cb.onShoot(true),  () => cb.onShoot(false));
     bindButton('btn-run',    () => cb.onRun(true),    () => cb.onRun(false));
     bindButton('btn-reload', () => cb.onReload(),     null);
+    bindButton('btn-swap',   () => cb.onSwap && cb.onSwap(), null);
     bindButton('btn-pause',  () => cb.onPause(),      null);
 
     joyEl.addEventListener('touchstart', joyStart, { passive: false });
