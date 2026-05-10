@@ -226,7 +226,7 @@ const UI = (() => {
   const gunImage = new Image();
   let gunImageLoaded = false;
   gunImage.onload = () => { gunImageLoaded = true; };
-  gunImage.src = 'assets/gun.png';
+  gunImage.src = 'assets/gun.jpg';
 
   // Muzzle position normalized to gun image dimensions (front sight / barrel tip)
   const MUZZLE_NORM = { x: 0.20, y: 0.10 };
