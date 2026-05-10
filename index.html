@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wave Survival FPS</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas" width="960" height="600"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div id="hud-top-left">
+        <div class="bar-label">HP</div>
+        <div class="bar"><div id="hp-bar" class="bar-fill hp"></div></div>
+        <div id="hp-text">100 / 100</div>
+        <div class="bar-label">STAMINA</div>
+        <div class="bar"><div id="stamina-bar" class="bar-fill stamina"></div></div>
+      </div>
+
+      <div id="hud-top-right">
+        <div id="wave-info">WAVE <span id="wave-num">1</span></div>
+        <div id="enemy-count">남은 적: <span id="enemies-left">0</span></div>
+        <div id="score-info">SCORE: <span id="score">0</span></div>
+        <div id="combo-info" class="hidden">COMBO ×<span id="combo-mult">1</span></div>
+      </div>
+
+      <div id="crosshair"></div>
+
+      <div id="hud-bottom-right">
+        <div id="weapon-name">권총</div>
+        <div id="ammo-text"><span id="ammo-current">12</span> / <span id="ammo-max">12</span></div>
+      </div>
+
+      <canvas id="minimap" width="160" height="160"></canvas>
+
+      <div id="wave-banner" class="hidden"></div>
+      <div id="hit-flash"></div>
+      <div id="damage-vignette"></div>
+    </div>
+
+    <!-- Title Screen -->
+    <div id="title-screen" class="overlay">
+      <h1>WAVE SURVIVAL</h1>
+      <p class="subtitle">웨이브 서바이벌 FPS</p>
+      <button id="start-btn" class="big-btn">게임 시작</button>
+      <div class="controls-help">
+        <h3>조작법</h3>
+        <ul>
+          <li><b>W A S D</b> — 이동</li>
+          <li><b>마우스</b> — 시점 회전</li>
+          <li><b>좌클릭</b> — 사격</li>
+          <li><b>R</b> — 재장전</li>
+          <li><b>Shift</b> — 달리기</li>
+          <li><b>1 ~ 4</b> — 무기 교체</li>
+          <li><b>ESC</b> — 일시정지</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pause Screen -->
+    <div id="pause-screen" class="overlay hidden">
+      <h2>일시정지</h2>
+      <button id="resume-btn" class="big-btn">계속하기</button>
+      <button id="quit-btn" class="big-btn secondary">메인으로</button>
+    </div>
+
+    <!-- Upgrade Screen -->
+    <div id="upgrade-screen" class="overlay hidden">
+      <h2>업그레이드 선택</h2>
+      <p class="subtitle">웨이브 <span id="cleared-wave">1</span> 클리어!</p>
+      <div id="upgrade-options"></div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-screen" class="overlay hidden">
+      <h2>GAME OVER</h2>
+      <div class="result">
+        <div>도달 웨이브: <span id="final-wave">1</span></div>
+        <div>최종 스코어: <span id="final-score">0</span></div>
+        <div>처치한 적: <span id="final-kills">0</span></div>
+      </div>
+      <button id="restart-btn" class="big-btn">다시 시작</button>
+    </div>
+
+    <!-- Click to lock prompt -->
+    <div id="lock-prompt" class="overlay hidden">
+      <p>클릭해서 게임 재개</p>
+    </div>
+  </div>
+
+  <script src="js/audio.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/raycaster.js"></script>
+  <script src="js/weapon.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/enemy.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
