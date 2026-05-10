@@ -30,11 +30,32 @@
     emptyDaily() {
       return { date: Random.todayString(), records: Records.empty() };
     },
+    // Coerce an arbitrary parsed payload back into the canonical record
+    // shape. Guards against (a) older schema versions that stored bare
+    // numbers, (b) external tampering with localStorage, (c) partial writes.
+    // Without this the game-over screen crashes when reading prev.bestX.value.
+    sanitize(raw) {
+      const out = Records.empty();
+      if (!raw || typeof raw !== 'object') return out;
+      for (const k of ['bestWave', 'bestScore', 'bestKills', 'bestCombo']) {
+        const v = raw[k];
+        if (v && typeof v === 'object' && typeof v.value === 'number' && isFinite(v.value)) {
+          out[k] = {
+            value: Math.max(0, v.value),
+            name: typeof v.name === 'string' ? v.name : ''
+          };
+        }
+      }
+      if (typeof raw.totalRuns === 'number' && isFinite(raw.totalRuns)) {
+        out.totalRuns = Math.max(0, raw.totalRuns | 0);
+      }
+      return out;
+    },
     load() {
       try {
         const raw = localStorage.getItem(Records.KEY);
         if (!raw) return Records.empty();
-        return Object.assign(Records.empty(), JSON.parse(raw));
+        return Records.sanitize(JSON.parse(raw));
       } catch (e) { return Records.empty(); }
     },
     save(r) {
@@ -46,9 +67,8 @@
         if (!raw) return Records.emptyDaily();
         const d = JSON.parse(raw);
         // Auto-reset when the calendar day rolls over.
-        if (d.date !== Random.todayString()) return Records.emptyDaily();
-        d.records = Object.assign(Records.empty(), d.records || {});
-        return d;
+        if (!d || d.date !== Random.todayString()) return Records.emptyDaily();
+        return { date: d.date, records: Records.sanitize(d.records) };
       } catch (e) { return Records.emptyDaily(); }
     },
     saveDaily(d) {
