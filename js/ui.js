@@ -47,58 +47,71 @@ const UI = (() => {
 
   function drawMinimap(player, enemies) {
     const c = minimapCtx;
-    const size = 160;
-    const tileSize = size / GameMap.W;
+    const size = 200;
+    // Scale so the whole map fits even at 42+ tiles.
+    const tileSize = size / Math.max(GameMap.W, GameMap.H);
     c.clearRect(0, 0, size, size);
-    c.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    c.fillStyle = 'rgba(0, 0, 0, 0.55)';
     c.fillRect(0, 0, size, size);
 
-    // Walls
+    // Walls — gray for structures, color-tagged for special types.
     for (let y = 0; y < GameMap.H; y++) {
       for (let x = 0; x < GameMap.W; x++) {
         const t = GameMap.getTile(x, y);
-        if (t >= 1 && t <= 4) {
-          const colors = GameMap.getWallColor(t);
-          c.fillStyle = colors.light;
+        if (t >= 1 && t <= 8) {
+          // Use a muted gray for most structures so the eye reads them as a single "buildings" layer.
+          c.fillStyle = (t === 7) ? '#888899'        // comms tower
+                      : (t === 8) ? '#d4b020'        // hazard
+                      : (t === 5) ? '#a08a55'        // sandbag (slight tint)
+                      : '#666666';
           c.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
         } else if (t === 9) {
-          c.fillStyle = 'rgba(255, 80, 80, 0.5)';
-          c.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+          // Spawn gates as orange diamonds.
+          const cx = x * tileSize + tileSize / 2;
+          const cy = y * tileSize + tileSize / 2;
+          const r = tileSize * 0.7;
+          c.fillStyle = '#ff9933';
+          c.beginPath();
+          c.moveTo(cx, cy - r);
+          c.lineTo(cx + r, cy);
+          c.lineTo(cx, cy + r);
+          c.lineTo(cx - r, cy);
+          c.closePath();
+          c.fill();
         }
       }
     }
 
-    // Enemies
+    // Enemies — red dots, boss = magenta.
     for (const e of enemies) {
       if (!e.alive) continue;
-      c.fillStyle = e.type.isBoss ? '#ff00ff' : '#ff4444';
-      const sz = e.type.isBoss ? tileSize * 1.4 : tileSize * 0.9;
-      c.fillRect(e.x * tileSize - sz/2, e.y * tileSize - sz/2, sz, sz);
+      c.fillStyle = e.type.isBoss ? '#ff44ff' : '#ff4444';
+      const r = e.type.isBoss ? tileSize * 0.9 : tileSize * 0.55;
+      c.beginPath();
+      c.arc(e.x * tileSize, e.y * tileSize, r, 0, Math.PI * 2);
+      c.fill();
     }
 
-    // Player
+    // Player — green triangle pointed in facing direction.
+    const px = player.x * tileSize;
+    const py = player.y * tileSize;
+    const triR = Math.max(4, tileSize * 1.0);
     c.fillStyle = '#44ff44';
     c.beginPath();
-    c.arc(player.x * tileSize, player.y * tileSize, tileSize * 0.6, 0, Math.PI * 2);
+    c.moveTo(
+      px + Math.cos(player.angle) * triR,
+      py + Math.sin(player.angle) * triR
+    );
+    c.lineTo(
+      px + Math.cos(player.angle + 2.5) * triR * 0.6,
+      py + Math.sin(player.angle + 2.5) * triR * 0.6
+    );
+    c.lineTo(
+      px + Math.cos(player.angle - 2.5) * triR * 0.6,
+      py + Math.sin(player.angle - 2.5) * triR * 0.6
+    );
+    c.closePath();
     c.fill();
-
-    // View cone
-    c.strokeStyle = 'rgba(80, 255, 80, 0.6)';
-    c.lineWidth = 1;
-    c.beginPath();
-    c.moveTo(player.x * tileSize, player.y * tileSize);
-    const fovHalf = Math.PI / 6;
-    const len = 4 * tileSize;
-    c.lineTo(
-      player.x * tileSize + Math.cos(player.angle - fovHalf) * len,
-      player.y * tileSize + Math.sin(player.angle - fovHalf) * len
-    );
-    c.moveTo(player.x * tileSize, player.y * tileSize);
-    c.lineTo(
-      player.x * tileSize + Math.cos(player.angle + fovHalf) * len,
-      player.y * tileSize + Math.sin(player.angle + fovHalf) * len
-    );
-    c.stroke();
   }
 
   // Show banner like "WAVE 3"

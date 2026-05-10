@@ -33,6 +33,7 @@
     game.canvas = document.getElementById('game-canvas');
     game.ctx = game.canvas.getContext('2d');
     Raycaster.init(game.canvas);
+    Environment.init();
 
     setupInput();
     setupUIButtons();
@@ -177,6 +178,8 @@
     UI.showHud();
     game.state = STATE.PLAYING;
 
+    Environment.init();
+
     startNextWave();
     requestPointerLock();
   }
@@ -307,6 +310,7 @@
 
       Enemies.updateProjectiles(game.projectiles, dt, game.player, game.particles);
       updateParticles(dt);
+      Environment.update(dt, game.wave.number, game.particles);
 
       // Spawn next enemy from queue
       spawnFromQueue(dt);
@@ -354,7 +358,8 @@
     ctx.save();
     ctx.translate(shakeX, shakeY);
 
-    Raycaster.render(game.player, game.enemies, game.particles, game.player.bobOffset + game.player.pitch);
+    const theme = Environment.themeForWave(game.wave.number || 1);
+    Raycaster.render(game.player, game.enemies, game.particles, game.player.bobOffset + game.player.pitch, theme);
 
     // Draw projectiles as glowing dots (simple)
     drawProjectiles();

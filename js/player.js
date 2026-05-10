@@ -1,8 +1,9 @@
 // Player state and shooting
 const Player = (() => {
   function create() {
+    const start = (typeof GameMap !== 'undefined' && GameMap.PLAYER_START) || { x: 12, y: 12 };
     return {
-      x: 12, y: 12,
+      x: start.x, y: start.y,
       angle: 0,
       pitch: 0,
       hp: 100, maxHp: 100,
@@ -110,7 +111,7 @@ const Player = (() => {
     if (typeof deltaY === 'number' && deltaY !== 0) {
       const { H } = Raycaster.getDimensions();
       p.pitch -= deltaY * 1.0;
-      const maxPitch = H * 0.45;
+      const maxPitch = H * 0.3;
       if (p.pitch > maxPitch) p.pitch = maxPitch;
       if (p.pitch < -maxPitch) p.pitch = -maxPitch;
     }
