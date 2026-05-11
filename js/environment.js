@@ -2,10 +2,9 @@
 // Background props (mountains, clouds, smoke, dust, lightning) were
 // removed; this module now only owns the per-wave palette.
 const Environment = (() => {
-  // Per-theme palette + decoration hints. `name` is read by the raycaster's
-  // sky pass to pick which celestial bodies / clouds / lightning to draw.
-  // `skyline` controls the rooftop silhouette opacity, `haze` is an rgb
-  // triplet used for the ground-fog band right at the horizon.
+  // Per-theme palette. `name` is read by the raycaster's sky pass to pick
+  // which celestial bodies / lightning to draw. `haze` is an rgb triplet
+  // used for the ground-fog band right at the horizon.
   const themes = {
     sunset: {
       name: 'sunset',
@@ -16,7 +15,6 @@ const Environment = (() => {
       floorFar: '#161412',
       ambient: 1.0,
       fogDist: 32,
-      skyline: 0.55,
       haze: '210,140,80',
       concreteTint: '120,90,70'
     },
@@ -29,7 +27,6 @@ const Environment = (() => {
       floorFar: '#0c0c12',
       ambient: 0.85,
       fogDist: 26,
-      skyline: 0.65,
       haze: '160,90,90',
       concreteTint: '80,60,80'
     },
@@ -42,7 +39,6 @@ const Environment = (() => {
       floorFar: '#05070a',
       ambient: 0.65,
       fogDist: 20,
-      skyline: 0.75,
       haze: '60,70,110',
       concreteTint: '50,55,75'
     },
@@ -55,7 +51,6 @@ const Environment = (() => {
       floorFar: '#04050a',
       ambient: 0.55,
       fogDist: 16,
-      skyline: 0.85,
       haze: '70,75,95',
       concreteTint: '55,65,80'
     }
