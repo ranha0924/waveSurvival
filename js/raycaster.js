@@ -311,11 +311,12 @@ const Raycaster = (() => {
 
   function drawSky(theme, player) {
     ensureBakedAssets();
-    // Fixed horizon at screen center. The floor pass overpaints its own
-    // area whenever pitch leaves the lower half exposed, so we fill the
-    // entire lower half here too (with the sky's bottom color) to avoid
-    // any unpainted strip when the player tilts up.
-    const horizon = H / 2;
+    // Sky horizon rides the smoothed pitch so the gradient bottom and the
+    // skyline silhouette stay attached to where the floor's real horizon
+    // sits. mouse-Y noise during yaw is dampened by the low-pass on
+    // player.smoothedPitch, so the backdrop doesn't twitch on rotation.
+    const pitch = (player && typeof player.smoothedPitch === 'number') ? player.smoothedPitch : 0;
+    const horizon = H / 2 + pitch;
     const M = 64;
     const grad = ctx.createLinearGradient(0, -M, 0, horizon);
     grad.addColorStop(0, theme.skyTop);
@@ -442,20 +443,19 @@ const Raycaster = (() => {
 
   function drawSkyline(theme, player) {
     if (!skylineCanvas) return;
-    // World-anchored: the skyline canvas tiles horizontally and scrolls with
-    // player.angle so the buildings appear fixed in the world. 1 FOV of yaw
-    // rotation scrolls the silhouette by exactly one canvas width, which
-    // matches the wall projection's horizontal motion. Y stays fixed at the
-    // unrotated horizon — distant buildings don't bob with pitch.
+    // World-anchored: scrolls horizontally with player.angle (1 FOV of yaw
+    // = 1 canvas-width) so the buildings stay fixed in world space.
+    // Vertical position rides the smoothed pitch — sustained looking-up/down
+    // moves the silhouette with the real horizon (so it doesn't detach from
+    // the floor), but mouse-Y noise during a pure yaw is filtered out by
+    // Player.update's smoothedPitch low-pass.
     const sh = skylineCanvas.height;
-    const dy = Math.floor(H / 2 - sh + 4);
+    const pitch = (player && typeof player.smoothedPitch === 'number') ? player.smoothedPitch : 0;
+    const horizon = H / 2 + pitch;
+    const dy = Math.floor(horizon - sh + 4);
     const cw = skylineCanvas.width;
     const angle = (player && typeof player.angle === 'number') ? player.angle : 0;
-    // Negative because turning right (positive angle) should slide the
-    // buildings LEFT on screen, the way distant scenery actually moves.
     const scroll = -(angle / FOV) * W;
-    // Normalize the starting offset into [-cw, 0] so the first tile we draw
-    // begins on or just left of the screen.
     let off = scroll % cw;
     if (off > 0) off -= cw;
 
