@@ -6,6 +6,10 @@ const Player = (() => {
       x: start.x, y: start.y,
       angle: 0,
       pitch: 0,
+      // Low-pass-filtered pitch the renderer uses for distant elements like
+      // the skyline so quick mouse-Y jitter during yaw doesn't bounce the
+      // horizon-anchored silhouette. Sustained looking-up/down still tracks.
+      smoothedPitch: 0,
       hp: 100, maxHp: 100,
       stamina: 100, maxStamina: 100,
       moveSpeed: 3.0,
@@ -108,6 +112,11 @@ const Player = (() => {
     p.kickback *= Math.exp(-dt * 8);
     p.muzzleFlash = Math.max(0, p.muzzleFlash - dt * 6);
     p.shake *= Math.exp(-dt * 6);
+    // Smooth-follow the pitch so sub-pixel mouse-Y noise during a yaw
+    // doesn't jitter the horizon-anchored skyline; sustained tilt still
+    // converges in ~0.2s.
+    const pitchLerp = Math.min(1, dt * 10);
+    p.smoothedPitch += (p.pitch - p.smoothedPitch) * pitchLerp;
 
     // Auto heal
     if (p.autoHeal && p.hp < p.maxHp) {
