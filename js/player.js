@@ -173,8 +173,17 @@ const Player = (() => {
       const perpX = ex - dirX * proj;
       const perpY = ey - dirY * proj;
       const perpDist = Math.sqrt(perpX * perpX + perpY * perpY);
-      if (perpDist >= e.type.radius) continue;
-      const hitFrac = 0.5 - (verticalOffset * proj) / H;
+      // Scale the hitbox (horizontally + vertically) by the sprite's render
+      // scale so a 2.2× boss can actually be hit on the shoulders/head where
+      // it visibly is, not on the unscaled cylinder under its feet.
+      const spr = (typeof Sprites !== 'undefined') ? Sprites.get(e.type.id) : null;
+      const scale = spr ? (spr.scale || 1) : 1;
+      if (perpDist >= e.type.radius * scale) continue;
+      // Visual body is bottom-anchored: spans 1/(2*scale) … 1 (in unit-screen
+      // coords where 0 is the top of an unscaled body). hitFrac maps the
+      // crosshair (which is offset from the world horizon by verticalOffset)
+      // into 0..1 across the visible sprite — 0 = head top, 1 = feet.
+      const hitFrac = 1 - 1 / (2 * scale) - (verticalOffset * proj) / (H * scale);
       if (hitFrac < 0 || hitFrac > 1) continue; // aim above/below the body
       const headshot = hitFrac < 0.3;
       candidates.push({ e, proj, headshot });
