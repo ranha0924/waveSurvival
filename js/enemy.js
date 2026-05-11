@@ -290,6 +290,7 @@ const Enemies = (() => {
     if (!e.alive) return;
     e.alive = false;
     Player.spawnExplosion(particles, e.x, e.y);
+    Player.spawnDeathBurst(particles, e.x, e.y, e.type.bloodColor || [255, 180, 60], false, false);
     Audio.explosion();
     const r = e.type.explodeRadius;
     const r2 = r * r;
@@ -311,6 +312,7 @@ const Enemies = (() => {
         if (o.hp <= 0) {
           o.alive = false;
           Audio.enemyDeath();
+          Player.spawnDeathBurst(particles, o.x, o.y, o.type.bloodColor || [180, 30, 30], false, !!o.type.isBoss);
           awardChainKill(player, o, scoreCallback);
         }
       }

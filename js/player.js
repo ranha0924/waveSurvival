@@ -277,10 +277,15 @@ const Player = (() => {
       p.kills++;
       if (headshot) p.headshots++;
       if (e.type.isBoss) p.bossKills++;
-      // Death particles
-      for (let i = 0; i < 14; i++) {
-        spawnDeathParticle(particles, e.x, e.y, e.type.bloodColor || [180, 30, 30]);
-      }
+      // Two-layer death burst (airborne spray + lingering ground stains).
+      // Boss / headshot variants are handled inside the helper.
+      spawnDeathBurst(
+        particles,
+        e.x, e.y,
+        e.type.bloodColor || [180, 30, 30],
+        headshot,
+        !!e.type.isBoss
+      );
       // Type-specific on-death side effects (bomber detonate, splitter spawn).
       if (enemies && Enemies.onKilled) {
         Enemies.onKilled(e, p, enemies, particles, scoreCallback);
@@ -387,6 +392,71 @@ const Player = (() => {
     });
   }
 
+  // Two-layer death burst. Replaces the old "14 identical droplets" loop.
+  //
+  //  layer 1 — fast spray: high-velocity airborne droplets that arc back
+  //            down with gravity (existing particle physics). Reads as the
+  //            "explode outward" moment of the kill.
+  //  layer 2 — ground stains: stationary, noGravity, pinned to a low
+  //            zOffset and long life. They linger on the floor as a visible
+  //            kill record without spawning a separate corpse entity.
+  //
+  // Boss kills scale the counts/velocities up; headshots add an extra
+  // high-arc burst from the head area so head shots feel chunkier.
+  function spawnDeathBurst(particles, x, y, color, headshot, isBoss) {
+    const baseScale = isBoss ? 2.4 : 1.0;
+    const sprayCount = Math.floor(20 * baseScale);
+    for (let i = 0; i < sprayCount; i++) {
+      particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 6 * baseScale,
+        vy: (Math.random() - 0.5) * 6 * baseScale,
+        zOffset: 0.15 + Math.random() * 0.55,
+        vz: 1.4 + Math.random() * 3.4,
+        size: 4 + Math.random() * 5,
+        color,
+        life: 1.0 + Math.random() * 0.5
+      });
+    }
+    // Darker shade for ground stains so they read as dried/pooled rather
+    // than fresh spray.
+    const stainColor = [
+      Math.floor(color[0] * 0.55),
+      Math.floor(color[1] * 0.50),
+      Math.floor(color[2] * 0.50)
+    ];
+    const stainCount = Math.floor(14 * baseScale);
+    for (let i = 0; i < stainCount; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 0.08 + Math.random() * 0.45 * baseScale;
+      particles.push({
+        x: x + Math.cos(a) * r,
+        y: y + Math.sin(a) * r,
+        vx: 0, vy: 0,
+        zOffset: 0.02 + Math.random() * 0.06,
+        vz: 0,
+        noGravity: true,
+        size: 8 + Math.random() * 12,
+        color: stainColor,
+        life: 3.5 + Math.random() * 1.5
+      });
+    }
+    if (headshot) {
+      for (let i = 0; i < 8; i++) {
+        particles.push({
+          x, y,
+          vx: (Math.random() - 0.5) * 3.5,
+          vy: (Math.random() - 0.5) * 3.5,
+          zOffset: 0.65,
+          vz: 3.5 + Math.random() * 2,
+          size: 3 + Math.random() * 3,
+          color,
+          life: 1.3
+        });
+      }
+    }
+  }
+
   function spawnExplosion(particles, x, y) {
     for (let i = 0; i < 18; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -466,6 +536,6 @@ const Player = (() => {
 
   return {
     create, update, turn, shoot, startReload, switchWeapon, cycleWeapon, takeDamage, getWeapon,
-    spawnExplosion
+    spawnExplosion, spawnDeathBurst
   };
 })();
