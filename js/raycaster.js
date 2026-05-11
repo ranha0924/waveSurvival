@@ -28,6 +28,9 @@ const Raycaster = (() => {
     resize();
     // Crisp pixel-art scaling for image sprites.
     ctx.imageSmoothingEnabled = false;
+    // Bake the per-tile wall body textures (sandbag bags, container ribs,
+    // brick courses, etc.) so drawWall can sample 1px columns from them.
+    if (typeof WallTextures !== 'undefined') WallTextures.buildAll();
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', resize);
     if (window.visualViewport) {
@@ -208,21 +211,36 @@ const Raycaster = (() => {
 
   // Render one screen column of a wall. The wall sits on the floor at
   // `horizon + lineH/2`; its top is pushed up by `shape.heightFactor * lineH`
-  // so towers tower, sandbags squat, and wrecks stay low. Side darkening and
-  // fog are applied via shadeColor on the body color.
+  // so towers tower, sandbags squat, and wrecks stay low. The body samples a
+  // 1px slice from the type's pre-baked WallTextures canvas so the surface
+  // reads as its actual material (stacked sandbags, corrugated container,
+  // brick, etc.) rather than a flat-shaded rectangle. Side darkening + fog
+  // ride on top as a single rgba overlay.
   function drawWall(x, horizon, type, shape, side, dist, wallU, fogDist, ambient) {
     const colors = GameMap.getWallColor(type);
     const baseColor = side === 1 ? colors.dark : colors.light;
     const fog = Math.min(1, dist / fogDist);
-    const lightFactor = ambient * (1 - fog * 0.7);
-    const bodyColor = shadeColor(baseColor, lightFactor);
+    const sideShade = side === 1 ? 0.65 : 1.0;
+    const lightFactor = ambient * sideShade * (1 - fog * 0.7);
 
     const lineH = H / dist;
     const bottomY = Math.floor(horizon + lineH / 2);
     const topY = Math.floor(horizon + lineH / 2 - shape.heightFactor * lineH);
-    if (bottomY > topY) {
-      ctx.fillStyle = bodyColor;
-      ctx.fillRect(x, topY, 1, bottomY - topY);
+    const dstH = bottomY - topY;
+    if (dstH > 0) {
+      const tex = (typeof WallTextures !== 'undefined') ? WallTextures.get(type) : null;
+      if (tex) {
+        const u = ((wallU % 1) + 1) % 1;
+        const srcX = Math.min(tex.width - 1, Math.max(0, Math.floor(u * tex.width)));
+        ctx.drawImage(tex, srcX, 0, 1, tex.height, x, topY, 1, dstH);
+        if (lightFactor < 1) {
+          ctx.fillStyle = `rgba(0,0,0,${(1 - lightFactor).toFixed(3)})`;
+          ctx.fillRect(x, topY, 1, dstH);
+        }
+      } else {
+        ctx.fillStyle = shadeColor(baseColor, lightFactor);
+        ctx.fillRect(x, topY, 1, dstH);
+      }
     }
 
     if (shape.topDeco) {
