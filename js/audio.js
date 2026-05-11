@@ -205,6 +205,18 @@ const Audio = (() => {
     }, 480);
   }
 
+  // Boss phase-2 transition stinger. Long low rumble + rising-pitch tones
+  // so it reads as "the thing got angrier" rather than a normal hit.
+  function bossEnrage() {
+    if (!ctx) return;
+    noise(0.55, 0.65, 240, 0.3);
+    tone(80, 0.45, 'sawtooth', 0.32);
+    tone(50, 0.50, 'sine', 0.28);
+    [110, 145, 185, 230, 285].forEach((f, i) => {
+      setTimeout(() => tone(f, 0.16, 'sawtooth', 0.28), 220 + i * 55);
+    });
+  }
+
   // Generic explosion — for bomber detonation and explosive-upgrade splash.
   // Replaces the previous "reuse the shotgun sound" hack which sounded like
   // a far-off gunshot rather than a kaboom.
@@ -270,7 +282,7 @@ const Audio = (() => {
     init, resume,
     shootPistol, shootShotgun, shootMachineGun, shootSniper,
     hit, hitFlesh, hitArmor, hitBoss, headshot,
-    enemyDeath, bossDeath, explosion,
+    enemyDeath, bossDeath, bossEnrage, explosion,
     playerHit, reload, emptyClick, footstep,
     waveStart, waveClear, gameOver, pickup, uiClick
   };

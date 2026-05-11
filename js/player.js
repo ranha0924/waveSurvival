@@ -257,6 +257,14 @@ const Player = (() => {
     else if (e.type.id === 'tank') Audio.hitArmor();
     else Audio.hitFlesh();
     spawnDamageNumber(particles, e.x, e.y, dmg, headshot);
+    // Boss phase trigger: once the boss drops below half HP, enrage it
+    // (faster + bigger summons). One-shot — the flag prevents the next
+    // damage tick from re-firing the transition effects.
+    if (e.type.isBoss && !e.phase2 && e.hp > 0 && e.hp <= e.maxHp * 0.5) {
+      e.phase2 = true;
+      Audio.bossEnrage();
+      UI.flashEnrage();
+    }
     if (e.hp <= 0 && e.alive) {
       e.alive = false;
       if (e.type.isBoss) Audio.bossDeath();

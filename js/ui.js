@@ -220,6 +220,16 @@ const UI = (() => {
     setTimeout(() => vig.classList.remove('active'), 200);
   }
 
+  // Boss phase-2 enrage screen flash. Heavier and longer than flashHit so
+  // the player can't miss that something just shifted, but uses the same
+  // vignette element so we don't add a new DOM node just for this.
+  function flashEnrage() {
+    const vig = $('damage-vignette');
+    if (!vig) return;
+    vig.classList.add('enrage');
+    setTimeout(() => vig.classList.remove('enrage'), 1500);
+  }
+
   // Title / pause / gameover screens
   function showTitle() { $('title-screen').classList.remove('hidden'); }
   function hideTitle() { $('title-screen').classList.add('hidden'); }
@@ -460,7 +470,7 @@ const UI = (() => {
 
   return {
     init, showHud, hideHud, updateHud, drawMinimap,
-    showWaveBanner, flashHit,
+    showWaveBanner, flashHit, flashEnrage,
     showTitle, hideTitle, showPause, hidePause,
     showLockPrompt, hideLockPrompt,
     showGameOver, hideGameOver,

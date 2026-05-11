@@ -149,12 +149,13 @@ const Enemies = (() => {
         }
       }
 
-      // Boss summon
+      // Boss summon — phase 2 cuts the cooldown so the player gets buried
+      // in adds after the boss drops to half HP.
       if (e.type.isBoss) {
         e.summonTimer -= dt;
         if (e.summonTimer <= 0 && enemies) {
           summonAdds(e, enemies);
-          e.summonTimer = e.type.summonCooldown;
+          e.summonTimer = e.phase2 ? 2.5 : e.type.summonCooldown;
         }
       }
     }
@@ -249,7 +250,7 @@ const Enemies = (() => {
   }
 
   function summonAdds(boss, enemies) {
-    const count = 2;
+    const count = boss.phase2 ? 4 : 2;
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = 1.2;
