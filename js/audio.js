@@ -3,6 +3,11 @@ const Audio = (() => {
   let ctx = null;
   let masterGain = null;
   let enabled = true;
+  // Decoded sample cache (AudioBuffers keyed by name). Loaded lazily once the
+  // AudioContext exists; functions below prefer a sample when ready and fall
+  // back to the procedural synth so the game still has SFX before files
+  // finish downloading / on environments where the load fails.
+  const samples = {};
 
   function init() {
     if (ctx) return;
@@ -11,9 +16,46 @@ const Audio = (() => {
       masterGain = ctx.createGain();
       masterGain.gain.value = 0.4;
       masterGain.connect(ctx.destination);
+      // Kick off sample preloads. Each one resolves independently — a slow or
+      // failing load just leaves that slot empty and we keep using the synth.
+      loadSample('reload',     'assets/audio/reload.mp3');
+      loadSample('pistol',     'assets/audio/pistol.wav');
+      loadSample('shotgun',    'assets/audio/shotgun.wav');
+      loadSample('machinegun', 'assets/audio/machinegun.wav');
+      loadSample('sniper',     'assets/audio/sniper.mp3');
+      loadSample('footstep',   'assets/audio/footstep.wav');
     } catch (e) {
       enabled = false;
     }
+  }
+
+  function loadSample(name, url) {
+    if (!ctx) return;
+    fetch(url)
+      .then((r) => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+      .then((buf) => new Promise((resolve, reject) => {
+        // Support both promise-style and callback-style decodeAudioData
+        ctx.decodeAudioData(buf, resolve, reject);
+      }))
+      .then((decoded) => { samples[name] = decoded; })
+      .catch(() => { /* leave slot empty; synth fallback handles it */ });
+  }
+
+  // Play a decoded sample. Returns true on success so callers can skip the
+  // synth fallback. `volume` is in the same 0..1 range as tone()/noise().
+  // `rate` lets footsteps vary slightly so consecutive plays don't sound
+  // mechanically identical.
+  function playSample(name, volume = 1.0, rate = 1.0) {
+    if (!enabled || !ctx || !samples[name]) return false;
+    const src = ctx.createBufferSource();
+    src.buffer = samples[name];
+    src.playbackRate.value = rate;
+    const gain = ctx.createGain();
+    gain.gain.value = volume;
+    src.connect(gain);
+    gain.connect(masterGain);
+    src.start();
+    return true;
   }
 
   function resume() {
@@ -58,29 +100,45 @@ const Audio = (() => {
     src.start();
   }
 
-  // Weapon-specific shoot sounds
+  // Weapon-specific shoot sounds. Each prefers the uploaded sample and falls
+  // back to the original procedural synth if the file slot is empty.
   function shootPistol() {
+    if (playSample('pistol', 0.55)) return;
     if (!ctx) return;
     noise(0.08, 0.5, 1800, 1);
     tone(180, 0.05, 'square', 0.2);
   }
 
   function shootShotgun() {
+    if (playSample('shotgun', 0.65)) return;
     if (!ctx) return;
     noise(0.18, 0.6, 1200, 0.8);
     tone(80, 0.12, 'sawtooth', 0.3);
   }
 
   function shootMachineGun() {
+    if (playSample('machinegun', 0.45)) return;
     if (!ctx) return;
     noise(0.05, 0.35, 2400, 1.2);
     tone(220, 0.03, 'square', 0.15);
   }
 
   function shootSniper() {
+    if (playSample('sniper', 0.7)) return;
     if (!ctx) return;
     noise(0.25, 0.7, 800, 0.5);
     tone(60, 0.2, 'sawtooth', 0.4);
+  }
+
+  // Single footstep. Pitch is randomized slightly so the loop the player
+  // hears while walking doesn't feel mechanical. Triggered from player.js
+  // on each stride threshold.
+  function footstep() {
+    const rate = 0.92 + Math.random() * 0.16;
+    if (playSample('footstep', 0.45, rate)) return;
+    if (!ctx) return;
+    // Fallback: short low thump
+    noise(0.05, 0.25, 350, 0.5);
   }
 
   function hit() {
@@ -165,6 +223,7 @@ const Audio = (() => {
   }
 
   function reload() {
+    if (playSample('reload', 0.7)) return;
     if (!ctx) return;
     tone(800, 0.04, 'square', 0.15);
     setTimeout(() => tone(600, 0.06, 'square', 0.15), 80);
@@ -212,7 +271,7 @@ const Audio = (() => {
     shootPistol, shootShotgun, shootMachineGun, shootSniper,
     hit, hitFlesh, hitArmor, hitBoss, headshot,
     enemyDeath, bossDeath, explosion,
-    playerHit, reload, emptyClick,
+    playerHit, reload, emptyClick, footstep,
     waveStart, waveClear, gameOver, pickup, uiClick
   };
 })();
