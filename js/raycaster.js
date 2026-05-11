@@ -231,19 +231,34 @@ const Raycaster = (() => {
     const proj = projectSprite(player, e.x, e.y);
     if (!proj) return;
     const horizon = H / 2 + horizonOffset;
-    const spriteH = Math.floor(H / proj.dist);
-    const spriteW = spriteH;
-    const drawStartY = Math.floor(horizon - spriteH / 2);
-    const drawStartX = proj.screenX - Math.floor(spriteW / 2);
+    const baseH = H / proj.dist;
+    const def = e.type;
+    const flash = e.hitFlash > 0;
+    const sprite = (typeof Sprites !== 'undefined') ? Sprites.get(def.id) : null;
+
+    let spriteH, spriteW, drawStartX, drawStartY;
+    if (sprite) {
+      // Honor the sprite's native aspect ratio and per-type render scale, and
+      // bottom-anchor so larger enemies (e.g. tank ×1.5) grow upward instead
+      // of sinking into the floor.
+      const scale = sprite.scale || 1;
+      const aspect = sprite.w / sprite.h;
+      spriteH = Math.floor(baseH * scale);
+      spriteW = Math.floor(spriteH * aspect);
+      const groundedBottom = horizon + baseH / 2;
+      drawStartY = Math.floor(groundedBottom - spriteH);
+      drawStartX = proj.screenX - Math.floor(spriteW / 2);
+    } else {
+      spriteH = Math.floor(baseH);
+      spriteW = spriteH;
+      drawStartY = Math.floor(horizon - spriteH / 2);
+      drawStartX = proj.screenX - Math.floor(spriteW / 2);
+    }
 
     const x0 = Math.max(0, drawStartX);
     const x1 = Math.min(W - 1, drawStartX + spriteW);
     const fog = Math.min(1, proj.dist / theme.fogDist);
     const lightFactor = theme.ambient * (1 - fog * 0.6);
-
-    const def = e.type;
-    const flash = e.hitFlash > 0;
-    const sprite = (typeof Sprites !== 'undefined') ? Sprites.get(def.id) : null;
 
     if (sprite) {
       drawImageBillboard(sprite, drawStartX, drawStartY, spriteW, spriteH,
