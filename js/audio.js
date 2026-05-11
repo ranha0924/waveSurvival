@@ -21,7 +21,7 @@ const Audio = (() => {
       loadSample('reload',     'assets/audio/reload.mp3');
       loadSample('pistol',     'assets/audio/pistol.wav');
       loadSample('shotgun',    'assets/audio/shotgun.wav');
-      loadSample('machinegun', 'assets/audio/machinegun.wav');
+      loadSample('machinegun', 'assets/audio/machinegun.mp3');
       loadSample('sniper',     'assets/audio/sniper.mp3');
       loadSample('footstep',   'assets/audio/footstep.wav');
     } catch (e) {
