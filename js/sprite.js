@@ -151,3 +151,4 @@ Sprites.register('tank',   'assets/tank.png',   { scale: 1.5 });
 Sprites.register('ranger', 'assets/ranger.png');
 Sprites.register('boss',   'assets/boss.png',   { scale: 2.2 });
 Sprites.register('bomber', 'assets/bomber.png');
+Sprites.register('splitter', 'assets/splitter.png');
