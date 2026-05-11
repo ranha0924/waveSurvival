@@ -25,6 +25,7 @@ const Raycaster = (() => {
   // Pre-baked sky/floor decoration canvases. Built lazily so init order
   // doesn't matter. Stars + skyline are seeded so they're stable run-to-run.
   let concreteTile = null;       // small repeating concrete texture
+  let concreteTileData = null;   // cached Uint8ClampedArray for per-pixel reads
   let skylineCanvas = null;      // building silhouettes baked at canvas width
   let skylineWidth = 0;          // width skylineCanvas was baked for
   let starField = null;          // [{x,y,size,twinkleRate,twinklePhase}]
@@ -74,7 +75,7 @@ const Raycaster = (() => {
     theme = theme || Environment.themeForWave(1);
 
     drawSky(theme, horizonOffset);
-    drawFloor(theme, horizonOffset);
+    drawFloor(player, theme, horizonOffset);
 
     castWalls(player, horizonOffset, theme);
 
@@ -288,7 +289,13 @@ const Raycaster = (() => {
   }
 
   function ensureBakedAssets() {
-    if (!concreteTile) concreteTile = buildConcreteTile();
+    if (!concreteTile) {
+      concreteTile = buildConcreteTile();
+      // Cache pixel buffer so the per-pixel floor cast can sample without
+      // hitting getImageData every frame.
+      concreteTileData = concreteTile.getContext('2d')
+        .getImageData(0, 0, concreteTile.width, concreteTile.height).data;
+    }
     if (!starField)    starField    = buildStarField();
     if (!cloudBank)    cloudBank    = buildCloudBank();
     if (!skylineCanvas || skylineWidth !== W) {
@@ -432,47 +439,118 @@ const Raycaster = (() => {
     ctx.restore();
   }
 
-  function drawFloor(theme, horizonOffset) {
+  function drawFloor(player, theme, horizonOffset) {
     ensureBakedAssets();
     const horizon = H / 2 + horizonOffset;
     if (horizon >= H) return;
     const M = 64;
-    // Base gradient — cool concrete tones (set in environment.js)
+
+    // Base gradient still gets laid down first so any rows the per-pixel
+    // cast skips (e.g., when horizon hits the bottom of screen) still have
+    // a sensible color underneath.
     const grad = ctx.createLinearGradient(0, horizon, 0, H + M);
     grad.addColorStop(0, theme.floorFar);
     grad.addColorStop(1, theme.floorNear);
     ctx.fillStyle = grad;
     ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
 
-    // Concrete tile overlay. The pattern is screen-aligned (not properly
-    // perspective-warped) but the alpha fades to zero at the horizon so the
-    // eye reads the texture as ground detail rather than a wallpaper.
-    if (concreteTile) {
-      const pattern = ctx.createPattern(concreteTile, 'repeat');
-      ctx.save();
-      ctx.fillStyle = pattern;
-      ctx.globalAlpha = 0.55;
-      ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
-      // Distance fade — darker overlay from horizon outward.
-      const fade = ctx.createLinearGradient(0, horizon, 0, H);
-      fade.addColorStop(0,    `rgba(${theme.floorFar ? hexToRgb(theme.floorFar) : '0,0,0'},0.90)`);
-      fade.addColorStop(0.20, `rgba(${theme.floorFar ? hexToRgb(theme.floorFar) : '0,0,0'},0.55)`);
-      fade.addColorStop(1,    'rgba(0,0,0,0)');
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = fade;
-      ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
-      ctx.restore();
-    }
+    castFloor(player, theme, horizon);
 
-    // Horizon haze band — pulls the eye toward the vanishing point and ties
-    // the floor color into the sky's warm/cool palette.
+    // Horizon haze band — sits on top so the texture transitions softly
+    // into the sky color rather than ending in a hard line.
     const haze = theme.haze || '180,160,140';
     const hazeH = Math.min(60, (H - horizon) * 0.35);
     const hazeGrad = ctx.createLinearGradient(0, horizon, 0, horizon + hazeH);
-    hazeGrad.addColorStop(0, `rgba(${haze},0.50)`);
+    hazeGrad.addColorStop(0, `rgba(${haze},0.55)`);
     hazeGrad.addColorStop(1, `rgba(${haze},0)`);
     ctx.fillStyle = hazeGrad;
     ctx.fillRect(-M, horizon, W + 2 * M, hazeH);
+  }
+
+  // True per-pixel floor cast. For each screen row below the horizon, the
+  // world distance for points on that row is constant; sample the concrete
+  // tile in world coordinates (1 tile = 1 world unit) so the texture actually
+  // recedes toward the vanishing point instead of being a screen-aligned
+  // wallpaper. Camera rotation rotates the texture too — joint lines run
+  // forward into the distance like real expansion joints, not vertically
+  // down the screen.
+  function castFloor(player, theme, horizon) {
+    if (!concreteTileData) return;
+    const TW = concreteTile.width;   // 128
+    const TH = concreteTile.height;
+    const horizonI = Math.floor(horizon);
+    if (horizonI >= H) return;
+
+    const startY = Math.max(horizonI + 1, 0);
+    const rowsH = H - startY;
+    if (rowsH <= 0) return;
+
+    const img = ctx.getImageData(0, startY, W, rowsH);
+    const data = img.data;
+
+    const cosA = Math.cos(player.angle);
+    const sinA = Math.sin(player.angle);
+    const tanFov = Math.tan(FOV / 2);
+
+    // Far-color fade target — blend toward this as distance grows so the
+    // texture doesn't pop against the gradient underneath.
+    const fr = parseInt(theme.floorFar.slice(1, 3), 16);
+    const fg = parseInt(theme.floorFar.slice(3, 5), 16);
+    const fb = parseInt(theme.floorFar.slice(5, 7), 16);
+
+    // 1 tile == 1 world unit. Larger TILE_SCALE → smaller-looking tile on
+    // the ground; tuned so cracks/joints are visible up close without the
+    // tile boundary becoming obvious.
+    const TILE_SCALE = 0.5;
+
+    for (let y = startY; y < H; y++) {
+      const rowY = y - horizonI;
+      if (rowY <= 0) continue;
+      const rowDist = (H * 0.5) / rowY;
+
+      // Left-edge ray (cameraX = -1) and step per screen column.
+      const rayL_x = cosA + sinA * tanFov;
+      const rayL_y = sinA - cosA * tanFov;
+      const rayR_x = cosA - sinA * tanFov;
+      const rayR_y = sinA + cosA * tanFov;
+      const worldXL = player.x + rayL_x * rowDist;
+      const worldYL = player.y + rayL_y * rowDist;
+      const worldXR = player.x + rayR_x * rowDist;
+      const worldYR = player.y + rayR_y * rowDist;
+      const stepX = (worldXR - worldXL) / W;
+      const stepY = (worldYR - worldYL) / W;
+
+      // Texture visibility: full strength up close, fades into floorFar.
+      const fade = Math.min(1, 4.5 / rowDist);
+      const oneMinusFade = 1 - fade;
+
+      let wx = worldXL;
+      let wy = worldYL;
+      const rowBase = (y - startY) * W * 4;
+
+      for (let x = 0; x < W; x++) {
+        // Tile in world units. World coord → texel.
+        let u = (wx / TILE_SCALE) % 1; if (u < 0) u += 1;
+        let v = (wy / TILE_SCALE) % 1; if (v < 0) v += 1;
+        const tx = (u * TW) | 0;
+        const ty = (v * TH) | 0;
+        const tIdx = (ty * TW + tx) * 4;
+        const idx = rowBase + x * 4;
+
+        const tr = concreteTileData[tIdx];
+        const tg = concreteTileData[tIdx + 1];
+        const tb = concreteTileData[tIdx + 2];
+        data[idx]     = (tr * fade + fr * oneMinusFade) | 0;
+        data[idx + 1] = (tg * fade + fg * oneMinusFade) | 0;
+        data[idx + 2] = (tb * fade + fb * oneMinusFade) | 0;
+        data[idx + 3] = 255;
+
+        wx += stepX;
+        wy += stepY;
+      }
+    }
+
+    ctx.putImageData(img, 0, startY);
   }
 
   function hexToRgb(hex) {
