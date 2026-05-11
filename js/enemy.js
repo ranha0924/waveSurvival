@@ -220,8 +220,6 @@ const Enemies = (() => {
       const ny = p.y + p.vy * dt;
       // Wall collision
       if (GameMap.isWall(nx, ny)) {
-        Player.spawnImpactParticles ? null : null;
-        // simple impact
         for (let j = 0; j < 4; j++) {
           particles.push({
             x: p.x, y: p.y,
@@ -263,9 +261,32 @@ const Enemies = (() => {
     }
   }
 
+  // Combo + score bookkeeping for indirect (chain / splash) kills, mirroring
+  // the logic in player.damageEnemy so the player gets proper credit when an
+  // explosive shot or bomber chain finishes off an enemy.
+  function awardChainKill(player, victim, scoreCallback) {
+    if (!scoreCallback) return;
+    const t = performance.now() / 1000;
+    if (t - player.lastKillTime < 2.0) {
+      player.comboCount = Math.min(3, player.comboCount + 1);
+    } else {
+      player.comboCount = 0;
+    }
+    player.lastKillTime = t;
+    if (player.comboCount > player.maxComboReached) {
+      player.maxComboReached = player.comboCount;
+    }
+    const comboMult = [1, 1.5, 2, 3][player.comboCount] || 1;
+    scoreCallback(Math.floor(victim.type.score * comboMult), victim);
+    player.kills++;
+    if (victim.type.isBoss) player.bossKills++;
+  }
+
   // Bomber explosion. Damages player + nearby enemies; spawns visual burst.
-  // Used both for "killed by bullet" and "got too close" code paths.
-  function detonateBomber(e, player, enemies, particles) {
+  // Used both for "killed by bullet" (scoreCallback present → chain kills are
+  // credited to the player) and "got too close" (no callback → bomber walked
+  // into the player and the player doesn't earn the kill).
+  function detonateBomber(e, player, enemies, particles, scoreCallback) {
     if (!e.alive) return;
     e.alive = false;
     Player.spawnExplosion(particles, e.x, e.y);
@@ -290,6 +311,7 @@ const Enemies = (() => {
         if (o.hp <= 0) {
           o.alive = false;
           Audio.enemyDeath();
+          awardChainKill(player, o, scoreCallback);
         }
       }
     }
@@ -353,13 +375,14 @@ const Enemies = (() => {
 
   // Called from player.js after a bullet kill resolves. Lets enemy types
   // run their own death side-effects (split, explode) without coupling
-  // player.js to specific type ids.
-  function onKilled(e, player, enemies, particles) {
+  // player.js to specific type ids. scoreCallback is forwarded so chain
+  // kills from a player-triggered detonation count toward score/kills/combo.
+  function onKilled(e, player, enemies, particles, scoreCallback) {
     if (e.type.explodeOnContact) {
       // Bullet-killed bomber still detonates. alive is already false; reset
       // so detonateBomber's guard passes, then immediately set false again.
       e.alive = true;
-      detonateBomber(e, player, enemies, particles);
+      detonateBomber(e, player, enemies, particles, scoreCallback);
     } else if (e.type.splitsInto) {
       spawnSplitChildren(e, enemies, player);
     }

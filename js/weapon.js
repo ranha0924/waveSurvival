@@ -76,13 +76,6 @@ const Weapons = (() => {
     }
   };
 
-  function clone(def) {
-    return JSON.parse(JSON.stringify({
-      ...def,
-      reserveAmmo: def.ammoInfinite ? null : def.reserveAmmo
-    }));
-  }
-
   function buildLoadout() {
     // Returns fresh weapons object for a new game
     const loadout = {};

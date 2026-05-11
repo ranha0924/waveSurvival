@@ -256,7 +256,7 @@ const Raycaster = (() => {
     }
 
     const x0 = Math.max(0, drawStartX);
-    const x1 = Math.min(W - 1, drawStartX + spriteW);
+    const x1 = Math.min(W, drawStartX + spriteW);
     const fog = Math.min(1, proj.dist / theme.fogDist);
     const lightFactor = theme.ambient * (1 - fog * 0.6);
 
@@ -314,7 +314,10 @@ const Raycaster = (() => {
       const barW = spriteW * 0.6;
       const barH = Math.max(2, spriteH * 0.03);
       const barX = proj.screenX - barW / 2;
-      const barY = drawStartY - barH * 2;
+      // Anchor above the head, but pin to a small top margin so very tall /
+      // very close scaled enemies (boss × 2.2) still show their HP bar
+      // on-screen instead of drifting off above the canvas.
+      const barY = Math.max(2, drawStartY - barH * 2);
       const cx = Math.floor(proj.screenX);
       if (cx >= 0 && cx < W && zBuffer[cx] > proj.dist) {
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
