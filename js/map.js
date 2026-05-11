@@ -138,7 +138,7 @@ const GameMap = (() => {
     3: { heightFactor: 1.30, seeOver: false, topDeco: 'crenel'  },  // crenellated watchtower
     4: { heightFactor: 1.00, seeOver: false, topDeco: 'corners' },  // container corner caps
     5: { heightFactor: 0.50, seeOver: true,  topDeco: null      },  // sandbag, low cover
-    6: { heightFactor: 0.65, seeOver: true,  topDeco: 'turret'  },  // wreck with raised cab/turret
+    6: { heightFactor: 1.00, seeOver: false, topDeco: 'turret'  },  // stacked wreck — full cover, cab still pokes up
     7: { heightFactor: 1.55, seeOver: false, topDeco: 'antenna' },  // comms pillar + spire
     8: { heightFactor: 1.00, seeOver: false, topDeco: 'beacon'  }   // hazard panel with warning light
   };

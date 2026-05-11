@@ -299,7 +299,11 @@ const Player = (() => {
       }
       if (dist > maxDist) return maxDist;
       const t = GameMap.getTile(mapX, mapY);
-      if (t >= 1 && t <= 4) return dist;
+      // Stop the bullet at any wall that isn't explicitly chest-high cover.
+      // Previously this only checked types 1..4, which silently let bullets
+      // (and sight) pass through comms towers / hazard panels / wrecks even
+      // though they're full-height structures.
+      if (t >= 1 && t <= 8 && !GameMap.getShape(t).seeOver) return dist;
     }
     return maxDist;
   }
