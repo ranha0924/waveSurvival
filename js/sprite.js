@@ -148,3 +148,4 @@ const Sprites = (() => {
 Sprites.register('grunt',  'assets/zombie.png');
 Sprites.register('rusher', 'assets/rusher.png');
 Sprites.register('tank',   'assets/tank.png', { scale: 1.5 });
+Sprites.register('ranger', 'assets/ranger.png');
