@@ -2,9 +2,14 @@
 const UI = (() => {
   const $ = id => document.getElementById(id);
 
+  // ---------- State ----------
   let minimapCtx;
-  let _hitFlashTimer = 0;
+  // setTimeout handle for the auto-hide on the mid-run "신기록" banner. Kept
+  // module-scoped so a second record breaking before the first banner fades
+  // doesn't leave a stale timeout that hides the new one early.
+  let _recordBannerTimer = 0;
 
+  // ---------- Init / HUD show ----------
   function init() {
     minimapCtx = $('minimap').getContext('2d');
   }
@@ -57,6 +62,7 @@ const UI = (() => {
     }
   }
 
+  // ---------- Minimap ----------
   function drawMinimap(player, enemies) {
     const c = minimapCtx;
     const size = 200;
@@ -126,6 +132,7 @@ const UI = (() => {
     c.fill();
   }
 
+  // ---------- Banners (wave start, new record) ----------
   // Show banner like "WAVE 3"
   function showWaveBanner(text) {
     const b = $('wave-banner');
@@ -140,7 +147,6 @@ const UI = (() => {
 
   // "신기록!" banner — bigger and more celebratory than the wave banner.
   // Shown when the player breaks their previous best mid-run.
-  let _recordBannerTimer = 0;
   function showRecordBanner(title, subtitle) {
     const wrap = $('record-banner');
     if (!wrap) return;
@@ -154,8 +160,9 @@ const UI = (() => {
     _recordBannerTimer = setTimeout(() => wrap.classList.add('hidden'), 3000);
   }
 
-  // Title-screen best display + nickname input helpers. Renders both the
-  // all-time records and the daily-seed records (which auto-reset every day).
+  // ---------- Title-screen records + nickname ----------
+  // Renders both the all-time records and the daily-seed records (which
+  // auto-reset every day).
   function updateTitleRecords(records, daily) {
     const wrap = $('best-records');
     if (wrap) {
@@ -187,7 +194,8 @@ const UI = (() => {
     if (el) el.value = v || '';
   }
 
-  // HUD BEST tags: small text next to wave/score showing the snapshot to beat.
+  // ---------- HUD record markers ----------
+  // BEST tags: small text next to wave/score showing the snapshot to beat.
   function setHudBest(records) {
     const wb = $('wave-best');
     const sb = $('score-best');
@@ -205,6 +213,7 @@ const UI = (() => {
     $('score') && $('score').classList.remove('beat-best');
   }
 
+  // ---------- Hit / enrage screen effects ----------
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -230,7 +239,7 @@ const UI = (() => {
     setTimeout(() => vig.classList.remove('enrage'), 1500);
   }
 
-  // Title / pause / gameover screens
+  // ---------- Overlay screens (title / pause / lock-prompt / gameover) ----------
   function showTitle() { $('title-screen').classList.remove('hidden'); }
   function hideTitle() { $('title-screen').classList.add('hidden'); }
   function showPause() { $('pause-screen').classList.remove('hidden'); }
@@ -290,7 +299,7 @@ const UI = (() => {
   }
   function hideGameOver() { $('gameover-screen').classList.add('hidden'); }
 
-  // Upgrade selection
+  // ---------- Upgrade selection ----------
   const upgrades = [
     // Attack
     { cat: 'attack', icon: '⚔', title: '데미지 +15%', desc: '모든 무기 데미지 증가', apply: (p) => p.damageMult *= 1.15 },
@@ -373,6 +382,7 @@ const UI = (() => {
   }
   function hideUpgradeMenu() { $('upgrade-screen').classList.add('hidden'); }
 
+  // ---------- First-person gun overlay ----------
   // First-person gun sprites — one per weapon. Sniper falls back to the M4.
   const GUN_SPRITES = {
     pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.21, y: 0.06 } },
