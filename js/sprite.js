@@ -147,5 +147,6 @@ const Sprites = (() => {
 // in, the renderer falls back to its procedural rectangle silhouette.
 Sprites.register('grunt',  'assets/zombie.png');
 Sprites.register('rusher', 'assets/rusher.png');
-Sprites.register('tank',   'assets/tank.png', { scale: 1.5 });
+Sprites.register('tank',   'assets/tank.png',   { scale: 1.5 });
 Sprites.register('ranger', 'assets/ranger.png');
+Sprites.register('boss',   'assets/boss.png',   { scale: 2.2 });
