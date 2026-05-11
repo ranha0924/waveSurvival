@@ -27,6 +27,14 @@ const Raycaster = (() => {
   let concreteTile = null;       // small repeating concrete texture
   let concreteTileData = null;   // cached Uint8ClampedArray for per-pixel reads
   let skylineCanvas = null;      // building silhouettes baked at canvas width
+  // Reusable buffer for the floor cast. castFloor overwrites every pixel each
+  // frame, so we use createImageData (no GPU→CPU readback) and reuse the
+  // same Uint8ClampedArray across frames — getImageData + reallocation per
+  // frame was the bottleneck that made the game unplayable on lower-end
+  // machines.
+  let floorBuf = null;
+  let floorBufW = 0;
+  let floorBufH = 0;
   let skylineWidth = 0;          // width skylineCanvas was baked for
   let starField = null;          // [{x,y,size,twinkleRate,twinklePhase}]
   let cloudBank = null;          // dark cloud blobs for storm/dusk
@@ -68,6 +76,7 @@ const Raycaster = (() => {
     zBuffer = new Float32Array(W);
     shortDist = new Float32Array(W);
     wallTopY = new Float32Array(W);
+    floorBuf = null;
     if (ctx) ctx.imageSmoothingEnabled = false;
   }
 
@@ -513,7 +522,15 @@ const Raycaster = (() => {
     const rowsH = H - startY;
     if (rowsH <= 0) return;
 
-    const img = ctx.getImageData(0, startY, W, rowsH);
+    // Reuse the floor pixel buffer across frames. getImageData would force a
+    // GPU→CPU readback every frame even though we overwrite every pixel
+    // anyway, which was costing several ms per frame at full resolution.
+    if (!floorBuf || floorBufW !== W || floorBufH !== rowsH) {
+      floorBuf = ctx.createImageData(W, rowsH);
+      floorBufW = W;
+      floorBufH = rowsH;
+    }
+    const img = floorBuf;
     const data = img.data;
 
     const cosA = Math.cos(player.angle);
