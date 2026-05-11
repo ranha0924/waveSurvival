@@ -68,16 +68,30 @@ const Player = (() => {
       dx = (cos * fwd - sin * right) * speed * dt;
       dy = (sin * fwd + cos * right) * speed * dt;
       const moved = GameMap.tryMove(p.x, p.y, dx, dy, p.radius);
+      const dxMoved = moved.x - p.x;
+      const dyMoved = moved.y - p.y;
+      const stepDist = Math.sqrt(dxMoved * dxMoved + dyMoved * dyMoved);
       p.x = moved.x; p.y = moved.y;
 
       // Bob
       p.bobPhase += dt * (running ? 14 : 9);
       p.bobOffset = Math.sin(p.bobPhase) * (running ? 6 : 4);
 
+      // Footstep trigger: fire a step roughly every ~0.55 world units when
+      // walking (~0.40 when running) so the cadence matches the bob.
+      // Tracked via an accumulator so framerate jitter doesn't drift it.
+      p.footstepAccum = (p.footstepAccum || 0) + stepDist;
+      const strideLen = running ? 0.40 : 0.55;
+      if (p.footstepAccum >= strideLen) {
+        p.footstepAccum -= strideLen;
+        Audio.footstep();
+      }
+
       // Stamina drain
       if (running) p.stamina = Math.max(0, p.stamina - 35 * dt);
     } else {
       p.bobOffset *= 0.85;
+      p.footstepAccum = 0;
     }
 
     // Stamina regen
