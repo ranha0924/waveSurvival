@@ -493,7 +493,9 @@
       p.vx *= Math.exp(-dt * 3);
       p.vy *= Math.exp(-dt * 3);
       p.zOffset += p.vz * dt;
-      p.vz -= dt * 6;
+      // Damage-number floats use noGravity so they rise steadily instead of
+      // arcing back down like blood/impact debris.
+      if (!p.noGravity) p.vz -= dt * 6;
       if (p.life <= 0) game.particles.splice(i, 1);
     }
   }
