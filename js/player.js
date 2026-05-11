@@ -400,17 +400,11 @@ const Player = (() => {
     });
   }
 
-  // Two-layer death burst. Replaces the old "14 identical droplets" loop.
-  //
-  //  layer 1 — fast spray: high-velocity airborne droplets that arc back
-  //            down with gravity (existing particle physics). Reads as the
-  //            "explode outward" moment of the kill.
-  //  layer 2 — ground stains: stationary, noGravity, pinned to a low
-  //            zOffset and long life. They linger on the floor as a visible
-  //            kill record without spawning a separate corpse entity.
-  //
-  // Boss kills scale the counts/velocities up; headshots add an extra
-  // high-arc burst from the head area so head shots feel chunkier.
+  // Single-layer death burst — fast airborne droplets only. The previous
+  // version also dropped lingering ground stains as a stand-in for corpses,
+  // but they didn't read as bodies and just clutter the floor, so the layer
+  // is gone. Headshots still add a higher-arc burst from the head area for
+  // extra feedback.
   function spawnDeathBurst(particles, x, y, color, headshot, isBoss) {
     const baseScale = isBoss ? 2.4 : 1.0;
     const sprayCount = Math.floor(18 * baseScale);
@@ -424,29 +418,6 @@ const Player = (() => {
         size: 2 + Math.random() * 2.5,
         color,
         life: 1.0 + Math.random() * 0.5
-      });
-    }
-    // Darker shade for ground stains so they read as dried/pooled rather
-    // than fresh spray.
-    const stainColor = [
-      Math.floor(color[0] * 0.55),
-      Math.floor(color[1] * 0.50),
-      Math.floor(color[2] * 0.50)
-    ];
-    const stainCount = Math.floor(12 * baseScale);
-    for (let i = 0; i < stainCount; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const r = 0.08 + Math.random() * 0.4 * baseScale;
-      particles.push({
-        x: x + Math.cos(a) * r,
-        y: y + Math.sin(a) * r,
-        vx: 0, vy: 0,
-        zOffset: 0.02 + Math.random() * 0.06,
-        vz: 0,
-        noGravity: true,
-        size: 3 + Math.random() * 4,
-        color: stainColor,
-        life: 3.5 + Math.random() * 1.5
       });
     }
     if (headshot) {
