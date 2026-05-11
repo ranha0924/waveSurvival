@@ -260,9 +260,9 @@ const Player = (() => {
     e.hp -= dmg;
     e.hitFlash = 0.1;
     // Pick the hit sound by enemy class so heavy/armored targets feel
-    // distinct from regular flesh hits and head shots always crack.
-    if (headshot) Audio.headshot();
-    else if (e.type.isBoss) Audio.hitBoss();
+    // distinct from regular flesh hits. Headshots fall through to the same
+    // sample so there's no synth "crack" layered on top of the impact.
+    if (e.type.isBoss) Audio.hitBoss();
     else if (e.type.id === 'tank') Audio.hitArmor();
     else Audio.hitFlesh();
     spawnDamageNumber(particles, e.x, e.y, dmg, headshot);
