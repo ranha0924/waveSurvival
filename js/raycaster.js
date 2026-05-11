@@ -11,10 +11,18 @@ const Raycaster = (() => {
   let shortDist;
   const FOV = Math.PI / 3; // 60deg
 
+  // Offscreen buffer used to apply per-frame fog/flash tint to image sprites
+  // before blitting them column-by-column. Reused across enemies; resized
+  // on demand to match the source sprite's native dimensions.
+  const tintBuf = document.createElement('canvas');
+  const tintCtx = tintBuf.getContext('2d');
+
   function init(canvasEl) {
     canvas = canvasEl;
     ctx = canvas.getContext('2d');
     resize();
+    // Crisp pixel-art scaling for image sprites.
+    ctx.imageSmoothingEnabled = false;
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', resize);
     if (window.visualViewport) {
@@ -42,6 +50,7 @@ const Raycaster = (() => {
     H = canvas.height;
     zBuffer = new Float32Array(W);
     shortDist = new Float32Array(W);
+    if (ctx) ctx.imageSmoothingEnabled = false;
   }
 
   function render(player, enemies, particles, horizonOffset, theme) {
@@ -233,49 +242,56 @@ const Raycaster = (() => {
     const lightFactor = theme.ambient * (1 - fog * 0.6);
 
     const def = e.type;
-    const bodyColor = shadeColor(def.color, lightFactor);
-    const headColor = shadeColor(def.headColor, lightFactor);
     const flash = e.hitFlash > 0;
+    const sprite = (typeof Sprites !== 'undefined') ? Sprites.get(def.id) : null;
 
-    for (let x = x0; x < x1; x++) {
-      if (zBuffer[x] < proj.dist) continue;
-      const localX = (x - drawStartX) / spriteW;
-      const fromCenter = Math.abs(localX - 0.5) * 2;
-      if (fromCenter > 0.95) continue;
+    if (sprite) {
+      drawImageBillboard(sprite, drawStartX, drawStartY, spriteW, spriteH,
+        proj.dist, lightFactor, flash, horizon);
+    } else {
+      const bodyColor = shadeColor(def.color, lightFactor);
+      const headColor = shadeColor(def.headColor, lightFactor);
 
-      const bodyTop = drawStartY + spriteH * 0.3;
-      let bodyBottom = drawStartY + spriteH;
-      const headTop = drawStartY;
-      const headBottom = drawStartY + spriteH * 0.3;
+      for (let x = x0; x < x1; x++) {
+        if (zBuffer[x] < proj.dist) continue;
+        const localX = (x - drawStartX) / spriteW;
+        const fromCenter = Math.abs(localX - 0.5) * 2;
+        if (fromCenter > 0.95) continue;
 
-      // If a short (see-over) wall stands between the player and this sprite
-      // in this column, clip the body at the horizon line — only the upper
-      // body should peek above the barricade.
-      if (proj.dist > shortDist[x]) bodyBottom = Math.min(bodyBottom, horizon);
+        const bodyTop = drawStartY + spriteH * 0.3;
+        let bodyBottom = drawStartY + spriteH;
+        const headTop = drawStartY;
+        const headBottom = drawStartY + spriteH * 0.3;
 
-      ctx.fillStyle = flash ? '#ffffff' : bodyColor;
-      if (fromCenter < 0.85 && bodyBottom > bodyTop) {
-        ctx.fillRect(x, bodyTop, 1, bodyBottom - bodyTop);
+        // If a short (see-over) wall stands between the player and this sprite
+        // in this column, clip the body at the horizon line — only the upper
+        // body should peek above the barricade.
+        if (proj.dist > shortDist[x]) bodyBottom = Math.min(bodyBottom, horizon);
+
+        ctx.fillStyle = flash ? '#ffffff' : bodyColor;
+        if (fromCenter < 0.85 && bodyBottom > bodyTop) {
+          ctx.fillRect(x, bodyTop, 1, bodyBottom - bodyTop);
+        }
+        if (fromCenter < 0.5) {
+          ctx.fillStyle = flash ? '#ffffff' : headColor;
+          ctx.fillRect(x, headTop, 1, headBottom - headTop);
+        }
       }
-      if (fromCenter < 0.5) {
-        ctx.fillStyle = flash ? '#ffffff' : headColor;
-        ctx.fillRect(x, headTop, 1, headBottom - headTop);
-      }
-    }
 
-    if (proj.dist < 12 && !flash) {
-      const eyeSize = Math.max(2, spriteH * 0.04);
-      const eyeY = drawStartY + spriteH * 0.12;
-      const eyeOffsetX = spriteW * 0.1;
-      const ex1 = proj.screenX - eyeOffsetX;
-      const ex2 = proj.screenX + eyeOffsetX;
-      const eyeColor = def.eyeColor || '#ff2222';
-      ctx.fillStyle = eyeColor;
-      if (zBuffer[Math.floor(ex1)] > proj.dist) {
-        ctx.fillRect(ex1 - eyeSize / 2, eyeY, eyeSize, eyeSize);
-      }
-      if (zBuffer[Math.floor(ex2)] > proj.dist) {
-        ctx.fillRect(ex2 - eyeSize / 2, eyeY, eyeSize, eyeSize);
+      if (proj.dist < 12 && !flash) {
+        const eyeSize = Math.max(2, spriteH * 0.04);
+        const eyeY = drawStartY + spriteH * 0.12;
+        const eyeOffsetX = spriteW * 0.1;
+        const ex1 = proj.screenX - eyeOffsetX;
+        const ex2 = proj.screenX + eyeOffsetX;
+        const eyeColor = def.eyeColor || '#ff2222';
+        ctx.fillStyle = eyeColor;
+        if (zBuffer[Math.floor(ex1)] > proj.dist) {
+          ctx.fillRect(ex1 - eyeSize / 2, eyeY, eyeSize, eyeSize);
+        }
+        if (zBuffer[Math.floor(ex2)] > proj.dist) {
+          ctx.fillRect(ex2 - eyeSize / 2, eyeY, eyeSize, eyeSize);
+        }
       }
     }
 
@@ -291,6 +307,50 @@ const Raycaster = (() => {
         ctx.fillStyle = '#ff3344';
         ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), barH);
       }
+    }
+  }
+
+  // Blit a registered image sprite as a billboard, column by column so the
+  // z-buffer (walls) and shortDist[] (see-over barricades) clip it correctly.
+  // Tinting is applied once into an offscreen buffer so transparent pixels
+  // stay transparent — using source-atop directly on the main canvas would
+  // bleed the tint into already-drawn walls/sky.
+  function drawImageBillboard(sprite, x0, y0, w, h, dist, light, flash, horizon) {
+    const sw = sprite.w, sh = sprite.h;
+    if (sw === 0 || sh === 0) return;
+
+    if (tintBuf.width !== sw || tintBuf.height !== sh) {
+      tintBuf.width = sw;
+      tintBuf.height = sh;
+    } else {
+      tintCtx.clearRect(0, 0, sw, sh);
+    }
+    tintCtx.imageSmoothingEnabled = false;
+    tintCtx.globalCompositeOperation = 'source-over';
+    tintCtx.drawImage(sprite.canvas, 0, 0);
+    if (flash) {
+      tintCtx.globalCompositeOperation = 'source-atop';
+      tintCtx.fillStyle = '#ffffff';
+      tintCtx.fillRect(0, 0, sw, sh);
+    } else if (light < 1) {
+      tintCtx.globalCompositeOperation = 'source-atop';
+      tintCtx.fillStyle = `rgba(0,0,0,${(1 - light).toFixed(3)})`;
+      tintCtx.fillRect(0, 0, sw, sh);
+    }
+    tintCtx.globalCompositeOperation = 'source-over';
+
+    const xStart = Math.max(0, x0);
+    const xEnd = Math.min(W, x0 + w);
+    for (let x = xStart; x < xEnd; x++) {
+      if (zBuffer[x] < dist) continue;
+      const u = (x - x0) / w;
+      const srcX = Math.min(sw - 1, Math.max(0, Math.floor(u * sw)));
+      let dstY1 = y0 + h;
+      if (dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
+      if (dstY1 <= y0) continue;
+      const dstH = dstY1 - y0;
+      const srcH = Math.max(1, Math.floor((dstH / h) * sh));
+      ctx.drawImage(tintBuf, srcX, 0, 1, srcH, x, y0, 1, dstH);
     }
   }
 
