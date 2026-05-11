@@ -193,15 +193,10 @@ const Audio = (() => {
     tone(45, 0.10, 'sine', 0.25);
   }
 
-  // Headshot crack — sharp high-frequency snap with a quick descending
-  // skull-pop tail. Fires regardless of enemy type so head shots always
-  // sound the most satisfying.
-  function headshot() {
-    if (!ctx) return;
-    noise(0.04, 0.65, 4500, 1.8);
-    tone(1800, 0.03, 'square', 0.28);
-    setTimeout(() => tone(950, 0.04, 'triangle', 0.18), 18);
-  }
+  // Headshot used to layer a synth "crack" on top of the hit sound; the
+  // synth read as a mechanical sound on top of the wet impact sample, so
+  // headshots now just play the regular hit sample (see player.damageEnemy).
+  // Kept removed rather than no-op so callers fail loudly if it's re-added.
 
   function enemyDeath() {
     if (!ctx) return;
@@ -301,7 +296,7 @@ const Audio = (() => {
   return {
     init, resume,
     shootPistol, shootShotgun, shootMachineGun, shootSniper,
-    hit, hitFlesh, hitArmor, hitBoss, headshot,
+    hit, hitFlesh, hitArmor, hitBoss,
     enemyDeath, bossDeath, bossEnrage, explosion,
     playerHit, reload, emptyClick, footstep,
     waveStart, waveClear, gameOver, pickup, uiClick
