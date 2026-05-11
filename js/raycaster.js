@@ -74,12 +74,11 @@ const Raycaster = (() => {
   function render(player, enemies, particles, horizonOffset, theme) {
     theme = theme || Environment.themeForWave(1);
 
-    // Sky / skyline anchor at the pitch-only horizon so distant elements
-    // (sun, moon, stars, building silhouettes) don't bounce up and down
-    // with the player's walking bob. Pitch is still applied so looking up
-    // / down moves the horizon line correctly.
-    const skyOffset = (player.pitch !== undefined) ? player.pitch : horizonOffset;
-    drawSky(theme, skyOffset);
+    // Sky pass is fully detached from the player's pitch + bob so the
+    // backdrop (gradient, sun/moon, stars, skyline) stays painted-on-screen
+    // regardless of camera direction. The floor still tracks the real
+    // horizon so the world below the eye line bobs / tilts naturally.
+    drawSky(theme);
     drawFloor(player, theme, horizonOffset);
 
     castWalls(player, horizonOffset, theme);
@@ -310,18 +309,25 @@ const Raycaster = (() => {
     }
   }
 
-  function drawSky(theme, horizonOffset) {
+  function drawSky(theme) {
     ensureBakedAssets();
-    const horizon = H / 2 + horizonOffset;
-    // Over-paint past the canvas edges so the camera-shake translate never
-    // exposes uncleared pixels along the borders.
+    // Fixed horizon at screen center. The floor pass overpaints its own
+    // area whenever pitch leaves the lower half exposed, so we fill the
+    // entire lower half here too (with the sky's bottom color) to avoid
+    // any unpainted strip when the player tilts up.
+    const horizon = H / 2;
     const M = 64;
     const grad = ctx.createLinearGradient(0, -M, 0, horizon);
     grad.addColorStop(0, theme.skyTop);
     grad.addColorStop(0.6, theme.skyMid);
     grad.addColorStop(1, theme.skyBottom);
     ctx.fillStyle = grad;
-    ctx.fillRect(-M, -M, W + 2 * M, Math.max(0, horizon) + M);
+    ctx.fillRect(-M, -M, W + 2 * M, horizon + M);
+    // Fill the lower half with the sky's bottom color too — the floor draws
+    // over its real area; whatever band of canvas is left between H/2 and
+    // the pitch-shifted real horizon stays a believable sky-bottom band.
+    ctx.fillStyle = theme.skyBottom;
+    ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
 
     const name = theme.name || 'sunset';
     if (name === 'sunset') drawSunsetSky(horizon);
