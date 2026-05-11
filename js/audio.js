@@ -89,11 +89,73 @@ const Audio = (() => {
     tone(200, 0.05, 'sawtooth', 0.15);
   }
 
+  // Wet meat impact — short, dampened low thud + body resonance.
+  // Default for grunt / rusher / ranger / bomber / splitter / splitterChild.
+  function hitFlesh() {
+    if (!ctx) return;
+    noise(0.05, 0.40, 700, 0.6);
+    tone(140, 0.04, 'sine', 0.18);
+  }
+
+  // Metallic / armored hit — for tank. Bright clang on top of a brief noise
+  // sizzle so it cuts through over the dull flesh hits.
+  function hitArmor() {
+    if (!ctx) return;
+    tone(900, 0.04, 'square', 0.22);
+    tone(1500, 0.03, 'triangle', 0.14);
+    noise(0.03, 0.18, 3500, 2);
+  }
+
+  // Boss hit — deeper and beefier than a flesh hit, with a sub-bass thump
+  // so the player feels each round landing on a heavy target.
+  function hitBoss() {
+    if (!ctx) return;
+    noise(0.10, 0.55, 350, 0.5);
+    tone(80, 0.08, 'sawtooth', 0.30);
+    tone(45, 0.10, 'sine', 0.25);
+  }
+
+  // Headshot crack — sharp high-frequency snap with a quick descending
+  // skull-pop tail. Fires regardless of enemy type so head shots always
+  // sound the most satisfying.
+  function headshot() {
+    if (!ctx) return;
+    noise(0.04, 0.65, 4500, 1.8);
+    tone(1800, 0.03, 'square', 0.28);
+    setTimeout(() => tone(950, 0.04, 'triangle', 0.18), 18);
+  }
+
   function enemyDeath() {
     if (!ctx) return;
     tone(300, 0.15, 'sawtooth', 0.25, 0.005, 0.1);
     tone(150, 0.2, 'square', 0.2, 0.005, 0.1);
     setTimeout(() => tone(80, 0.15, 'sawtooth', 0.2), 100);
+  }
+
+  // Boss death — dramatic descending wail layered over an initial impact
+  // and a final low boom. Roughly one second total; fires once per kill.
+  function bossDeath() {
+    if (!ctx) return;
+    noise(0.25, 0.60, 500, 0.4);
+    tone(70, 0.30, 'sawtooth', 0.35);
+    [380, 310, 240, 180, 130, 90].forEach((f, i) => {
+      setTimeout(() => tone(f, 0.22, 'sawtooth', 0.28), i * 75);
+    });
+    setTimeout(() => {
+      noise(0.35, 0.50, 250, 0.35);
+      tone(45, 0.30, 'sine', 0.40);
+    }, 480);
+  }
+
+  // Generic explosion — for bomber detonation and explosive-upgrade splash.
+  // Replaces the previous "reuse the shotgun sound" hack which sounded like
+  // a far-off gunshot rather than a kaboom.
+  function explosion() {
+    if (!ctx) return;
+    noise(0.22, 0.70, 700, 0.45);
+    tone(60, 0.16, 'sawtooth', 0.40);
+    tone(120, 0.10, 'square', 0.22);
+    setTimeout(() => noise(0.12, 0.40, 400, 0.30), 70);
   }
 
   function playerHit() {
@@ -148,7 +210,9 @@ const Audio = (() => {
   return {
     init, resume,
     shootPistol, shootShotgun, shootMachineGun, shootSniper,
-    hit, enemyDeath, playerHit, reload, emptyClick,
+    hit, hitFlesh, hitArmor, hitBoss, headshot,
+    enemyDeath, bossDeath, explosion,
+    playerHit, reload, emptyClick,
     waveStart, waveClear, gameOver, pickup, uiClick
   };
 })();

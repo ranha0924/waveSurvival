@@ -290,7 +290,7 @@ const Enemies = (() => {
     if (!e.alive) return;
     e.alive = false;
     Player.spawnExplosion(particles, e.x, e.y);
-    Audio.shootShotgun();
+    Audio.explosion();
     const r = e.type.explodeRadius;
     const r2 = r * r;
     const dmg = e.type.damage * e.damageMult;

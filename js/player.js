@@ -229,16 +229,23 @@ const Player = (() => {
         }
       }
       spawnExplosion(particles, impactX, impactY);
+      Audio.explosion();
     }
   }
 
   function damageEnemy(p, e, dmg, headshot, particles, enemies, scoreCallback) {
     e.hp -= dmg;
     e.hitFlash = 0.1;
-    Audio.hit();
+    // Pick the hit sound by enemy class so heavy/armored targets feel
+    // distinct from regular flesh hits and head shots always crack.
+    if (headshot) Audio.headshot();
+    else if (e.type.isBoss) Audio.hitBoss();
+    else if (e.type.id === 'tank') Audio.hitArmor();
+    else Audio.hitFlesh();
     if (e.hp <= 0 && e.alive) {
       e.alive = false;
-      Audio.enemyDeath();
+      if (e.type.isBoss) Audio.bossDeath();
+      else Audio.enemyDeath();
       // Score
       const t = performance.now() / 1000;
       if (t - p.lastKillTime < 2.0) {
