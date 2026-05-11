@@ -125,6 +125,24 @@ const GameMap = (() => {
     8: { light: '#d4b020', dark: '#16140a', pattern: 'hazard' }      // hazard
   };
 
+  // Structural silhouette per wall type, read by the raycaster.
+  //   heightFactor — vertical extent vs the default unit cube (1.0). >1 grows
+  //                  upward (towers, antennas); <1 is short cover.
+  //   seeOver       — ray continues past the wall so the world behind still
+  //                  renders. Used for chest-high cover (sandbags, wrecks).
+  //   topDeco       — name of the silhouette drawn above the wall body. See
+  //                  drawTopDeco() in raycaster.js for the catalogue.
+  const wallShapes = {
+    1: { heightFactor: 1.00, seeOver: false, topDeco: 'jagged'  },  // broken-top concrete + barbed wire
+    2: { heightFactor: 1.05, seeOver: false, topDeco: 'roof'    },  // hangar with slight roofline cap
+    3: { heightFactor: 1.30, seeOver: false, topDeco: 'crenel'  },  // crenellated watchtower
+    4: { heightFactor: 1.00, seeOver: false, topDeco: 'corners' },  // container corner caps
+    5: { heightFactor: 0.50, seeOver: true,  topDeco: null      },  // sandbag, low cover
+    6: { heightFactor: 0.65, seeOver: true,  topDeco: 'turret'  },  // wreck with raised cab/turret
+    7: { heightFactor: 1.55, seeOver: false, topDeco: 'antenna' },  // comms pillar + spire
+    8: { heightFactor: 1.00, seeOver: false, topDeco: 'beacon'  }   // hazard panel with warning light
+  };
+
   function getTile(x, y) {
     const ix = Math.floor(x), iy = Math.floor(y);
     if (ix < 0 || ix >= W || iy < 0 || iy >= H) return 1;
@@ -138,6 +156,7 @@ const GameMap = (() => {
 
   function getWallColor(type) { return wallColors[type] || wallColors[1]; }
   function getPattern(type) { return (wallColors[type] && wallColors[type].pattern) || 'concrete'; }
+  function getShape(type) { return wallShapes[type] || wallShapes[1]; }
 
   function getSpawnPoints() {
     const pts = [];
@@ -187,7 +206,7 @@ const GameMap = (() => {
 
   return {
     W, H, data,
-    getTile, isWall, getWallColor, getPattern,
+    getTile, isWall, getWallColor, getPattern, getShape,
     getSpawnPoints, canMove, tryMove, hasLineOfSight,
     PLAYER_START
   };
