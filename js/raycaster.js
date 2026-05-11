@@ -2,19 +2,19 @@
 // Outdoor variant: theme-driven sky, textured walls, long draw distance,
 // atmospheric darkness/fog.
 const Raycaster = (() => {
+  // ---------- State ----------
+  const FOV = Math.PI / 3; // 60deg
+
   let canvas, ctx;
   let W, H;
-  let zBuffer;
-  // Per-column distance to the nearest short (see-over) wall, used by sprites
-  // to clip their lower body so enemies behind a sandbag are obscured below
-  // the wall's top while remaining visible above it.
-  let shortDist;
-  // Per-column screen Y of the nearest opaque wall's TOP. Sprites behind a
-  // wall are clipped against this so a tall enemy still visibly pokes above
-  // a shorter wall — the column-scalar zBuffer alone would hide the entire
-  // sprite, which made the boss look like it had a ceiling sitting on it.
-  let wallTopY;
-  const FOV = Math.PI / 3; // 60deg
+
+  // Per-column depth + clipping buffers. Filled by castWalls each frame and
+  // consumed by sprite rendering so enemies clip against walls correctly.
+  //   zBuffer  : distance to the nearest OPAQUE wall in this column
+  //   shortDist: distance to the nearest SEE-OVER wall (sandbag, wreck)
+  //   wallTopY : screen-Y of the opaque wall's TOP, so a tall enemy can still
+  //              poke above a shorter wall instead of being fully hidden
+  let zBuffer, shortDist, wallTopY;
 
   // Offscreen buffer used to apply per-frame fog/flash tint to image sprites
   // before blitting them column-by-column. Reused across enemies; resized
@@ -22,10 +22,12 @@ const Raycaster = (() => {
   const tintBuf = document.createElement('canvas');
   const tintCtx = tintBuf.getContext('2d');
 
-  // Pre-baked sky/floor decoration canvases. Built lazily so init order
-  // doesn't matter. Stars are seeded so they're stable run-to-run.
+  // Pre-baked decoration assets. Built lazily so script-load order doesn't
+  // matter; seeded so positions stay stable run-to-run.
   let concreteTile = null;       // small repeating concrete texture
   let concreteTileData = null;   // cached Uint8ClampedArray for per-pixel reads
+  let starField = null;          // [{u,v,size,twinkleRate,twinklePhase,baseAlpha}]
+
   // Reusable buffer for the floor cast. castFloor overwrites every pixel each
   // frame, so we use createImageData (no GPU→CPU readback) and reuse the
   // same Uint8ClampedArray across frames — getImageData + reallocation per
@@ -34,14 +36,12 @@ const Raycaster = (() => {
   let floorBuf = null;
   let floorBufW = 0;
   let floorBufH = 0;
-  let starField = null;          // [{x,y,size,twinkleRate,twinklePhase}]
 
+  // ---------- Init / resize ----------
   function init(canvasEl) {
     canvas = canvasEl;
     ctx = canvas.getContext('2d');
     resize();
-    // Crisp pixel-art scaling for image sprites.
-    ctx.imageSmoothingEnabled = false;
     // Bake the per-tile wall body textures (sandbag bags, container ribs,
     // brick courses, etc.) so drawWall can sample 1px columns from them.
     if (typeof WallTextures !== 'undefined') WallTextures.buildAll();
@@ -77,6 +77,7 @@ const Raycaster = (() => {
     if (ctx) ctx.imageSmoothingEnabled = false;
   }
 
+  // ---------- Frame orchestration ----------
   function render(player, enemies, particles, horizonOffset, theme) {
     theme = theme || Environment.themeForWave(1);
 
@@ -86,24 +87,24 @@ const Raycaster = (() => {
     // the eye line bobs / tilts naturally.
     drawSky(theme, player);
     drawFloor(player, theme, horizonOffset);
-
     castWalls(player, horizonOffset, theme);
+    drawSprites(player, enemies, particles, horizonOffset, theme);
+  }
 
+  // Collect every billboarded thing in the world, sort far→near so closer
+  // sprites overdraw farther ones, then dispatch to its type-specific draw.
+  function drawSprites(player, enemies, particles, horizonOffset, theme) {
     const sprites = [];
+    const push = (x, y, type, ref) => {
+      const dx = x - player.x, dy = y - player.y;
+      sprites.push({ dist: dx * dx + dy * dy, type, ref });
+    };
     for (const e of enemies) {
-      if (!e.alive) continue;
-      const dx = e.x - player.x, dy = e.y - player.y;
-      sprites.push({ x: e.x, y: e.y, dist: dx * dx + dy * dy, type: 'enemy', ref: e });
+      if (e.alive) push(e.x, e.y, 'enemy', e);
     }
-    for (const p of particles) {
-      const dx = p.x - player.x, dy = p.y - player.y;
-      sprites.push({ x: p.x, y: p.y, dist: dx * dx + dy * dy, type: 'particle', ref: p });
-    }
+    for (const p of particles) push(p.x, p.y, 'particle', p);
     if (typeof Pickups !== 'undefined') {
-      for (const k of Pickups.getList()) {
-        const dx = k.x - player.x, dy = k.y - player.y;
-        sprites.push({ x: k.x, y: k.y, dist: dx * dx + dy * dy, type: 'pickup', ref: k });
-      }
+      for (const k of Pickups.getList()) push(k.x, k.y, 'pickup', k);
     }
     sprites.sort((a, b) => b.dist - a.dist);
 
@@ -114,6 +115,7 @@ const Raycaster = (() => {
     }
   }
 
+  // ---------- Pickup sprites ----------
   // Pickup billboards sit on the floor and bob slightly. Rendered like enemy
   // sprites (column-by-column blit so the existing zBuffer / wallTopY /
   // shortDist clipping all still apply), but at ~30% of an enemy's size.
@@ -154,6 +156,7 @@ const Raycaster = (() => {
     ctx.restore();
   }
 
+  // ---------- Baked assets (concrete tile, star field) ----------
   // Mulberry32 — same generator we use for wall textures, seeded per asset
   // so star positions / concrete cracks stay stable.
   function rng(seed) {
@@ -249,6 +252,7 @@ const Raycaster = (() => {
     if (!starField) starField = buildStarField();
   }
 
+  // ---------- Sky pass ----------
   function drawSky(theme, player) {
     ensureBakedAssets();
     // Sky horizon rides the smoothed pitch so the gradient bottom stays
@@ -302,6 +306,7 @@ const Raycaster = (() => {
     }
   }
 
+  // ---------- Floor pass ----------
   function drawFloor(player, theme, horizonOffset) {
     ensureBakedAssets();
     const horizon = H / 2 + horizonOffset;
@@ -447,13 +452,7 @@ const Raycaster = (() => {
     ctx.putImageData(img, 0, startY);
   }
 
-  function hexToRgb(hex) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `${r},${g},${b}`;
-  }
-
+  // ---------- Wall pass ----------
   function castWalls(player, horizonOffset, theme) {
     const cosA = Math.cos(player.angle);
     const sinA = Math.sin(player.angle);
@@ -707,6 +706,7 @@ const Raycaster = (() => {
     }
   }
 
+  // ---------- Sprites + helpers ----------
   function shadeColor(hex, factor) {
     factor = Math.max(0, factor);
     const r = parseInt(hex.slice(1, 3), 16);
