@@ -545,7 +545,6 @@ const Raycaster = (() => {
     const proj = projectSprite(player, p.x, p.y);
     if (!proj) return;
     const horizon = H / 2 + horizonOffset;
-    const sz = Math.max(2, Math.floor(H / proj.dist * p.size * 0.05));
     const drawY = Math.floor(horizon - p.zOffset * H / proj.dist);
     const drawX = proj.screenX;
     const cx = Math.floor(drawX);
@@ -553,6 +552,28 @@ const Raycaster = (() => {
     if (zBuffer[cx] < proj.dist) return;
     if (proj.dist > shortDist[cx] && drawY > horizon) return;
     const fog = Math.min(1, proj.dist / theme.fogDist);
+
+    if (p.text) {
+      // Floating damage number: scale font by distance so far hits stay
+      // legible without dwarfing close ones, draw a black outline so it
+      // reads against bright walls/sprites, and fade by remaining life.
+      const baseSize = p.headshot ? 36 : 28;
+      const fontSize = Math.max(11, Math.min(48, Math.floor(baseSize / proj.dist * 4)));
+      const alpha = Math.min(1, p.life * 1.4) * (1 - fog * 0.4);
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = `rgba(0,0,0,${alpha.toFixed(3)})`;
+      ctx.fillText(p.text, drawX - 1, drawY);
+      ctx.fillText(p.text, drawX + 1, drawY);
+      ctx.fillText(p.text, drawX, drawY - 1);
+      ctx.fillText(p.text, drawX, drawY + 1);
+      ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${alpha.toFixed(3)})`;
+      ctx.fillText(p.text, drawX, drawY);
+      return;
+    }
+
+    const sz = Math.max(2, Math.floor(H / proj.dist * p.size * 0.05));
     ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.life * (1 - fog * 0.5)})`;
     ctx.fillRect(drawX - sz / 2, drawY - sz / 2, sz, sz);
   }

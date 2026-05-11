@@ -242,6 +242,7 @@ const Player = (() => {
     else if (e.type.isBoss) Audio.hitBoss();
     else if (e.type.id === 'tank') Audio.hitArmor();
     else Audio.hitFlesh();
+    spawnDamageNumber(particles, e.x, e.y, dmg, headshot);
     if (e.hp <= 0 && e.alive) {
       e.alive = false;
       if (e.type.isBoss) Audio.bossDeath();
@@ -301,6 +302,28 @@ const Player = (() => {
       if (t >= 1 && t <= 4) return dist;
     }
     return maxDist;
+  }
+
+  // Damage numbers float up out of the hit point, fading as they rise.
+  // Headshots come out red+larger so the player gets a clear visual reward.
+  // Spawned per damage instance — shotgun will produce 6 nearby numbers,
+  // which is fine because the small random offsets fan them out as they rise.
+  function spawnDamageNumber(particles, x, y, dmg, headshot) {
+    const value = Math.max(1, Math.ceil(dmg));
+    particles.push({
+      x: x + (Math.random() - 0.5) * 0.15,
+      y: y + (Math.random() - 0.5) * 0.15,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      zOffset: 0.55 + Math.random() * 0.10,
+      vz: 1.4,
+      noGravity: true,           // pure float, no arc
+      text: String(value),
+      headshot,
+      color: headshot ? [255, 90, 70] : [255, 240, 220],
+      size: 1,
+      life: 0.85
+    });
   }
 
   function spawnHitParticles(particles, x, y, color) {
