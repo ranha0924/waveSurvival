@@ -1,6 +1,6 @@
 // Main entry: state machine, input, game loop, wave manager
 (() => {
-  // Game states
+  // ---------- State enum ----------
   const STATE = {
     TITLE: 'title',
     PLAYING: 'playing',
@@ -10,6 +10,18 @@
     WAVE_INTERMISSION: 'wave_intermission'
   };
 
+  // The four persistent best stats, in one table — drives sanitize / save /
+  // bump logic so every site that touches records is consistent. `flag` is
+  // the short name used in UI's "broken" map.
+  const BEST_FIELDS = [
+    { key: 'bestWave',  stat: 'wave',  flag: 'wave'  },
+    { key: 'bestScore', stat: 'score', flag: 'score' },
+    { key: 'bestKills', stat: 'kills', flag: 'kills' },
+    { key: 'bestCombo', stat: 'combo', flag: 'combo' }
+  ];
+  const BEST_KEYS = BEST_FIELDS.map(f => f.key);
+
+  // ---------- Records (localStorage persistence) ----------
   // Persistent best records keyed in localStorage. Each "best" stat is paired
   // with the nickname that set it, so the title screen can show who holds it.
   // Daily records use a separate slot that auto-resets when the date changes,
@@ -19,13 +31,9 @@
     DAILY_KEY: 'wavesurvival_daily_v1',
     NICK_KEY:  'wavesurvival_nick_v1',
     empty() {
-      return {
-        bestWave:  { value: 0, name: '' },
-        bestScore: { value: 0, name: '' },
-        bestKills: { value: 0, name: '' },
-        bestCombo: { value: 0, name: '' },
-        totalRuns: 0
-      };
+      const r = { totalRuns: 0 };
+      for (const k of BEST_KEYS) r[k] = { value: 0, name: '' };
+      return r;
     },
     emptyDaily() {
       return { date: Random.todayString(), records: Records.empty() };
@@ -37,7 +45,7 @@
     sanitize(raw) {
       const out = Records.empty();
       if (!raw || typeof raw !== 'object') return out;
-      for (const k of ['bestWave', 'bestScore', 'bestKills', 'bestCombo']) {
+      for (const k of BEST_KEYS) {
         const v = raw[k];
         if (v && typeof v === 'object' && typeof v.value === 'number' && isFinite(v.value)) {
           out[k] = {
@@ -68,7 +76,7 @@
       try {
         const onDisk = Records.load();
         const merged = Records.empty();
-        for (const k of ['bestWave', 'bestScore', 'bestKills', 'bestCombo']) {
+        for (const k of BEST_KEYS) {
           const a = (r && r[k]) || merged[k];
           const b = onDisk[k];
           merged[k] = (a.value >= b.value) ? a : b;
@@ -96,7 +104,7 @@
         const sameDay = d && onDisk && d.date === onDisk.date;
         const base = sameDay ? onDisk.records : Records.empty();
         const merged = Records.empty();
-        for (const k of ['bestWave', 'bestScore', 'bestKills', 'bestCombo']) {
+        for (const k of BEST_KEYS) {
           const a = (d && d.records && d.records[k]) || merged[k];
           const b = base[k];
           merged[k] = (a.value >= b.value) ? a : b;
@@ -117,6 +125,35 @@
     }
   };
 
+  // Snapshot of the current run's bumpable stats. Single shape used by both
+  // persistRunBests (mid-run save) and gameOver so they bump records the
+  // same way.
+  function currentStats() {
+    return {
+      wave:  game.wave.number,
+      score: game.score.score,
+      kills: game.player ? game.player.kills : 0,
+      combo: game.player ? game.player.maxComboReached : 0
+    };
+  }
+
+  // Apply `stats` into `records`, bumping each tracked field if the live
+  // value exceeds what's stored. Returns a {wave, score, kills, combo}
+  // flag-map of which fields actually changed so callers can decide whether
+  // to save and which "new record" banners to fire.
+  function bumpRecords(records, stats, nick) {
+    const broken = { wave: false, score: false, kills: false, combo: false };
+    for (const f of BEST_FIELDS) {
+      if (stats[f.stat] > records[f.key].value) {
+        records[f.key] = { value: stats[f.stat], name: nick };
+        broken[f.flag] = true;
+      }
+    }
+    return broken;
+  }
+  const anyBroken = (b) => b.wave || b.score || b.kills || b.combo;
+
+  // ---------- Game state ----------
   const game = {
     state: STATE.TITLE,
     player: null,
@@ -139,6 +176,7 @@
     nick: ''
   };
 
+  // ---------- Init / UI wiring ----------
   function init() {
     Audio.init();
     UI.init();
@@ -215,6 +253,7 @@
     UI.setNickInput(game.nick);
   }
 
+  // ---------- Input ----------
   // Map physical key codes to canonical names used by the game.
   // Uses e.code (layout / IME independent) so Korean IME, Dvorak, etc. work.
   function codeToName(code) {
@@ -317,6 +356,7 @@
     }
   }
 
+  // ---------- Run lifecycle ----------
   // Persist any all-time / daily bests the current run has earned. Called
   // after every wave clear and on tab-hide / unload so a refresh, crash,
   // or AFK timeout during a long run doesn't discard a new record.
@@ -324,41 +364,14 @@
   // until the player dies).
   function persistRunBests() {
     if (!game.player) return;
-    const cur = {
-      wave:  game.wave.number,
-      score: game.score.score,
-      kills: game.player.kills,
-      combo: game.player.maxComboReached
-    };
+    const stats = currentStats();
     const nick = game.nick || '익명';
 
     const allTime = Records.load();
-    let allDirty = false;
-    function bumpAll(field, value) {
-      if (value > allTime[field].value) {
-        allTime[field] = { value, name: nick };
-        allDirty = true;
-      }
-    }
-    bumpAll('bestWave',  cur.wave);
-    bumpAll('bestScore', cur.score);
-    bumpAll('bestKills', cur.kills);
-    bumpAll('bestCombo', cur.combo);
-    if (allDirty) Records.save(allTime);
+    if (anyBroken(bumpRecords(allTime, stats, nick))) Records.save(allTime);
 
     const daily = Records.loadDaily();
-    let dailyDirty = false;
-    function bumpDaily(field, value) {
-      if (value > daily.records[field].value) {
-        daily.records[field] = { value, name: nick };
-        dailyDirty = true;
-      }
-    }
-    bumpDaily('bestWave',  cur.wave);
-    bumpDaily('bestScore', cur.score);
-    bumpDaily('bestKills', cur.kills);
-    bumpDaily('bestCombo', cur.combo);
-    if (dailyDirty) Records.saveDaily(daily);
+    if (anyBroken(bumpRecords(daily.records, stats, nick))) Records.saveDaily(daily);
   }
 
   function startGame() {
@@ -517,6 +530,7 @@
     }
   }
 
+  // ---------- Game loop + rendering ----------
   function updateParticles(dt) {
     for (let i = game.particles.length - 1; i >= 0; i--) {
       const p = game.particles[i];
@@ -647,6 +661,7 @@
     }
   }
 
+  // ---------- Game over ----------
   function gameOver() {
     game.state = STATE.GAMEOVER;
     if (!game.touchMode) document.exitPointerLock();
@@ -654,44 +669,31 @@
     Audio.gameOver();
     UI.hideHud();
 
-    const stats = {
-      wave:      game.wave.number,
-      score:     game.score.score,
-      kills:     game.player.kills,
+    const nick = game.nick || '익명';
+    const stats = currentStats();
+    // Extra non-bumpable stats shown on the result screen only.
+    const resultStats = {
+      ...stats,
+      maxCombo:  stats.combo,
       headshots: game.player.headshots,
-      bossKills: game.player.bossKills,
-      maxCombo:  game.player.maxComboReached
+      bossKills: game.player.bossKills
     };
 
     // Compare against the snapshot taken at run start, then merge into the
     // persisted records (each best is independent — you can break one without
-    // breaking the others).
+    // breaking the others). Daily uses an independent leaderboard for the
+    // day's seed; we don't surface its broken flags in the UI.
     const prev = game.runBest || Records.empty();
     const updated = Records.load();
-    const broken = { wave: false, score: false, kills: false, combo: false };
-
-    function bumpInto(target, field, value, statName, brokenOut) {
-      if (value > target[field].value) {
-        target[field] = { value, name: game.nick || '익명' };
-        if (brokenOut) brokenOut[statName] = true;
-      }
-    }
-    bumpInto(updated, 'bestWave',  stats.wave,     'wave',  broken);
-    bumpInto(updated, 'bestScore', stats.score,    'score', broken);
-    bumpInto(updated, 'bestKills', stats.kills,    'kills', broken);
-    bumpInto(updated, 'bestCombo', stats.maxCombo, 'combo', broken);
+    const broken = bumpRecords(updated, stats, nick);
     updated.totalRuns = (updated.totalRuns || 0) + 1;
     Records.save(updated);
 
-    // Daily records — independent leaderboard for the day's seed.
     const daily = Records.loadDaily();
-    bumpInto(daily.records, 'bestWave',  stats.wave,     null, null);
-    bumpInto(daily.records, 'bestScore', stats.score,    null, null);
-    bumpInto(daily.records, 'bestKills', stats.kills,    null, null);
-    bumpInto(daily.records, 'bestCombo', stats.maxCombo, null, null);
+    bumpRecords(daily.records, stats, nick);
     Records.saveDaily(daily);
 
-    UI.showGameOver(stats, prev, broken, game.nick);
+    UI.showGameOver(resultStats, prev, broken, game.nick);
   }
 
   // Boot
