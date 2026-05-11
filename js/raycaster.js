@@ -22,6 +22,14 @@ const Raycaster = (() => {
   const tintBuf = document.createElement('canvas');
   const tintCtx = tintBuf.getContext('2d');
 
+  // Pre-baked sky/floor decoration canvases. Built lazily so init order
+  // doesn't matter. Stars + skyline are seeded so they're stable run-to-run.
+  let concreteTile = null;       // small repeating concrete texture
+  let skylineCanvas = null;      // building silhouettes baked at canvas width
+  let skylineWidth = 0;          // width skylineCanvas was baked for
+  let starField = null;          // [{x,y,size,twinkleRate,twinklePhase}]
+  let cloudBank = null;          // dark cloud blobs for storm/dusk
+
   function init(canvasEl) {
     canvas = canvasEl;
     ctx = canvas.getContext('2d');
@@ -135,29 +143,343 @@ const Raycaster = (() => {
     ctx.restore();
   }
 
+  // Mulberry32 — same generator we use for wall textures, seeded per asset
+  // so star positions / skyline rooftops / concrete cracks stay stable.
+  function rng(seed) {
+    let s = seed | 0;
+    return () => {
+      s = (s + 0x6D2B79F5) | 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Build a 128×128 concrete tile: cool gray base, scattered light/dark
+  // speckles, two expansion joints crossing it, a couple of hairline cracks.
+  function buildConcreteTile() {
+    const cv = document.createElement('canvas');
+    cv.width = 128; cv.height = 128;
+    const c = cv.getContext('2d');
+    const r = rng(9911);
+    // Base
+    c.fillStyle = '#9a9a9a';
+    c.fillRect(0, 0, 128, 128);
+    // Light blotches
+    for (let i = 0; i < 70; i++) {
+      const x = r() * 128, y = r() * 128;
+      c.fillStyle = `rgba(255,255,255,${(0.04 + r() * 0.06).toFixed(3)})`;
+      c.fillRect(Math.floor(x), Math.floor(y), 1 + Math.floor(r() * 3), 1 + Math.floor(r() * 3));
+    }
+    // Dark grain
+    for (let i = 0; i < 380; i++) {
+      const x = r() * 128, y = r() * 128;
+      c.fillStyle = `rgba(0,0,0,${(0.05 + r() * 0.15).toFixed(3)})`;
+      c.fillRect(Math.floor(x), Math.floor(y), 1, 1);
+    }
+    // Stains
+    for (let i = 0; i < 6; i++) {
+      const x = r() * 128, y = r() * 128;
+      const w = 6 + r() * 22, h = 6 + r() * 22;
+      c.fillStyle = `rgba(40,30,20,${(0.05 + r() * 0.08).toFixed(3)})`;
+      c.beginPath();
+      c.ellipse(x, y, w / 2, h / 2, r() * Math.PI, 0, Math.PI * 2);
+      c.fill();
+    }
+    // Expansion joints (one horizontal, one vertical, slightly off-center)
+    c.fillStyle = 'rgba(0,0,0,0.55)';
+    c.fillRect(0, 62, 128, 2);
+    c.fillRect(64, 0, 2, 128);
+    c.fillStyle = 'rgba(255,255,255,0.10)';
+    c.fillRect(0, 64, 128, 1);
+    c.fillRect(66, 0, 1, 128);
+    // Hairline cracks
+    c.strokeStyle = 'rgba(0,0,0,0.45)';
+    c.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      let cx = r() * 128, cy = r() * 128;
+      c.beginPath(); c.moveTo(cx, cy);
+      for (let j = 0; j < 5; j++) {
+        cx += (r() - 0.5) * 22;
+        cy += (r() - 0.5) * 22;
+        c.lineTo(cx, cy);
+      }
+      c.stroke();
+    }
+    return cv;
+  }
+
+  // Bake building silhouettes once per canvas width. Each rooftop has a
+  // jagged top + occasional antenna so the horizon doesn't read as a flat
+  // line. Drawn in black at varying heights so the sky tint comes from the
+  // sky gradient behind them.
+  function buildSkylineCanvas(targetW) {
+    const buildings = [];
+    const r = rng(2027);
+    let x = -20;
+    while (x < targetW + 20) {
+      const w = 18 + Math.floor(r() * 70);
+      const h = 14 + Math.floor(r() * 70);
+      const hasAntenna = r() < 0.35;
+      buildings.push({ x, w, h, hasAntenna, antennaH: 8 + Math.floor(r() * 18) });
+      x += w + Math.floor(r() * 14 - 4);
+    }
+    const maxH = 100;
+    const cv = document.createElement('canvas');
+    cv.width = targetW;
+    cv.height = maxH + 24;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#000000';
+    for (const b of buildings) {
+      const top = maxH - b.h;
+      c.fillRect(b.x, top, b.w, b.h + 4);
+      // Tiny lit window every now and then so the silhouette reads as a
+      // city, not a black bar.
+      const lr = rng(b.x * 73 + 1);
+      const cols = Math.max(1, Math.floor(b.w / 7));
+      const rows = Math.max(1, Math.floor(b.h / 7));
+      c.fillStyle = '#3a3a26';
+      for (let cc = 0; cc < cols; cc++) {
+        for (let rr = 0; rr < rows; rr++) {
+          if (lr() < 0.16) {
+            c.fillRect(b.x + 2 + cc * 7, top + 2 + rr * 7, 2, 2);
+          }
+        }
+      }
+      c.fillStyle = '#000000';
+      if (b.hasAntenna) {
+        c.fillRect(b.x + Math.floor(b.w / 2), top - b.antennaH, 1, b.antennaH);
+        c.fillRect(b.x + Math.floor(b.w / 2) - 2, top - b.antennaH, 5, 1);
+      }
+    }
+    return cv;
+  }
+
+  function buildStarField() {
+    const r = rng(7777);
+    const stars = [];
+    for (let i = 0; i < 70; i++) {
+      stars.push({
+        u: r(),
+        v: r() * 0.55,
+        size: 1 + Math.floor(r() * 2),
+        twinkleRate: 1.0 + r() * 2.5,
+        twinklePhase: r() * Math.PI * 2,
+        baseAlpha: 0.45 + r() * 0.45
+      });
+    }
+    return stars;
+  }
+
+  function buildCloudBank() {
+    const r = rng(4242);
+    const clouds = [];
+    for (let i = 0; i < 10; i++) {
+      clouds.push({
+        u: r(),
+        v: r() * 0.7,
+        w: 0.18 + r() * 0.22,
+        h: 0.04 + r() * 0.05,
+        alpha: 0.20 + r() * 0.25
+      });
+    }
+    return clouds;
+  }
+
+  function ensureBakedAssets() {
+    if (!concreteTile) concreteTile = buildConcreteTile();
+    if (!starField)    starField    = buildStarField();
+    if (!cloudBank)    cloudBank    = buildCloudBank();
+    if (!skylineCanvas || skylineWidth !== W) {
+      skylineCanvas = buildSkylineCanvas(W);
+      skylineWidth = W;
+    }
+  }
+
   function drawSky(theme, horizonOffset) {
+    ensureBakedAssets();
     const horizon = H / 2 + horizonOffset;
     // Over-paint past the canvas edges so the camera-shake translate never
     // exposes uncleared pixels along the borders.
     const M = 64;
-    const top = -M;
-    const grad = ctx.createLinearGradient(0, top, 0, horizon);
+    const grad = ctx.createLinearGradient(0, -M, 0, horizon);
     grad.addColorStop(0, theme.skyTop);
     grad.addColorStop(0.6, theme.skyMid);
     grad.addColorStop(1, theme.skyBottom);
     ctx.fillStyle = grad;
     ctx.fillRect(-M, -M, W + 2 * M, Math.max(0, horizon) + M);
+
+    const name = theme.name || 'sunset';
+    if (name === 'sunset') drawSunsetSky(horizon);
+    else if (name === 'dusk') drawDuskSky(horizon);
+    else if (name === 'night') drawNightSky(horizon);
+    else if (name === 'storm') drawStormSky(horizon);
+
+    drawSkyline(horizon, theme);
+  }
+
+  function drawSunsetSky(horizon) {
+    // Big low sun + warm halo so the gradient reads as a real horizon line.
+    const sunX = W * 0.62;
+    const sunY = horizon - 12;
+    const sunR = Math.min(W, H) * 0.06;
+    const halo = ctx.createRadialGradient(sunX, sunY, sunR, sunX, sunY, sunR * 4.5);
+    halo.addColorStop(0, 'rgba(255,180,90,0.55)');
+    halo.addColorStop(1, 'rgba(255,160,80,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR * 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fde4a8';
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+    ctx.fill();
+    // A pair of warm cloud streaks
+    drawCloudStreak(W * 0.20, horizon * 0.55, W * 0.30, 'rgba(255,200,140,0.18)');
+    drawCloudStreak(W * 0.75, horizon * 0.32, W * 0.22, 'rgba(255,180,120,0.14)');
+  }
+
+  function drawDuskSky(horizon) {
+    // Dim moon high, a few stars, soft purple clouds.
+    drawStars(horizon, 25, 0.35);
+    drawCloudStreak(W * 0.30, horizon * 0.4,  W * 0.30, 'rgba(120,80,140,0.20)');
+    drawCloudStreak(W * 0.70, horizon * 0.55, W * 0.28, 'rgba(180,90,130,0.18)');
+    const moonX = W * 0.78, moonY = horizon * 0.22, moonR = Math.min(W, H) * 0.035;
+    const glow = ctx.createRadialGradient(moonX, moonY, moonR, moonX, moonY, moonR * 3);
+    glow.addColorStop(0, 'rgba(240,220,200,0.35)');
+    glow.addColorStop(1, 'rgba(240,220,200,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR * 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e0d6b8';
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawNightSky(horizon) {
+    drawStars(horizon, 70, 1.0);
+    const moonX = W * 0.75, moonY = horizon * 0.20, moonR = Math.min(W, H) * 0.045;
+    const glow = ctx.createRadialGradient(moonX, moonY, moonR, moonX, moonY, moonR * 3.5);
+    glow.addColorStop(0, 'rgba(230,230,210,0.45)');
+    glow.addColorStop(1, 'rgba(230,230,210,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR * 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f4f0d8';
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+    ctx.fill();
+    // Crater hint
+    ctx.fillStyle = 'rgba(150,150,135,0.4)';
+    ctx.beginPath();
+    ctx.arc(moonX - moonR * 0.3, moonY - moonR * 0.2, moonR * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(moonX + moonR * 0.25, moonY + moonR * 0.15, moonR * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawStormSky(horizon) {
+    // Heavy cloud bands first
+    for (const cd of cloudBank) {
+      drawCloudStreak(cd.u * W, cd.v * horizon, cd.w * W,
+        `rgba(20,18,30,${(cd.alpha + 0.15).toFixed(3)})`);
+    }
+    // Occasional lightning flash — deterministic enough to feel like weather
+    // without storing per-frame state. Uses performance.now() so it pulses
+    // briefly every few seconds.
+    const t = performance.now() / 1000;
+    const cycle = t % 7;
+    if (cycle < 0.12) {
+      const alpha = (1 - cycle / 0.12) * 0.55;
+      ctx.fillStyle = `rgba(220,220,255,${alpha.toFixed(3)})`;
+      ctx.fillRect(0, 0, W, horizon);
+    }
+  }
+
+  function drawStars(horizon, count, intensity) {
+    const t = performance.now() / 1000;
+    for (let i = 0; i < Math.min(count, starField.length); i++) {
+      const s = starField[i];
+      const x = Math.floor(s.u * W);
+      const y = Math.floor(s.v * horizon);
+      const twinkle = 0.5 + 0.5 * Math.sin(t * s.twinkleRate + s.twinklePhase);
+      const a = (s.baseAlpha * (0.6 + 0.4 * twinkle) * intensity).toFixed(3);
+      ctx.fillStyle = `rgba(255,250,225,${a})`;
+      ctx.fillRect(x, y, s.size, s.size);
+    }
+  }
+
+  function drawCloudStreak(cx, cy, length, fillStyle) {
+    ctx.fillStyle = fillStyle;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, length * 0.5, length * 0.10, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawSkyline(horizon, theme) {
+    if (!skylineCanvas) return;
+    // Draw the baked silhouette so its bottom sits on the horizon line.
+    const sh = skylineCanvas.height;
+    const dy = Math.floor(horizon - sh + 4);
+    ctx.save();
+    ctx.globalAlpha = theme.skyline || 0.6;
+    ctx.drawImage(skylineCanvas, 0, dy);
+    ctx.restore();
   }
 
   function drawFloor(theme, horizonOffset) {
+    ensureBakedAssets();
     const horizon = H / 2 + horizonOffset;
     if (horizon >= H) return;
     const M = 64;
+    // Base gradient — cool concrete tones (set in environment.js)
     const grad = ctx.createLinearGradient(0, horizon, 0, H + M);
     grad.addColorStop(0, theme.floorFar);
     grad.addColorStop(1, theme.floorNear);
     ctx.fillStyle = grad;
     ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
+
+    // Concrete tile overlay. The pattern is screen-aligned (not properly
+    // perspective-warped) but the alpha fades to zero at the horizon so the
+    // eye reads the texture as ground detail rather than a wallpaper.
+    if (concreteTile) {
+      const pattern = ctx.createPattern(concreteTile, 'repeat');
+      ctx.save();
+      ctx.fillStyle = pattern;
+      ctx.globalAlpha = 0.55;
+      ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
+      // Distance fade — darker overlay from horizon outward.
+      const fade = ctx.createLinearGradient(0, horizon, 0, H);
+      fade.addColorStop(0,    `rgba(${theme.floorFar ? hexToRgb(theme.floorFar) : '0,0,0'},0.90)`);
+      fade.addColorStop(0.20, `rgba(${theme.floorFar ? hexToRgb(theme.floorFar) : '0,0,0'},0.55)`);
+      fade.addColorStop(1,    'rgba(0,0,0,0)');
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = fade;
+      ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
+      ctx.restore();
+    }
+
+    // Horizon haze band — pulls the eye toward the vanishing point and ties
+    // the floor color into the sky's warm/cool palette.
+    const haze = theme.haze || '180,160,140';
+    const hazeH = Math.min(60, (H - horizon) * 0.35);
+    const hazeGrad = ctx.createLinearGradient(0, horizon, 0, horizon + hazeH);
+    hazeGrad.addColorStop(0, `rgba(${haze},0.50)`);
+    hazeGrad.addColorStop(1, `rgba(${haze},0)`);
+    ctx.fillStyle = hazeGrad;
+    ctx.fillRect(-M, horizon, W + 2 * M, hazeH);
+  }
+
+  function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `${r},${g},${b}`;
   }
 
   function castWalls(player, horizonOffset, theme) {

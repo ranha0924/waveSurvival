@@ -2,42 +2,62 @@
 // Background props (mountains, clouds, smoke, dust, lightning) were
 // removed; this module now only owns the per-wave palette.
 const Environment = (() => {
+  // Per-theme palette + decoration hints. `name` is read by the raycaster's
+  // sky pass to pick which celestial bodies / clouds / lightning to draw.
+  // `skyline` controls the rooftop silhouette opacity, `haze` is an rgb
+  // triplet used for the ground-fog band right at the horizon.
   const themes = {
     sunset: {
+      name: 'sunset',
       skyTop: '#1a1530',
       skyMid: '#7b3c3c',
       skyBottom: '#d8884a',
-      floorNear: '#3e3a2a',
-      floorFar: '#1c1a14',
+      floorNear: '#5c5650',
+      floorFar: '#2a2622',
       ambient: 1.0,
-      fogDist: 32
+      fogDist: 32,
+      skyline: 0.55,
+      haze: '210,140,80',
+      concreteTint: '120,90,70'
     },
     dusk: {
+      name: 'dusk',
       skyTop: '#0a0a20',
       skyMid: '#3b1f55',
       skyBottom: '#a8324e',
-      floorNear: '#2c2820',
-      floorFar: '#14120e',
+      floorNear: '#3e3c44',
+      floorFar: '#16161c',
       ambient: 0.85,
-      fogDist: 26
+      fogDist: 26,
+      skyline: 0.65,
+      haze: '160,90,90',
+      concreteTint: '80,60,80'
     },
     night: {
+      name: 'night',
       skyTop: '#020208',
       skyMid: '#070a18',
       skyBottom: '#16182e',
-      floorNear: '#16141c',
-      floorFar: '#08070d',
+      floorNear: '#26282d',
+      floorFar: '#0a0c10',
       ambient: 0.65,
-      fogDist: 20
+      fogDist: 20,
+      skyline: 0.75,
+      haze: '60,70,110',
+      concreteTint: '50,55,75'
     },
     storm: {
+      name: 'storm',
       skyTop: '#020205',
       skyMid: '#0a0c18',
       skyBottom: '#1a1822',
-      floorNear: '#181620',
-      floorFar: '#080610',
+      floorNear: '#202428',
+      floorFar: '#08090d',
       ambient: 0.55,
-      fogDist: 16
+      fogDist: 16,
+      skyline: 0.85,
+      haze: '70,75,95',
+      concreteTint: '55,65,80'
     }
   };
 
