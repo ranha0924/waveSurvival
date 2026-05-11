@@ -531,50 +531,73 @@ const Raycaster = (() => {
     // tile boundary becoming obvious.
     const TILE_SCALE = 0.5;
 
-    for (let y = startY; y < H; y++) {
+    // Cache the camera-plane axes — they don't change across rows, only the
+    // row distance scales them. Hoisting these out of the row loop avoids a
+    // few thousand redundant multiplies per frame.
+    const rayL_x = cosA + sinA * tanFov;
+    const rayL_y = sinA - cosA * tanFov;
+    const rayR_x = cosA - sinA * tanFov;
+    const rayR_y = sinA + cosA * tanFov;
+    const dxL = rayL_x;
+    const dyL = rayL_y;
+    const planeStepX = (rayR_x - rayL_x) / W;
+    const planeStepY = (rayR_y - rayL_y) / W;
+
+    // 2×2 block sampling: process every other pixel and copy the result to
+    // the four neighbours. Cuts the inner-loop work by ~4× — the floor was
+    // the per-frame bottleneck on mobile and the visual difference between
+    // 1× and 2× sampling at this texture density is hard to notice.
+    for (let y = startY; y < H; y += 2) {
       const rowY = y - horizonI;
       if (rowY <= 0) continue;
       const rowDist = (H * 0.5) / rowY;
 
-      // Left-edge ray (cameraX = -1) and step per screen column.
-      const rayL_x = cosA + sinA * tanFov;
-      const rayL_y = sinA - cosA * tanFov;
-      const rayR_x = cosA - sinA * tanFov;
-      const rayR_y = sinA + cosA * tanFov;
-      const worldXL = player.x + rayL_x * rowDist;
-      const worldYL = player.y + rayL_y * rowDist;
-      const worldXR = player.x + rayR_x * rowDist;
-      const worldYR = player.y + rayR_y * rowDist;
-      const stepX = (worldXR - worldXL) / W;
-      const stepY = (worldYR - worldYL) / W;
-
-      // Texture visibility: full strength up close, fades into floorFar.
+      const worldXL = player.x + dxL * rowDist;
+      const worldYL = player.y + dyL * rowDist;
+      const stepX = planeStepX * rowDist;
+      const stepY = planeStepY * rowDist;
       const fade = Math.min(1, 4.5 / rowDist);
       const oneMinusFade = 1 - fade;
 
       let wx = worldXL;
       let wy = worldYL;
-      const rowBase = (y - startY) * W * 4;
+      const rowBase     = (y     - startY) * W * 4;
+      const nextRowBase = (y + 1 - startY) * W * 4;
+      const writeNextRow = (y + 1) < H;
 
-      for (let x = 0; x < W; x++) {
+      for (let x = 0; x < W; x += 2) {
         // Tile in world units. World coord → texel.
         let u = (wx / TILE_SCALE) % 1; if (u < 0) u += 1;
         let v = (wy / TILE_SCALE) % 1; if (v < 0) v += 1;
         const tx = (u * TW) | 0;
         const ty = (v * TH) | 0;
         const tIdx = (ty * TW + tx) * 4;
-        const idx = rowBase + x * 4;
 
         const tr = concreteTileData[tIdx];
         const tg = concreteTileData[tIdx + 1];
         const tb = concreteTileData[tIdx + 2];
-        data[idx]     = (tr * fade + fr * oneMinusFade) | 0;
-        data[idx + 1] = (tg * fade + fg * oneMinusFade) | 0;
-        data[idx + 2] = (tb * fade + fb * oneMinusFade) | 0;
-        data[idx + 3] = 255;
+        const r = (tr * fade + fr * oneMinusFade) | 0;
+        const g = (tg * fade + fg * oneMinusFade) | 0;
+        const b = (tb * fade + fb * oneMinusFade) | 0;
 
-        wx += stepX;
-        wy += stepY;
+        // Splat the same color into the 2×2 block. Guards keep us inside
+        // canvas bounds on odd dimensions.
+        const idx = rowBase + x * 4;
+        data[idx]     = r; data[idx + 1] = g; data[idx + 2] = b; data[idx + 3] = 255;
+        if (x + 1 < W) {
+          data[idx + 4] = r; data[idx + 5] = g; data[idx + 6] = b; data[idx + 7] = 255;
+        }
+        if (writeNextRow) {
+          const nIdx = nextRowBase + x * 4;
+          data[nIdx]     = r; data[nIdx + 1] = g; data[nIdx + 2] = b; data[nIdx + 3] = 255;
+          if (x + 1 < W) {
+            data[nIdx + 4] = r; data[nIdx + 5] = g; data[nIdx + 6] = b; data[nIdx + 7] = 255;
+          }
+        }
+
+        // Skip 2 columns per iteration since we wrote a 2-wide block.
+        wx += stepX * 2;
+        wy += stepY * 2;
       }
     }
 
