@@ -150,30 +150,46 @@ const Audio = (() => {
 
   // Wet meat impact — short, dampened low thud + body resonance.
   // Default for grunt / rusher / ranger / bomber / splitter / splitterChild.
-  // Prefer the uploaded hit-impact sample; the synth path stays as a fallback
-  // for the brief window before the sample finishes loading.
+  // Prefer the uploaded hit-impact sample (pitched down for weight) layered
+  // with a sub-bass thump so the impact lands hard. Synth path is the
+  // fallback while the sample is still loading.
   function hitFlesh() {
     if (!ctx) return;
     // Slight pitch jitter so back-to-back hits don't sound identical.
-    const rate = 0.92 + Math.random() * 0.16;
-    if (playSample('hitFlesh', 0.9, rate)) return;
+    const rate = 0.74 + Math.random() * 0.10;
+    if (playSample('hitFlesh', 1.1, rate)) {
+      tone(65, 0.07, 'sine', 0.32);
+      return;
+    }
     noise(0.05, 0.40, 700, 0.6);
     tone(140, 0.04, 'sine', 0.18);
   }
 
-  // Metallic / armored hit — for tank. Bright clang on top of a brief noise
-  // sizzle so it cuts through over the dull flesh hits.
+  // Tank hit — same hit-impact sample as flesh but kept a touch brighter so
+  // it still reads as a harder surface than the grunts, with its own thump
+  // for weight.
   function hitArmor() {
     if (!ctx) return;
+    const rate = 0.95 + Math.random() * 0.12;
+    if (playSample('hitFlesh', 1.15, rate)) {
+      tone(90, 0.07, 'sine', 0.30);
+      return;
+    }
     tone(900, 0.04, 'square', 0.22);
     tone(1500, 0.03, 'triangle', 0.14);
     noise(0.03, 0.18, 3500, 2);
   }
 
-  // Boss hit — deeper and beefier than a flesh hit, with a sub-bass thump
-  // so the player feels each round landing on a heavy target.
+  // Boss hit — pitched-down sample with a deeper sub-bass thump so each
+  // round on the boss feels beefier and heavier than a regular zombie hit.
   function hitBoss() {
     if (!ctx) return;
+    const rate = 0.50 + Math.random() * 0.10;
+    if (playSample('hitFlesh', 1.2, rate)) {
+      tone(45, 0.12, 'sine', 0.45);
+      tone(80, 0.08, 'sawtooth', 0.22);
+      return;
+    }
     noise(0.10, 0.55, 350, 0.5);
     tone(80, 0.08, 'sawtooth', 0.30);
     tone(45, 0.10, 'sine', 0.25);
