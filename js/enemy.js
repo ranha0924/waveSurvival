@@ -315,6 +315,7 @@ const Enemies = (() => {
           Audio.enemyDeath();
           Player.spawnDeathBurst(particles, o.x, o.y, o.type.bloodColor || [180, 30, 30], false, !!o.type.isBoss);
           awardChainKill(player, o, scoreCallback);
+          if (typeof Pickups !== 'undefined') Pickups.onEnemyKilled(o);
         }
       }
     }

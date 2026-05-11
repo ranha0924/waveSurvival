@@ -80,12 +80,59 @@ const Raycaster = (() => {
       const dx = p.x - player.x, dy = p.y - player.y;
       sprites.push({ x: p.x, y: p.y, dist: dx * dx + dy * dy, type: 'particle', ref: p });
     }
+    if (typeof Pickups !== 'undefined') {
+      for (const k of Pickups.getList()) {
+        const dx = k.x - player.x, dy = k.y - player.y;
+        sprites.push({ x: k.x, y: k.y, dist: dx * dx + dy * dy, type: 'pickup', ref: k });
+      }
+    }
     sprites.sort((a, b) => b.dist - a.dist);
 
     for (const s of sprites) {
       if (s.type === 'enemy') drawEnemySprite(player, s.ref, horizonOffset, theme);
+      else if (s.type === 'pickup') drawPickupSprite(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
     }
+  }
+
+  // Pickup billboards sit on the floor and bob slightly. Rendered like enemy
+  // sprites (column-by-column blit so the existing zBuffer / wallTopY /
+  // shortDist clipping all still apply), but at ~30% of an enemy's size.
+  function drawPickupSprite(player, k, horizonOffset, theme) {
+    const proj = projectSprite(player, k.x, k.y);
+    if (!proj) return;
+    const canvas = Pickups.getCanvas(k.typeId);
+    if (!canvas) return;
+
+    const horizon = H / 2 + horizonOffset;
+    const lineH = H / proj.dist;
+    const pickupH = Math.max(4, Math.floor(lineH * 0.32));
+    const aspect = canvas.width / canvas.height;
+    const pickupW = Math.max(4, Math.floor(pickupH * aspect));
+    const bob = Math.sin(k.bobPhase) * (lineH * 0.04);
+    const groundedBottom = horizon + lineH / 2;
+    const drawStartY = Math.floor(groundedBottom - pickupH + bob);
+    const drawStartX = Math.floor(proj.screenX - pickupW / 2);
+
+    // Soft pre-despawn fade in the last 3 seconds.
+    const lifeFade = Math.min(1, k.life / 3);
+
+    const xStart = Math.max(0, drawStartX);
+    const xEnd = Math.min(W, drawStartX + pickupW);
+    ctx.save();
+    ctx.globalAlpha = lifeFade;
+    for (let x = xStart; x < xEnd; x++) {
+      let dstY1 = drawStartY + pickupH;
+      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
+      if (proj.dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
+      if (dstY1 <= drawStartY) continue;
+      const u = (x - drawStartX) / pickupW;
+      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
+      const dstH = dstY1 - drawStartY;
+      const srcH = Math.max(1, Math.floor((dstH / pickupH) * canvas.height));
+      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
+    }
+    ctx.restore();
   }
 
   function drawSky(theme, horizonOffset) {

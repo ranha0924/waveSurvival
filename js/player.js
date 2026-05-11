@@ -298,6 +298,8 @@ const Player = (() => {
       if (enemies && Enemies.onKilled) {
         Enemies.onKilled(e, p, enemies, particles, scoreCallback);
       }
+      // Drop pickup (handled by Pickups module — boss spawns multi-item burst).
+      if (typeof Pickups !== 'undefined') Pickups.onEnemyKilled(e);
     }
   }
 
