@@ -5,15 +5,16 @@
 const Sprites = (() => {
   const cache = new Map();
 
-  function register(typeId, source) {
+  function register(typeId, source, opts) {
+    const scale = (opts && opts.scale) || 1;
     if (typeof source === 'function') {
       const cv = source();
-      cache.set(typeId, { canvas: cv, w: cv.width, h: cv.height, ready: true });
+      cache.set(typeId, { canvas: cv, w: cv.width, h: cv.height, ready: true, scale });
       return;
     }
     // String → treat as image URL. Loads asynchronously; until ready, get()
     // returns null and the renderer keeps using the rectangle fallback.
-    const entry = { canvas: null, w: 0, h: 0, ready: false };
+    const entry = { canvas: null, w: 0, h: 0, ready: false, scale };
     cache.set(typeId, entry);
     const img = new Image();
     img.onload = () => {
@@ -141,8 +142,9 @@ const Sprites = (() => {
 })();
 
 // Default registrations. Add more lines like:
-//   Sprites.register('rusher', 'assets/rusher.png');
-// and the renderer will pick them up automatically.
-// grunt loads from a chroma-keyed PNG; while it streams in, the renderer
-// falls back to its procedural rectangle silhouette.
-Sprites.register('grunt', 'assets/zombie.png');
+//   Sprites.register('boss', 'assets/boss.png', { scale: 2 });
+// and the renderer will pick them up automatically. While an asset streams
+// in, the renderer falls back to its procedural rectangle silhouette.
+Sprites.register('grunt',  'assets/zombie.png');
+Sprites.register('rusher', 'assets/rusher.png');
+Sprites.register('tank',   'assets/tank.png', { scale: 1.5 });
