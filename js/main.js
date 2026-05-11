@@ -323,8 +323,10 @@
     UI.showWaveBanner(`WAVE ${game.wave.number}`);
     Audio.waveStart();
 
-    // Wave-record banner fires once when the player reaches a wave higher
-    // than their previous best (or any wave > 0 if there's no record yet).
+    // Wave-record banner fires once per run when the player reaches a wave
+    // higher than their previous best. Skipped on a first-ever run (no prior
+    // record to beat) so a brand-new player doesn't get a "신기록" banner
+    // for clearing wave 1.
     const prevBestWave = game.runBest ? game.runBest.bestWave.value : 0;
     if (!game.recordFired.wave && game.wave.number > prevBestWave && prevBestWave > 0) {
       game.recordFired.wave = true;

@@ -260,7 +260,9 @@ const Player = (() => {
         spawnDeathParticle(particles, e.x, e.y, e.type.bloodColor || [180, 30, 30]);
       }
       // Type-specific on-death side effects (bomber detonate, splitter spawn).
-      if (enemies && Enemies.onKilled) Enemies.onKilled(e, p, enemies, particles);
+      if (enemies && Enemies.onKilled) {
+        Enemies.onKilled(e, p, enemies, particles, scoreCallback);
+      }
     }
   }
 
