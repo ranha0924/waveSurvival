@@ -74,7 +74,12 @@ const Raycaster = (() => {
   function render(player, enemies, particles, horizonOffset, theme) {
     theme = theme || Environment.themeForWave(1);
 
-    drawSky(theme, horizonOffset);
+    // Sky / skyline anchor at the pitch-only horizon so distant elements
+    // (sun, moon, stars, building silhouettes) don't bounce up and down
+    // with the player's walking bob. Pitch is still applied so looking up
+    // / down moves the horizon line correctly.
+    const skyOffset = (player.pitch !== undefined) ? player.pitch : horizonOffset;
+    drawSky(theme, skyOffset);
     drawFloor(player, theme, horizonOffset);
 
     castWalls(player, horizonOffset, theme);
@@ -164,19 +169,20 @@ const Raycaster = (() => {
     cv.width = 128; cv.height = 128;
     const c = cv.getContext('2d');
     const r = rng(9911);
-    // Base
-    c.fillStyle = '#9a9a9a';
+    // Base — darker concrete so close-range pixels don't blow out against
+    // the gradient + lighting.
+    c.fillStyle = '#5a5a5c';
     c.fillRect(0, 0, 128, 128);
     // Light blotches
     for (let i = 0; i < 70; i++) {
       const x = r() * 128, y = r() * 128;
-      c.fillStyle = `rgba(255,255,255,${(0.04 + r() * 0.06).toFixed(3)})`;
+      c.fillStyle = `rgba(255,255,255,${(0.03 + r() * 0.05).toFixed(3)})`;
       c.fillRect(Math.floor(x), Math.floor(y), 1 + Math.floor(r() * 3), 1 + Math.floor(r() * 3));
     }
-    // Dark grain
+    // Dark grain — slightly stronger to read against the darker base
     for (let i = 0; i < 380; i++) {
       const x = r() * 128, y = r() * 128;
-      c.fillStyle = `rgba(0,0,0,${(0.05 + r() * 0.15).toFixed(3)})`;
+      c.fillStyle = `rgba(0,0,0,${(0.10 + r() * 0.20).toFixed(3)})`;
       c.fillRect(Math.floor(x), Math.floor(y), 1, 1);
     }
     // Stains
