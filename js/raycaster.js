@@ -1,6 +1,6 @@
 // Raycasting renderer with DDA wall projection + sprite billboards.
-// Outdoor variant: theme-driven sky, skyline silhouettes, textured walls,
-// long draw distance, atmospheric darkness/fog.
+// Outdoor variant: theme-driven sky, textured walls, long draw distance,
+// atmospheric darkness/fog.
 const Raycaster = (() => {
   let canvas, ctx;
   let W, H;
@@ -23,10 +23,9 @@ const Raycaster = (() => {
   const tintCtx = tintBuf.getContext('2d');
 
   // Pre-baked sky/floor decoration canvases. Built lazily so init order
-  // doesn't matter. Stars + skyline are seeded so they're stable run-to-run.
+  // doesn't matter. Stars are seeded so they're stable run-to-run.
   let concreteTile = null;       // small repeating concrete texture
   let concreteTileData = null;   // cached Uint8ClampedArray for per-pixel reads
-  let skylineCanvas = null;      // building silhouettes baked at canvas width
   // Reusable buffer for the floor cast. castFloor overwrites every pixel each
   // frame, so we use createImageData (no GPU→CPU readback) and reuse the
   // same Uint8ClampedArray across frames — getImageData + reallocation per
@@ -35,9 +34,7 @@ const Raycaster = (() => {
   let floorBuf = null;
   let floorBufW = 0;
   let floorBufH = 0;
-  let skylineWidth = 0;          // width skylineCanvas was baked for
   let starField = null;          // [{x,y,size,twinkleRate,twinklePhase}]
-  let cloudBank = null;          // dark cloud blobs for storm/dusk
 
   function init(canvasEl) {
     canvas = canvasEl;
@@ -84,9 +81,9 @@ const Raycaster = (() => {
     theme = theme || Environment.themeForWave(1);
 
     // Sky pass is fully detached from the player's pitch + bob so the
-    // backdrop (gradient, sun/moon, stars, skyline) stays painted-on-screen
-    // regardless of camera direction. The floor still tracks the real
-    // horizon so the world below the eye line bobs / tilts naturally.
+    // backdrop (gradient, sun/moon, stars) stays painted-on-screen regardless
+    // of camera direction. The floor still tracks the real horizon so the
+    // world below the eye line bobs / tilts naturally.
     drawSky(theme, player);
     drawFloor(player, theme, horizonOffset);
 
@@ -158,7 +155,7 @@ const Raycaster = (() => {
   }
 
   // Mulberry32 — same generator we use for wall textures, seeded per asset
-  // so star positions / skyline rooftops / concrete cracks stay stable.
+  // so star positions / concrete cracks stay stable.
   function rng(seed) {
     let s = seed | 0;
     return () => {
@@ -225,52 +222,6 @@ const Raycaster = (() => {
     return cv;
   }
 
-  // Bake building silhouettes once per canvas width. Each rooftop has a
-  // jagged top + occasional antenna so the horizon doesn't read as a flat
-  // line. Drawn in black at varying heights so the sky tint comes from the
-  // sky gradient behind them.
-  function buildSkylineCanvas(targetW) {
-    const buildings = [];
-    const r = rng(2027);
-    let x = -20;
-    while (x < targetW + 20) {
-      const w = 18 + Math.floor(r() * 70);
-      const h = 14 + Math.floor(r() * 70);
-      const hasAntenna = r() < 0.35;
-      buildings.push({ x, w, h, hasAntenna, antennaH: 8 + Math.floor(r() * 18) });
-      x += w + Math.floor(r() * 14 - 4);
-    }
-    const maxH = 100;
-    const cv = document.createElement('canvas');
-    cv.width = targetW;
-    cv.height = maxH + 24;
-    const c = cv.getContext('2d');
-    c.fillStyle = '#000000';
-    for (const b of buildings) {
-      const top = maxH - b.h;
-      c.fillRect(b.x, top, b.w, b.h + 4);
-      // Tiny lit window every now and then so the silhouette reads as a
-      // city, not a black bar.
-      const lr = rng(b.x * 73 + 1);
-      const cols = Math.max(1, Math.floor(b.w / 7));
-      const rows = Math.max(1, Math.floor(b.h / 7));
-      c.fillStyle = '#3a3a26';
-      for (let cc = 0; cc < cols; cc++) {
-        for (let rr = 0; rr < rows; rr++) {
-          if (lr() < 0.16) {
-            c.fillRect(b.x + 2 + cc * 7, top + 2 + rr * 7, 2, 2);
-          }
-        }
-      }
-      c.fillStyle = '#000000';
-      if (b.hasAntenna) {
-        c.fillRect(b.x + Math.floor(b.w / 2), top - b.antennaH, 1, b.antennaH);
-        c.fillRect(b.x + Math.floor(b.w / 2) - 2, top - b.antennaH, 5, 1);
-      }
-    }
-    return cv;
-  }
-
   function buildStarField() {
     const r = rng(7777);
     const stars = [];
@@ -287,21 +238,6 @@ const Raycaster = (() => {
     return stars;
   }
 
-  function buildCloudBank() {
-    const r = rng(4242);
-    const clouds = [];
-    for (let i = 0; i < 10; i++) {
-      clouds.push({
-        u: r(),
-        v: r() * 0.7,
-        w: 0.18 + r() * 0.22,
-        h: 0.04 + r() * 0.05,
-        alpha: 0.20 + r() * 0.25
-      });
-    }
-    return clouds;
-  }
-
   function ensureBakedAssets() {
     if (!concreteTile) {
       concreteTile = buildConcreteTile();
@@ -310,20 +246,15 @@ const Raycaster = (() => {
       concreteTileData = concreteTile.getContext('2d')
         .getImageData(0, 0, concreteTile.width, concreteTile.height).data;
     }
-    if (!starField)    starField    = buildStarField();
-    if (!cloudBank)    cloudBank    = buildCloudBank();
-    if (!skylineCanvas || skylineWidth !== W) {
-      skylineCanvas = buildSkylineCanvas(W);
-      skylineWidth = W;
-    }
+    if (!starField) starField = buildStarField();
   }
 
   function drawSky(theme, player) {
     ensureBakedAssets();
-    // Sky horizon rides the smoothed pitch so the gradient bottom and the
-    // skyline silhouette stay attached to where the floor's real horizon
-    // sits. mouse-Y noise during yaw is dampened by the low-pass on
-    // player.smoothedPitch, so the backdrop doesn't twitch on rotation.
+    // Sky horizon rides the smoothed pitch so the gradient bottom stays
+    // attached to where the floor's real horizon sits. mouse-Y noise during
+    // yaw is dampened by the low-pass on player.smoothedPitch, so the
+    // backdrop doesn't twitch on rotation.
     const pitch = (player && typeof player.smoothedPitch === 'number') ? player.smoothedPitch : 0;
     const horizon = H / 2 + pitch;
     const M = 64;
@@ -344,8 +275,6 @@ const Raycaster = (() => {
     else if (name === 'dusk') drawDuskSky(horizon);
     else if (name === 'night') drawNightSky(horizon);
     else if (name === 'storm') drawStormSky(horizon);
-
-    drawSkyline(theme, player);
   }
 
   function drawSunsetSky(horizon) {
@@ -364,16 +293,11 @@ const Raycaster = (() => {
     ctx.beginPath();
     ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
     ctx.fill();
-    // A pair of warm cloud streaks
-    drawCloudStreak(W * 0.20, horizon * 0.55, W * 0.30, 'rgba(255,200,140,0.18)');
-    drawCloudStreak(W * 0.75, horizon * 0.32, W * 0.22, 'rgba(255,180,120,0.14)');
   }
 
   function drawDuskSky(horizon) {
-    // Dim moon high, a few stars, soft purple clouds.
+    // Dim moon high, a few stars.
     drawStars(horizon, 25, 0.35);
-    drawCloudStreak(W * 0.30, horizon * 0.4,  W * 0.30, 'rgba(120,80,140,0.20)');
-    drawCloudStreak(W * 0.70, horizon * 0.55, W * 0.28, 'rgba(180,90,130,0.18)');
     const moonX = W * 0.78, moonY = horizon * 0.22, moonR = Math.min(W, H) * 0.035;
     const glow = ctx.createRadialGradient(moonX, moonY, moonR, moonX, moonY, moonR * 3);
     glow.addColorStop(0, 'rgba(240,220,200,0.35)');
@@ -413,11 +337,6 @@ const Raycaster = (() => {
   }
 
   function drawStormSky(horizon) {
-    // Heavy cloud bands first
-    for (const cd of cloudBank) {
-      drawCloudStreak(cd.u * W, cd.v * horizon, cd.w * W,
-        `rgba(20,18,30,${(cd.alpha + 0.15).toFixed(3)})`);
-    }
     // Occasional lightning flash — deterministic enough to feel like weather
     // without storing per-frame state. Uses performance.now() so it pulses
     // briefly every few seconds.
@@ -441,39 +360,6 @@ const Raycaster = (() => {
       ctx.fillStyle = `rgba(255,250,225,${a})`;
       ctx.fillRect(x, y, s.size, s.size);
     }
-  }
-
-  function drawCloudStreak(cx, cy, length, fillStyle) {
-    ctx.fillStyle = fillStyle;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, length * 0.5, length * 0.10, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  function drawSkyline(theme, player) {
-    if (!skylineCanvas) return;
-    // World-anchored: scrolls horizontally with player.angle (1 FOV of yaw
-    // = 1 canvas-width) so the buildings stay fixed in world space.
-    // Vertical position rides the smoothed pitch — sustained looking-up/down
-    // moves the silhouette with the real horizon (so it doesn't detach from
-    // the floor), but mouse-Y noise during a pure yaw is filtered out by
-    // Player.update's smoothedPitch low-pass.
-    const sh = skylineCanvas.height;
-    const pitch = (player && typeof player.smoothedPitch === 'number') ? player.smoothedPitch : 0;
-    const horizon = H / 2 + pitch;
-    const dy = Math.floor(horizon - sh + 4);
-    const cw = skylineCanvas.width;
-    const angle = (player && typeof player.angle === 'number') ? player.angle : 0;
-    const scroll = -(angle / FOV) * W;
-    let off = scroll % cw;
-    if (off > 0) off -= cw;
-
-    ctx.save();
-    ctx.globalAlpha = theme.skyline || 0.6;
-    for (let x = off; x < W; x += cw) {
-      ctx.drawImage(skylineCanvas, Math.floor(x), dy);
-    }
-    ctx.restore();
   }
 
   function drawFloor(player, theme, horizonOffset) {
