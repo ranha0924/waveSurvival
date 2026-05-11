@@ -143,4 +143,6 @@ const Sprites = (() => {
 // Default registrations. Add more lines like:
 //   Sprites.register('rusher', 'assets/rusher.png');
 // and the renderer will pick them up automatically.
-Sprites.register('grunt', Sprites.buildZombie);
+// grunt loads from a chroma-keyed PNG; while it streams in, the renderer
+// falls back to its procedural rectangle silhouette.
+Sprites.register('grunt', 'assets/zombie.png');
