@@ -116,6 +116,7 @@
     game.ctx = game.canvas.getContext('2d');
     Raycaster.init(game.canvas);
     Environment.init();
+    if (typeof Pickups !== 'undefined') Pickups.init();
 
     setupInput();
     setupUIButtons();
@@ -334,6 +335,7 @@
     game.enemies = [];
     game.projectiles = [];
     game.particles = [];
+    if (typeof Pickups !== 'undefined') Pickups.clear();
     game.score = { score: 0 };
     game.wave = { number: 0, enemiesAlive: 0, queue: [], spawnTimer: 0, spawnInterval: 0.6 };
     // Clear any stale input state from previous run / menu interaction
@@ -523,6 +525,7 @@
 
       Enemies.updateProjectiles(game.projectiles, dt, game.player, game.particles);
       updateParticles(dt);
+      if (typeof Pickups !== 'undefined') Pickups.update(dt, game.player, game.particles);
       Environment.update(dt, game.wave.number, game.particles);
 
       // Spawn next enemy from queue
