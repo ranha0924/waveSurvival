@@ -258,6 +258,15 @@
     document.addEventListener('pointerlockerror', () => {
       if (game.state === STATE.PLAYING && !game.touchMode) UI.showLockPrompt();
     });
+
+    // Save any new bests when the page is about to close or backgrounded so
+    // long runs don't lose progress if the player navigates away without
+    // dying first.
+    window.addEventListener('pagehide', persistRunBests);
+    window.addEventListener('beforeunload', persistRunBests);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) persistRunBests();
+    });
   }
 
   function requestPointerLock() {
@@ -276,6 +285,50 @@
     }
   }
 
+  // Persist any all-time / daily bests the current run has earned. Called
+  // after every wave clear and on tab-hide / unload so a refresh, crash,
+  // or AFK timeout during a long run doesn't discard a new record.
+  // totalRuns is left alone — that's gameOver's job (a run isn't "complete"
+  // until the player dies).
+  function persistRunBests() {
+    if (!game.player) return;
+    const cur = {
+      wave:  game.wave.number,
+      score: game.score.score,
+      kills: game.player.kills,
+      combo: game.player.maxComboReached
+    };
+    const nick = game.nick || '익명';
+
+    const allTime = Records.load();
+    let allDirty = false;
+    function bumpAll(field, value) {
+      if (value > allTime[field].value) {
+        allTime[field] = { value, name: nick };
+        allDirty = true;
+      }
+    }
+    bumpAll('bestWave',  cur.wave);
+    bumpAll('bestScore', cur.score);
+    bumpAll('bestKills', cur.kills);
+    bumpAll('bestCombo', cur.combo);
+    if (allDirty) Records.save(allTime);
+
+    const daily = Records.loadDaily();
+    let dailyDirty = false;
+    function bumpDaily(field, value) {
+      if (value > daily.records[field].value) {
+        daily.records[field] = { value, name: nick };
+        dailyDirty = true;
+      }
+    }
+    bumpDaily('bestWave',  cur.wave);
+    bumpDaily('bestScore', cur.score);
+    bumpDaily('bestKills', cur.kills);
+    bumpDaily('bestCombo', cur.combo);
+    if (dailyDirty) Records.saveDaily(daily);
+  }
+
   function startGame() {
     game.player = Player.create();
     game.enemies = [];
@@ -289,7 +342,9 @@
     game.lastTime = performance.now();
 
     // Snapshot best records at run start so HUD/banners compare against a
-    // stable baseline. We persist updated records only on game-over.
+    // stable baseline. Mid-run updates are persisted by persistRunBests()
+    // (wave clear / tab hide / unload) — game-over also re-saves with the
+    // final stats and bumps totalRuns.
     game.runBest = Records.load();
     game.recordFired = { score: false, wave: false };
     UI.setHudBest(game.runBest);
@@ -409,6 +464,10 @@
       Audio.waveClear();
       // Cleanup dead enemies
       game.enemies = game.enemies.filter(e => e.alive);
+
+      // Persist any new bests now so a mid-run refresh / crash doesn't
+      // throw away the wave/score/kills the player just earned.
+      persistRunBests();
 
       game.state = STATE.UPGRADE;
       if (!game.touchMode) document.exitPointerLock();
