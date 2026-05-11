@@ -46,14 +46,23 @@ const Audio = (() => {
   // synth fallback. `volume` is in the same 0..1 range as tone()/noise().
   // `rate` lets footsteps vary slightly so consecutive plays don't sound
   // mechanically identical.
-  function playSample(name, volume = 1.0, rate = 1.0) {
+  function playSample(name, volume = 1.0, rate = 1.0, lowpassHz = 0) {
     if (!enabled || !ctx || !samples[name]) return false;
     const src = ctx.createBufferSource();
     src.buffer = samples[name];
     src.playbackRate.value = rate;
     const gain = ctx.createGain();
     gain.gain.value = volume;
-    src.connect(gain);
+    let node = src;
+    if (lowpassHz > 0) {
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = lowpassHz;
+      filter.Q.value = 0.7;
+      node.connect(filter);
+      node = filter;
+    }
+    node.connect(gain);
     gain.connect(masterGain);
     src.start();
     return true;
@@ -156,40 +165,29 @@ const Audio = (() => {
   function hitFlesh() {
     if (!ctx) return;
     // Slight pitch jitter so back-to-back hits don't sound identical.
-    const rate = 0.74 + Math.random() * 0.10;
-    if (playSample('hitFlesh', 1.1, rate)) {
-      tone(65, 0.07, 'sine', 0.32);
-      return;
-    }
+    const rate = 0.72 + Math.random() * 0.10;
+    if (playSample('hitFlesh', 1.2, rate, 1600)) return;
     noise(0.05, 0.40, 700, 0.6);
     tone(140, 0.04, 'sine', 0.18);
   }
 
-  // Tank hit — same hit-impact sample as flesh but kept a touch brighter so
-  // it still reads as a harder surface than the grunts, with its own thump
-  // for weight.
+  // Tank hit — same hit-impact sample as flesh but kept a touch brighter
+  // and less filtered so it still reads as a harder surface than the grunts.
   function hitArmor() {
     if (!ctx) return;
     const rate = 0.95 + Math.random() * 0.12;
-    if (playSample('hitFlesh', 1.15, rate)) {
-      tone(90, 0.07, 'sine', 0.30);
-      return;
-    }
+    if (playSample('hitFlesh', 1.2, rate, 3500)) return;
     tone(900, 0.04, 'square', 0.22);
     tone(1500, 0.03, 'triangle', 0.14);
     noise(0.03, 0.18, 3500, 2);
   }
 
-  // Boss hit — pitched-down sample with a deeper sub-bass thump so each
-  // round on the boss feels beefier and heavier than a regular zombie hit.
+  // Boss hit — pitched-down sample with a tight low-pass so each round on
+  // the boss feels beefier and heavier than a regular zombie hit.
   function hitBoss() {
     if (!ctx) return;
-    const rate = 0.50 + Math.random() * 0.10;
-    if (playSample('hitFlesh', 1.2, rate)) {
-      tone(45, 0.12, 'sine', 0.45);
-      tone(80, 0.08, 'sawtooth', 0.22);
-      return;
-    }
+    const rate = 0.48 + Math.random() * 0.10;
+    if (playSample('hitFlesh', 1.3, rate, 900)) return;
     noise(0.10, 0.55, 350, 0.5);
     tone(80, 0.08, 'sawtooth', 0.30);
     tone(45, 0.10, 'sine', 0.25);
