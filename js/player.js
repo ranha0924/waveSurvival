@@ -1,5 +1,10 @@
 // Player state and shooting
 const Player = (() => {
+  // Weapons selectable from the loadout. 1-4 keys map to indices into this
+  // array; cycleWeapon walks it for the mobile swap button.
+  const WEAPON_ORDER = ['pistol', 'shotgun', 'machinegun', 'sniper'];
+
+  // ---------- Factory ----------
   function create() {
     const start = (typeof GameMap !== 'undefined' && GameMap.PLAYER_START) || { x: 12, y: 12 };
     return {
@@ -51,6 +56,7 @@ const Player = (() => {
 
   function getWeapon(p) { return p.loadout[p.currentWeapon]; }
 
+  // ---------- Per-frame update ----------
   function update(p, dt, input) {
     // Movement — keys feed digital fwd/right; an optional analog `input.move`
     // (from a virtual joystick) overrides them when present.
@@ -133,6 +139,7 @@ const Player = (() => {
     }
   }
 
+  // ---------- Aim ----------
   function turn(p, deltaX, deltaY) {
     p.angle += deltaX * 0.0025;
     // Normalize
@@ -148,6 +155,7 @@ const Player = (() => {
     }
   }
 
+  // ---------- Shooting / hit resolution ----------
   function shoot(p, enemies, particles, scoreCallback) {
     if (p.reloading) return;
     if (p.shootCooldown > 0) return;
@@ -346,6 +354,7 @@ const Player = (() => {
     return maxDist;
   }
 
+  // ---------- Particle spawners ----------
   // Damage numbers float up out of the hit point, fading as they rise.
   // Headshots come out red+larger so the player gets a clear visual reward.
   // Spawned per damage instance — shotgun will produce 6 nearby numbers,
@@ -396,19 +405,6 @@ const Player = (() => {
         life: 0.5
       });
     }
-  }
-
-  function spawnDeathParticle(particles, x, y, color) {
-    particles.push({
-      x, y,
-      vx: (Math.random() - 0.5) * 5,
-      vy: (Math.random() - 0.5) * 5,
-      zOffset: Math.random() * 0.5,
-      vz: 1 + Math.random() * 3,
-      size: 4 + Math.random() * 4,
-      color,
-      life: 1.0
-    });
   }
 
   // Single-layer death burst — fast airborne droplets only. The previous
@@ -464,6 +460,7 @@ const Player = (() => {
     }
   }
 
+  // ---------- Reload ----------
   function startReload(p) {
     if (p.reloading) return;
     const w = getWeapon(p);
@@ -487,8 +484,7 @@ const Player = (() => {
     p.reloading = false;
   }
 
-  const WEAPON_ORDER = ['pistol', 'shotgun', 'machinegun', 'sniper'];
-
+  // ---------- Weapon switching ----------
   function switchWeapon(p, key) {
     const idx = parseInt(key) - 1;
     if (idx < 0 || idx >= WEAPON_ORDER.length) return;
@@ -517,6 +513,7 @@ const Player = (() => {
     p.shootCooldown = 0.2;
   }
 
+  // ---------- Player damage ----------
   function takeDamage(p, dmg) {
     const actual = dmg * (1 / Math.max(0.5, p.defenseMult));
     p.hp = Math.max(0, p.hp - actual);
