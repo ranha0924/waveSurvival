@@ -9,6 +9,11 @@ const Raycaster = (() => {
   // to clip their lower body so enemies behind a sandbag are obscured below
   // the wall's top while remaining visible above it.
   let shortDist;
+  // Per-column screen Y of the nearest opaque wall's TOP. Sprites behind a
+  // wall are clipped against this so a tall enemy still visibly pokes above
+  // a shorter wall — the column-scalar zBuffer alone would hide the entire
+  // sprite, which made the boss look like it had a ceiling sitting on it.
+  let wallTopY;
   const FOV = Math.PI / 3; // 60deg
 
   // Offscreen buffer used to apply per-frame fog/flash tint to image sprites
@@ -50,6 +55,7 @@ const Raycaster = (() => {
     H = canvas.height;
     zBuffer = new Float32Array(W);
     shortDist = new Float32Array(W);
+    wallTopY = new Float32Array(W);
     if (ctx) ctx.imageSmoothingEnabled = false;
   }
 
@@ -112,7 +118,12 @@ const Raycaster = (() => {
     const ambient = theme.ambient;
     const horizon = H / 2 + horizonOffset;
 
-    for (let i = 0; i < W; i++) shortDist[i] = Infinity;
+    for (let i = 0; i < W; i++) {
+      shortDist[i] = Infinity;
+      // Default to bottom-of-screen so "no wall in this column" is treated as
+      // "doesn't clip anything" by the per-column min(dstY1, wallTopY[x]).
+      wallTopY[i] = H + 1;
+    }
 
     for (let x = 0; x < W; x++) {
       const cameraX = 2 * x / W - 1;
@@ -164,13 +175,19 @@ const Raycaster = (() => {
       }
 
       // Sprites should be visible over short walls, so the z-buffer tracks
-      // only the nearest opaque (tall) wall.
+      // only the nearest opaque (tall) wall. wallTopY is set in lockstep so
+      // sprites behind that wall can still draw the silhouette that pokes
+      // above the wall's top (boss / tank / comms tower).
       zBuffer[x] = tallHit ? tallHit.perpDist : 1e6;
 
       if (tallHit) {
         const wallU = tallHit.side === 0
           ? (player.y + tallHit.perpDist * rayDirY)
           : (player.x + tallHit.perpDist * rayDirX);
+        const lineH = H / tallHit.perpDist;
+        // Body top in screen coords — same formula drawWall() uses. Stored
+        // as a float so sprite clipping can compare without losing fractions.
+        wallTopY[x] = horizon + lineH / 2 - tallHit.shape.heightFactor * lineH;
         drawWall(x, horizon, tallHit.wallType, tallHit.shape, tallHit.side, tallHit.perpDist, wallU, fogDist, ambient);
       }
 
@@ -394,28 +411,32 @@ const Raycaster = (() => {
       const headColor = shadeColor(def.headColor, lightFactor);
 
       for (let x = x0; x < x1; x++) {
-        if (zBuffer[x] < proj.dist) continue;
         const localX = (x - drawStartX) / spriteW;
         const fromCenter = Math.abs(localX - 0.5) * 2;
         if (fromCenter > 0.95) continue;
 
-        const bodyTop = drawStartY + spriteH * 0.3;
+        const bodyTopY = drawStartY + spriteH * 0.3;
         let bodyBottom = drawStartY + spriteH;
-        const headTop = drawStartY;
-        const headBottom = drawStartY + spriteH * 0.3;
+        const headTopY = drawStartY;
+        let headBottomY = drawStartY + spriteH * 0.3;
 
-        // If a short (see-over) wall stands between the player and this sprite
-        // in this column, clip the body at the horizon line — only the upper
-        // body should peek above the barricade.
+        // Tall opaque wall in front: cap the visible Y at the wall's top so
+        // we still draw whatever silhouette pokes above it.
+        if (zBuffer[x] < proj.dist) {
+          const cap = wallTopY[x];
+          bodyBottom = Math.min(bodyBottom, cap);
+          headBottomY = Math.min(headBottomY, cap);
+        }
+        // Short (see-over) wall in front: clip body at horizon line.
         if (proj.dist > shortDist[x]) bodyBottom = Math.min(bodyBottom, horizon);
 
         ctx.fillStyle = flash ? '#ffffff' : bodyColor;
-        if (fromCenter < 0.85 && bodyBottom > bodyTop) {
-          ctx.fillRect(x, bodyTop, 1, bodyBottom - bodyTop);
+        if (fromCenter < 0.85 && bodyBottom > bodyTopY) {
+          ctx.fillRect(x, bodyTopY, 1, bodyBottom - bodyTopY);
         }
-        if (fromCenter < 0.5) {
+        if (fromCenter < 0.5 && headBottomY > headTopY) {
           ctx.fillStyle = flash ? '#ffffff' : headColor;
-          ctx.fillRect(x, headTop, 1, headBottom - headTop);
+          ctx.fillRect(x, headTopY, 1, headBottomY - headTopY);
         }
       }
 
@@ -486,10 +507,14 @@ const Raycaster = (() => {
     const xStart = Math.max(0, x0);
     const xEnd = Math.min(W, x0 + w);
     for (let x = xStart; x < xEnd; x++) {
-      if (zBuffer[x] < dist) continue;
       const u = (x - x0) / w;
       const srcX = Math.min(sw - 1, Math.max(0, Math.floor(u * sw)));
       let dstY1 = y0 + h;
+      // Tall opaque wall in front: clip the sprite to the area above the
+      // wall's top so the silhouette of a big enemy still pokes over.
+      if (zBuffer[x] < dist) dstY1 = Math.min(dstY1, wallTopY[x]);
+      // Short cover (sandbag / wreck) in front: hide everything below the
+      // horizon line in this column.
       if (dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
       if (dstY1 <= y0) continue;
       const dstH = dstY1 - y0;
