@@ -78,7 +78,7 @@ const Raycaster = (() => {
     // backdrop (gradient, sun/moon, stars, skyline) stays painted-on-screen
     // regardless of camera direction. The floor still tracks the real
     // horizon so the world below the eye line bobs / tilts naturally.
-    drawSky(theme);
+    drawSky(theme, player);
     drawFloor(player, theme, horizonOffset);
 
     castWalls(player, horizonOffset, theme);
@@ -309,7 +309,7 @@ const Raycaster = (() => {
     }
   }
 
-  function drawSky(theme) {
+  function drawSky(theme, player) {
     ensureBakedAssets();
     // Fixed horizon at screen center. The floor pass overpaints its own
     // area whenever pitch leaves the lower half exposed, so we fill the
@@ -335,7 +335,7 @@ const Raycaster = (() => {
     else if (name === 'night') drawNightSky(horizon);
     else if (name === 'storm') drawStormSky(horizon);
 
-    drawSkyline(theme);
+    drawSkyline(theme, player);
   }
 
   function drawSunsetSky(horizon) {
@@ -440,17 +440,30 @@ const Raycaster = (() => {
     ctx.fill();
   }
 
-  function drawSkyline(theme) {
+  function drawSkyline(theme, player) {
     if (!skylineCanvas) return;
-    // Pinned to the unrotated horizon line (screen center) regardless of
-    // pitch or bob, so the buildings stay dead still while the player looks
-    // around. Decoupling from `horizon` also stops mouse-Y noise that leaks
-    // into pitch during yaw from jittering the silhouette.
+    // World-anchored: the skyline canvas tiles horizontally and scrolls with
+    // player.angle so the buildings appear fixed in the world. 1 FOV of yaw
+    // rotation scrolls the silhouette by exactly one canvas width, which
+    // matches the wall projection's horizontal motion. Y stays fixed at the
+    // unrotated horizon — distant buildings don't bob with pitch.
     const sh = skylineCanvas.height;
     const dy = Math.floor(H / 2 - sh + 4);
+    const cw = skylineCanvas.width;
+    const angle = (player && typeof player.angle === 'number') ? player.angle : 0;
+    // Negative because turning right (positive angle) should slide the
+    // buildings LEFT on screen, the way distant scenery actually moves.
+    const scroll = -(angle / FOV) * W;
+    // Normalize the starting offset into [-cw, 0] so the first tile we draw
+    // begins on or just left of the screen.
+    let off = scroll % cw;
+    if (off > 0) off -= cw;
+
     ctx.save();
     ctx.globalAlpha = theme.skyline || 0.6;
-    ctx.drawImage(skylineCanvas, 0, dy);
+    for (let x = off; x < W; x += cw) {
+      ctx.drawImage(skylineCanvas, Math.floor(x), dy);
+    }
     ctx.restore();
   }
 
