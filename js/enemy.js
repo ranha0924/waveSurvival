@@ -1,5 +1,6 @@
 // Enemy types, spawn logic, AI
 const Enemies = (() => {
+  // ---------- Type catalog ----------
   const types = {
     grunt: {
       id: 'grunt', name: '졸개',
@@ -79,6 +80,15 @@ const Enemies = (() => {
     }
   };
 
+  // Apply damage to the player and flash the screen vignette. Every site
+  // that hits the player wants both, so this keeps the two from drifting
+  // apart (e.g. silent damage with no feedback).
+  function damagePlayer(player, dmg) {
+    Player.takeDamage(player, dmg);
+    UI.flashHit();
+  }
+
+  // ---------- Factory ----------
   function create(type, x, y, scale = 1) {
     const def = types[type];
     return {
@@ -100,6 +110,7 @@ const Enemies = (() => {
     };
   }
 
+  // ---------- AI update ----------
   function update(e, dt, player, projectiles, particles, enemies) {
     if (!e.alive) return;
     e.attackTimer -= dt;
@@ -143,8 +154,7 @@ const Enemies = (() => {
         }
         // Attack only with LoS so they don't hit you through walls
         if (dist < e.type.attackRange && hasLOS && e.attackTimer <= 0) {
-          Player.takeDamage(player, e.type.damage * e.damageMult);
-          UI.flashHit();
+          damagePlayer(player, e.type.damage * e.damageMult);
           e.attackTimer = e.type.attackCooldown;
         }
       }
@@ -199,6 +209,7 @@ const Enemies = (() => {
     e.lastX = e.x; e.lastY = e.y;
   }
 
+  // ---------- Projectiles (ranged enemy bullets) ----------
   function fireProjectile(e, player, projectiles) {
     const dx = player.x - e.x, dy = player.y - e.y;
     const d = Math.sqrt(dx * dx + dy * dy);
@@ -240,8 +251,7 @@ const Enemies = (() => {
       // Player hit
       const dx = player.x - p.x, dy = player.y - p.y;
       if (dx * dx + dy * dy < 0.16) {
-        Player.takeDamage(player, p.damage);
-        UI.flashHit();
+        damagePlayer(player, p.damage);
         projectiles.splice(i, 1);
         continue;
       }
@@ -249,6 +259,7 @@ const Enemies = (() => {
     }
   }
 
+  // ---------- Boss adds + chain kill bookkeeping ----------
   function summonAdds(boss, enemies) {
     const count = boss.phase2 ? 4 : 2;
     for (let i = 0; i < count; i++) {
@@ -283,6 +294,7 @@ const Enemies = (() => {
     if (victim.type.isBoss) player.bossKills++;
   }
 
+  // ---------- Bomber detonation + splitter ----------
   // Bomber explosion. Damages player + nearby enemies; spawns visual burst.
   // Used both for "killed by bullet" (scoreCallback present → chain kills are
   // credited to the player) and "got too close" (no callback → bomber walked
@@ -298,8 +310,7 @@ const Enemies = (() => {
     const dmg = e.type.damage * e.damageMult;
     const dx = player.x - e.x, dy = player.y - e.y;
     if (dx * dx + dy * dy < r2) {
-      Player.takeDamage(player, dmg);
-      UI.flashHit();
+      damagePlayer(player, dmg);
     }
     // Chain damage other enemies. We deal raw HP only — secondary deaths
     // don't trigger their own onDeath effects, otherwise a tight clump of
@@ -377,6 +388,7 @@ const Enemies = (() => {
     }
   }
 
+  // ---------- On-killed dispatch (player.damageEnemy hook) ----------
   // Called from player.js after a bullet kill resolves. Lets enemy types
   // run their own death side-effects (split, explode) without coupling
   // player.js to specific type ids. scoreCallback is forwarded so chain
@@ -392,7 +404,7 @@ const Enemies = (() => {
     }
   }
 
-  // Wave composition logic
+  // ---------- Wave composition ----------
   function buildWave(waveNum) {
     // Returns array of {type, scale}
     const out = [];
