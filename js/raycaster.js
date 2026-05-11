@@ -131,9 +131,9 @@ const Raycaster = (() => {
       if (rayDirY < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
       else { stepY = 1; sideDistY = (mapY + 1.0 - player.y) * deltaDistY; }
 
-      // Walk the ray. Short walls (type 5 sandbags) are recorded but do not
-      // terminate the cast — the world behind them must still render so the
-      // player can see over the barricade.
+      // Walk the ray. Walls flagged seeOver (sandbags, vehicle wrecks) are
+      // recorded but do not terminate the cast — the world behind them must
+      // still render so the player can see over the chest-high cover.
       const shortHits = [];
       let tallHit = null;
       let side = 0;
@@ -150,14 +150,15 @@ const Raycaster = (() => {
         }
         const t = GameMap.getTile(mapX, mapY);
         if (t < 1 || t > 8) continue;
+        const shape = GameMap.getShape(t);
         let perpDist;
         if (side === 0) perpDist = (mapX - player.x + (1 - stepX) / 2) / (rayDirX || 1e-9);
         else perpDist = (mapY - player.y + (1 - stepY) / 2) / (rayDirY || 1e-9);
         perpDist = Math.max(0.0001, perpDist);
-        if (t === 5) {
-          shortHits.push({ wallType: t, perpDist, side });
+        if (shape.seeOver) {
+          shortHits.push({ wallType: t, perpDist, side, shape });
         } else {
-          tallHit = { wallType: t, perpDist, side };
+          tallHit = { wallType: t, perpDist, side, shape };
           break;
         }
       }
@@ -167,42 +168,167 @@ const Raycaster = (() => {
       zBuffer[x] = tallHit ? tallHit.perpDist : 1e6;
 
       if (tallHit) {
-        const lineH = Math.floor(H / tallHit.perpDist);
-        const drawStart = Math.floor(horizon - lineH / 2);
-        const drawEnd = drawStart + lineH;
         const wallU = tallHit.side === 0
           ? (player.y + tallHit.perpDist * rayDirY)
           : (player.x + tallHit.perpDist * rayDirX);
-        drawWallColumn(x, drawStart, drawEnd, tallHit.wallType, tallHit.side, tallHit.perpDist, wallU, fogDist, ambient);
+        drawWall(x, horizon, tallHit.wallType, tallHit.shape, tallHit.side, tallHit.perpDist, wallU, fogDist, ambient);
       }
 
-      // Short walls render half-height (sitting on the floor), far→near so
-      // closer barricades overdraw farther ones.
+      // See-over walls draw far→near so closer cover overdraws farther.
       let nearestShortVisible = Infinity;
-      const shortTopY = Math.floor(horizon);
       for (let i = shortHits.length - 1; i >= 0; i--) {
         const h = shortHits[i];
         if (tallHit && h.perpDist >= tallHit.perpDist) continue;
         if (h.perpDist < nearestShortVisible) nearestShortVisible = h.perpDist;
-        const halfH = Math.floor(H / h.perpDist / 2);
-        const drawStart = shortTopY;
-        const drawEnd = drawStart + halfH;
         const wallU = h.side === 0
           ? (player.y + h.perpDist * rayDirY)
           : (player.x + h.perpDist * rayDirX);
-        drawWallColumn(x, drawStart, drawEnd, h.wallType, h.side, h.perpDist, wallU, fogDist, ambient);
+        drawWall(x, horizon, h.wallType, h.shape, h.side, h.perpDist, wallU, fogDist, ambient);
       }
       shortDist[x] = nearestShortVisible;
     }
   }
 
-  function drawWallColumn(x, y0, y1, type, side, dist, wallU, fogDist, ambient) {
+  // Render one screen column of a wall. The wall sits on the floor at
+  // `horizon + lineH/2`; its top is pushed up by `shape.heightFactor * lineH`
+  // so towers tower, sandbags squat, and wrecks stay low. Side darkening and
+  // fog are applied via shadeColor on the body color.
+  function drawWall(x, horizon, type, shape, side, dist, wallU, fogDist, ambient) {
     const colors = GameMap.getWallColor(type);
     const baseColor = side === 1 ? colors.dark : colors.light;
     const fog = Math.min(1, dist / fogDist);
     const lightFactor = ambient * (1 - fog * 0.7);
-    ctx.fillStyle = shadeColor(baseColor, lightFactor);
-    ctx.fillRect(x, y0, 1, y1 - y0);
+    const bodyColor = shadeColor(baseColor, lightFactor);
+
+    const lineH = H / dist;
+    const bottomY = Math.floor(horizon + lineH / 2);
+    const topY = Math.floor(horizon + lineH / 2 - shape.heightFactor * lineH);
+    if (bottomY > topY) {
+      ctx.fillStyle = bodyColor;
+      ctx.fillRect(x, topY, 1, bottomY - topY);
+    }
+
+    if (shape.topDeco) {
+      drawTopDeco(x, topY, lineH, shape.topDeco, baseColor, lightFactor, wallU, side);
+    }
+  }
+
+  // Per-column silhouette drawer for the optional decoration that sits above
+  // a wall body. Each kind keys off `wallU` (the world-coordinate U of the
+  // hit point) so the pattern stays tile-aligned and stable as the camera
+  // moves. Heights scale with `lineH` so they shrink with distance like the
+  // wall body does.
+  function drawTopDeco(x, topY, lineH, kind, baseColor, lightFactor, wallU, side) {
+    const fract = wallU - Math.floor(wallU);
+    const dark  = shadeColor(baseColor, lightFactor * 0.55);
+    const lit   = shadeColor(baseColor, Math.min(1.6, lightFactor * 1.25));
+
+    switch (kind) {
+      case 'crenel': {
+        // Battlement: 4 merlons per tile, alternating raised/embrasure.
+        const phase = Math.floor(fract * 8);
+        if (phase % 2 === 0) {
+          const h = Math.max(2, lineH * 0.10);
+          ctx.fillStyle = dark;
+          ctx.fillRect(x, topY - h, 1, h);
+          ctx.fillStyle = lit;
+          ctx.fillRect(x, topY - h, 1, 1); // top highlight
+        }
+        break;
+      }
+      case 'jagged': {
+        // Broken concrete crown: deterministic per-slot height + a thin
+        // barbed-wire dotted line a bit above.
+        const slot = Math.floor(wallU * 18);
+        const n = Math.sin(slot * 12.9898) * 43758.5453;
+        const noise = n - Math.floor(n);
+        const h = Math.max(1, lineH * (0.03 + noise * 0.06));
+        ctx.fillStyle = dark;
+        ctx.fillRect(x, topY - h, 1, h);
+        if (Math.floor(wallU * 48) % 4 === 0) {
+          ctx.fillStyle = '#181614';
+          ctx.fillRect(x, Math.floor(topY - lineH * 0.13), 1, 1);
+        }
+        break;
+      }
+      case 'antenna': {
+        // Tall central spire with a few cross-bars; thin "guy wires" tapering
+        // outward make the silhouette read as a comms tower from any angle.
+        const dx = Math.abs(fract - 0.5);
+        if (dx < 0.025) {
+          const h = lineH * 0.75;
+          ctx.fillStyle = '#0e1014';
+          ctx.fillRect(x, topY - h, 1, h);
+        } else if (dx < 0.18) {
+          // Cross-bars
+          const bars = [0.30, 0.45, 0.58, 0.68];
+          for (const hf of bars) {
+            ctx.fillStyle = shadeColor('#3a3d44', lightFactor);
+            ctx.fillRect(x, Math.floor(topY - lineH * hf), 1, 1);
+          }
+        }
+        // Spire tip beacon pulse
+        if (dx < 0.04 && Math.floor((performance.now() / 400)) % 2 === 0) {
+          ctx.fillStyle = '#ff5544';
+          ctx.fillRect(x, Math.floor(topY - lineH * 0.78), 1, 2);
+        }
+        break;
+      }
+      case 'turret': {
+        // Center-of-tile raised cab/turret box with a top edge highlight.
+        if (fract > 0.28 && fract < 0.72) {
+          const h = lineH * 0.28;
+          ctx.fillStyle = dark;
+          ctx.fillRect(x, topY - h, 1, h);
+          ctx.fillStyle = lit;
+          ctx.fillRect(x, topY - h, 1, 1);
+          // Slit window on the front of the cab
+          if (fract > 0.42 && fract < 0.58) {
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(x, Math.floor(topY - h * 0.55), 1, Math.max(1, Math.floor(h * 0.18)));
+          }
+        }
+        break;
+      }
+      case 'beacon': {
+        // Hazard panel: warning bar across the top with a slow-blinking light.
+        ctx.fillStyle = '#ffd040';
+        ctx.fillRect(x, topY, 1, 2);
+        ctx.fillStyle = '#a06a00';
+        ctx.fillRect(x, topY + 2, 1, 1);
+        const blink = Math.floor(performance.now() / 600) % 2 === 0;
+        if (blink && fract > 0.45 && fract < 0.55) {
+          ctx.fillStyle = '#ff3322';
+          ctx.fillRect(x, Math.floor(topY - lineH * 0.04), 1, 2);
+        }
+        break;
+      }
+      case 'roof': {
+        // Subtle roofline shadow + a peak in the center of each tile so the
+        // hangar reads as having a slightly pitched roof.
+        ctx.fillStyle = dark;
+        ctx.fillRect(x, topY, 1, 2);
+        const dx = Math.abs(fract - 0.5);
+        if (dx < 0.04) {
+          const h = lineH * 0.06;
+          ctx.fillStyle = dark;
+          ctx.fillRect(x, topY - h, 1, h);
+        }
+        break;
+      }
+      case 'corners': {
+        // Container corner caps + a thin top rail so the box edge reads
+        // clearly even at distance.
+        ctx.fillStyle = dark;
+        ctx.fillRect(x, topY, 1, 1);
+        if (fract < 0.06 || fract > 0.94) {
+          const h = Math.max(2, lineH * 0.07);
+          ctx.fillStyle = '#1a1208';
+          ctx.fillRect(x, topY - h, 1, h);
+        }
+        break;
+      }
+    }
   }
 
   function shadeColor(hex, factor) {
