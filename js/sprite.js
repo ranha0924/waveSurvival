@@ -152,3 +152,6 @@ Sprites.register('ranger', 'assets/ranger.png');
 Sprites.register('boss',   'assets/boss.png',   { scale: 2.2 });
 Sprites.register('bomber', 'assets/bomber.png');
 Sprites.register('splitter', 'assets/splitter.png');
+// Splitter children re-use the grunt zombie art at 0.7× so they read as
+// "smaller broken-off pieces" rather than full-size clones of the parent.
+Sprites.register('splitterChild', 'assets/zombie.png', { scale: 0.7 });
