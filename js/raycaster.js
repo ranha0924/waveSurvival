@@ -81,9 +81,9 @@ const Raycaster = (() => {
     theme = theme || Environment.themeForWave(1);
 
     // Sky pass is fully detached from the player's pitch + bob so the
-    // backdrop (gradient, sun/moon, stars) stays painted-on-screen regardless
-    // of camera direction. The floor still tracks the real horizon so the
-    // world below the eye line bobs / tilts naturally.
+    // backdrop (gradient, stars) stays painted-on-screen regardless of camera
+    // direction. The floor still tracks the real horizon so the world below
+    // the eye line bobs / tilts naturally.
     drawSky(theme, player);
     drawFloor(player, theme, horizonOffset);
 
@@ -271,69 +271,9 @@ const Raycaster = (() => {
     ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
 
     const name = theme.name || 'sunset';
-    if (name === 'sunset') drawSunsetSky(horizon);
-    else if (name === 'dusk') drawDuskSky(horizon);
-    else if (name === 'night') drawNightSky(horizon);
+    if (name === 'dusk') drawStars(horizon, 25, 0.35);
+    else if (name === 'night') drawStars(horizon, 70, 1.0);
     else if (name === 'storm') drawStormSky(horizon);
-  }
-
-  function drawSunsetSky(horizon) {
-    // Big low sun + warm halo so the gradient reads as a real horizon line.
-    const sunX = W * 0.62;
-    const sunY = horizon - 12;
-    const sunR = Math.min(W, H) * 0.06;
-    const halo = ctx.createRadialGradient(sunX, sunY, sunR, sunX, sunY, sunR * 4.5);
-    halo.addColorStop(0, 'rgba(255,180,90,0.55)');
-    halo.addColorStop(1, 'rgba(255,160,80,0)');
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, sunR * 4.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#fde4a8';
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  function drawDuskSky(horizon) {
-    // Dim moon high, a few stars.
-    drawStars(horizon, 25, 0.35);
-    const moonX = W * 0.78, moonY = horizon * 0.22, moonR = Math.min(W, H) * 0.035;
-    const glow = ctx.createRadialGradient(moonX, moonY, moonR, moonX, moonY, moonR * 3);
-    glow.addColorStop(0, 'rgba(240,220,200,0.35)');
-    glow.addColorStop(1, 'rgba(240,220,200,0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(moonX, moonY, moonR * 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#e0d6b8';
-    ctx.beginPath();
-    ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  function drawNightSky(horizon) {
-    drawStars(horizon, 70, 1.0);
-    const moonX = W * 0.75, moonY = horizon * 0.20, moonR = Math.min(W, H) * 0.045;
-    const glow = ctx.createRadialGradient(moonX, moonY, moonR, moonX, moonY, moonR * 3.5);
-    glow.addColorStop(0, 'rgba(230,230,210,0.45)');
-    glow.addColorStop(1, 'rgba(230,230,210,0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(moonX, moonY, moonR * 3.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#f4f0d8';
-    ctx.beginPath();
-    ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
-    ctx.fill();
-    // Crater hint
-    ctx.fillStyle = 'rgba(150,150,135,0.4)';
-    ctx.beginPath();
-    ctx.arc(moonX - moonR * 0.3, moonY - moonR * 0.2, moonR * 0.18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(moonX + moonR * 0.25, moonY + moonR * 0.15, moonR * 0.12, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   function drawStormSky(horizon) {
