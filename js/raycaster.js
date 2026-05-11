@@ -329,7 +329,7 @@ const Raycaster = (() => {
     else if (name === 'night') drawNightSky(horizon);
     else if (name === 'storm') drawStormSky(horizon);
 
-    drawSkyline(horizon, theme);
+    drawSkyline(theme);
   }
 
   function drawSunsetSky(horizon) {
@@ -434,11 +434,14 @@ const Raycaster = (() => {
     ctx.fill();
   }
 
-  function drawSkyline(horizon, theme) {
+  function drawSkyline(theme) {
     if (!skylineCanvas) return;
-    // Draw the baked silhouette so its bottom sits on the horizon line.
+    // Pinned to the unrotated horizon line (screen center) regardless of
+    // pitch or bob, so the buildings stay dead still while the player looks
+    // around. Decoupling from `horizon` also stops mouse-Y noise that leaks
+    // into pitch during yaw from jittering the silhouette.
     const sh = skylineCanvas.height;
-    const dy = Math.floor(horizon - sh + 4);
+    const dy = Math.floor(H / 2 - sh + 4);
     ctx.save();
     ctx.globalAlpha = theme.skyline || 0.6;
     ctx.drawImage(skylineCanvas, 0, dy);
