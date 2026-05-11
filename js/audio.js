@@ -24,6 +24,7 @@ const Audio = (() => {
       loadSample('machinegun', 'assets/audio/machinegun.mp3');
       loadSample('sniper',     'assets/audio/sniper.mp3');
       loadSample('footstep',   'assets/audio/footstep.wav');
+      loadSample('hitFlesh',   'assets/audio/hit_flesh.ogg');
     } catch (e) {
       enabled = false;
     }
@@ -149,8 +150,13 @@ const Audio = (() => {
 
   // Wet meat impact — short, dampened low thud + body resonance.
   // Default for grunt / rusher / ranger / bomber / splitter / splitterChild.
+  // Prefer the uploaded hit-impact sample; the synth path stays as a fallback
+  // for the brief window before the sample finishes loading.
   function hitFlesh() {
     if (!ctx) return;
+    // Slight pitch jitter so back-to-back hits don't sound identical.
+    const rate = 0.92 + Math.random() * 0.16;
+    if (playSample('hitFlesh', 0.9, rate)) return;
     noise(0.05, 0.40, 700, 0.6);
     tone(140, 0.04, 'sine', 0.18);
   }
