@@ -413,7 +413,7 @@ const Player = (() => {
   // high-arc burst from the head area so head shots feel chunkier.
   function spawnDeathBurst(particles, x, y, color, headshot, isBoss) {
     const baseScale = isBoss ? 2.4 : 1.0;
-    const sprayCount = Math.floor(20 * baseScale);
+    const sprayCount = Math.floor(18 * baseScale);
     for (let i = 0; i < sprayCount; i++) {
       particles.push({
         x, y,
@@ -421,7 +421,7 @@ const Player = (() => {
         vy: (Math.random() - 0.5) * 6 * baseScale,
         zOffset: 0.15 + Math.random() * 0.55,
         vz: 1.4 + Math.random() * 3.4,
-        size: 4 + Math.random() * 5,
+        size: 2 + Math.random() * 2.5,
         color,
         life: 1.0 + Math.random() * 0.5
       });
@@ -433,10 +433,10 @@ const Player = (() => {
       Math.floor(color[1] * 0.50),
       Math.floor(color[2] * 0.50)
     ];
-    const stainCount = Math.floor(14 * baseScale);
+    const stainCount = Math.floor(12 * baseScale);
     for (let i = 0; i < stainCount; i++) {
       const a = Math.random() * Math.PI * 2;
-      const r = 0.08 + Math.random() * 0.45 * baseScale;
+      const r = 0.08 + Math.random() * 0.4 * baseScale;
       particles.push({
         x: x + Math.cos(a) * r,
         y: y + Math.sin(a) * r,
@@ -444,7 +444,7 @@ const Player = (() => {
         zOffset: 0.02 + Math.random() * 0.06,
         vz: 0,
         noGravity: true,
-        size: 8 + Math.random() * 12,
+        size: 3 + Math.random() * 4,
         color: stainColor,
         life: 3.5 + Math.random() * 1.5
       });
@@ -457,7 +457,7 @@ const Player = (() => {
           vy: (Math.random() - 0.5) * 3.5,
           zOffset: 0.65,
           vz: 3.5 + Math.random() * 2,
-          size: 3 + Math.random() * 3,
+          size: 1.5 + Math.random() * 1.5,
           color,
           life: 1.3
         });
