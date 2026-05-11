@@ -58,8 +58,27 @@
         return Records.sanitize(JSON.parse(raw));
       } catch (e) { return Records.empty(); }
     },
+    // Re-read storage just before writing and take max(field) so a stale or
+    // empty in-memory snapshot never regresses a higher value already saved.
+    // Without this, any transient load failure (parse error, schema mismatch,
+    // storage access blip) followed by a save would clobber the real bests
+    // with the current run's stats — the "high score resets after a day"
+    // failure mode some players hit.
     save(r) {
-      try { localStorage.setItem(Records.KEY, JSON.stringify(r)); } catch (e) {}
+      try {
+        const onDisk = Records.load();
+        const merged = Records.empty();
+        for (const k of ['bestWave', 'bestScore', 'bestKills', 'bestCombo']) {
+          const a = (r && r[k]) || merged[k];
+          const b = onDisk[k];
+          merged[k] = (a.value >= b.value) ? a : b;
+        }
+        merged.totalRuns = Math.max(
+          (r && typeof r.totalRuns === 'number') ? r.totalRuns : 0,
+          onDisk.totalRuns || 0
+        );
+        localStorage.setItem(Records.KEY, JSON.stringify(merged));
+      } catch (e) {}
     },
     loadDaily() {
       try {
@@ -72,7 +91,19 @@
       } catch (e) { return Records.emptyDaily(); }
     },
     saveDaily(d) {
-      try { localStorage.setItem(Records.DAILY_KEY, JSON.stringify(d)); } catch (e) {}
+      try {
+        const onDisk = Records.loadDaily();
+        const sameDay = d && onDisk && d.date === onDisk.date;
+        const base = sameDay ? onDisk.records : Records.empty();
+        const merged = Records.empty();
+        for (const k of ['bestWave', 'bestScore', 'bestKills', 'bestCombo']) {
+          const a = (d && d.records && d.records[k]) || merged[k];
+          const b = base[k];
+          merged[k] = (a.value >= b.value) ? a : b;
+        }
+        const out = { date: (d && d.date) || Random.todayString(), records: merged };
+        localStorage.setItem(Records.DAILY_KEY, JSON.stringify(out));
+      } catch (e) {}
     },
     loadNick() {
       try { return localStorage.getItem(Records.NICK_KEY) || ''; } catch (e) { return ''; }
