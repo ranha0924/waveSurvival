@@ -7,8 +7,23 @@
 // the column's screen height. Side darkening + fog are still applied as
 // an overlay in the raycaster, so this module only owns the base look.
 const WallTextures = (() => {
+  // ---------- Constants + helpers ----------
   const TEX_W = 64, TEX_H = 64;
   const cache = {};
+
+  // Numeric tile types this module renders. Mirrors the legend at the top
+  // of map.js; kept named here so buildAll's wiring reads as material →
+  // builder instead of a column of magic numbers.
+  const TILE = {
+    CONCRETE:  1,
+    HANGAR:    2,
+    STONE:     3,
+    CONTAINER: 4,
+    SANDBAG:   5,
+    VEHICLE:   6,
+    COMMS:     7,
+    HAZARD:    8
+  };
 
   function newTex() {
     const cv = document.createElement('canvas');
@@ -30,6 +45,7 @@ const WallTextures = (() => {
     };
   }
 
+  // ---------- Texture builders (one per tile material) ----------
   // Concrete blast wall: weathered slab with horizontal pour-line joints,
   // vertical streaks, speckled grain, and a few hairline cracks.
   function buildConcrete() {
@@ -401,15 +417,16 @@ const WallTextures = (() => {
     return cv;
   }
 
+  // ---------- Public API ----------
   function buildAll() {
-    cache[1] = buildConcrete();
-    cache[2] = buildHangar();
-    cache[3] = buildStone();
-    cache[4] = buildContainer();
-    cache[5] = buildSandbag();
-    cache[6] = buildVehicle();
-    cache[7] = buildComms();
-    cache[8] = buildHazard();
+    cache[TILE.CONCRETE]  = buildConcrete();
+    cache[TILE.HANGAR]    = buildHangar();
+    cache[TILE.STONE]     = buildStone();
+    cache[TILE.CONTAINER] = buildContainer();
+    cache[TILE.SANDBAG]   = buildSandbag();
+    cache[TILE.VEHICLE]   = buildVehicle();
+    cache[TILE.COMMS]     = buildComms();
+    cache[TILE.HAZARD]    = buildHazard();
   }
 
   function get(type) { return cache[type]; }
