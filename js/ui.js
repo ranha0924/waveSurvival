@@ -21,8 +21,11 @@ const UI = (() => {
     // HP
     $('hp-text').textContent = Math.ceil(player.hp);
 
-    // Stamina
-    $('stamina-bar').style.width = (player.stamina / player.maxStamina * 100) + '%';
+    // Stamina — bar dims red while exhausted so the player sees why sprint
+    // won't kick in until it refills.
+    const stBar = $('stamina-bar');
+    stBar.style.width = (player.stamina / player.maxStamina * 100) + '%';
+    stBar.classList.toggle('exhausted', !!player.exhausted);
 
     // Wave / enemies
     $('wave-num').textContent = wave.number;

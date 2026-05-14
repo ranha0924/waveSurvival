@@ -95,7 +95,12 @@ html, body {
   width: 100%;
   background: #ffffff;
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
-  transition: width 0.15s ease-out;
+  transition: width 0.15s ease-out, background 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+#stamina-bar.exhausted {
+  background: #ff5555;
+  box-shadow: 0 0 8px rgba(255, 80, 80, 0.7);
 }
 
 .bar-label {
