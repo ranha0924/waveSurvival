@@ -186,8 +186,11 @@ const Player = (() => {
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
 
-    // Find wall distance via DDA-lite
-    const wallDist = raycastWall(p.x, p.y, dirX, dirY, maxRange);
+    // Find wall distance via DDA-lite. Boss shots ignore the weapon's
+    // maxRange — the boss is huge and the player should be able to plink it
+    // from anywhere on the map — but still respect wall occlusion.
+    const wallDist = raycastWall(p.x, p.y, dirX, dirY, Infinity);
+    const rangeCap = Math.min(maxRange, wallDist);
 
     // Check enemies — sort by distance
     const { H } = Raycaster.getDimensions();
@@ -199,7 +202,8 @@ const Player = (() => {
       const ey = e.y - p.y;
       // Project onto ray
       const proj = ex * dirX + ey * dirY;
-      if (proj < 0 || proj > Math.min(maxRange, wallDist)) continue;
+      const cap = e.type.isBoss ? wallDist : rangeCap;
+      if (proj < 0 || proj > cap) continue;
       // Perpendicular distance
       const perpX = ex - dirX * proj;
       const perpY = ey - dirY * proj;
@@ -215,8 +219,10 @@ const Player = (() => {
       // crosshair (which is offset from the world horizon by verticalOffset)
       // into 0..1 across the visible sprite — 0 = head top, 1 = feet.
       const hitFrac = 1 - 1 / (2 * scale) - (verticalOffset * proj) / (H * scale);
-      if (hitFrac < 0 || hitFrac > 1) continue; // aim above/below the body
-      const headshot = hitFrac < 0.3;
+      // The boss is forgiving on vertical aim: any ray inside its cylinder
+      // counts as a body hit so long-range pitch error doesn't erase shots.
+      if (!e.type.isBoss && (hitFrac < 0 || hitFrac > 1)) continue;
+      const headshot = hitFrac < 0.3 && hitFrac >= 0;
       candidates.push({ e, proj, headshot });
     }
     candidates.sort((a, b) => a.proj - b.proj);
