@@ -16,7 +16,7 @@ const Player = (() => {
       // horizon-anchored silhouette. Sustained looking-up/down still tracks.
       smoothedPitch: 0,
       hp: 100, maxHp: 100,
-      stamina: 100, maxStamina: 100,
+      stamina: 100, maxStamina: 100, exhausted: false,
       moveSpeed: 3.0,
       runSpeed: 5.0,
       radius: 0.25,
@@ -67,7 +67,13 @@ const Player = (() => {
       fwd = input.move.fwd;
       right = input.move.right;
     }
-    const running = !!input.keys['shift'] && p.stamina > 0 && Math.abs(fwd) > 0.1;
+    // Once stamina fully drains, lock sprint off until it recovers past a
+    // threshold. Without the latch, a single frame of regen would
+    // immediately re-enable sprinting and the player could run forever at
+    // ~0 stamina.
+    if (p.stamina <= 0) p.exhausted = true;
+    else if (p.exhausted && p.stamina >= 30) p.exhausted = false;
+    const running = !!input.keys['shift'] && !p.exhausted && Math.abs(fwd) > 0.1;
 
     let speed = (running ? p.runSpeed : p.moveSpeed) * p.moveSpeedMult;
 
