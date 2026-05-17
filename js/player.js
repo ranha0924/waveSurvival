@@ -192,10 +192,13 @@ const Player = (() => {
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
 
-    // Find wall distance via DDA-lite. Boss shots ignore the weapon's
-    // maxRange — the boss is huge and the player should be able to plink it
-    // from anywhere on the map — but still respect wall occlusion.
-    const wallDist = raycastWall(p.x, p.y, dirX, dirY, Infinity);
+    // Find first opaque wall and its height factor via DDA-lite. The boss is
+    // plinkable from anywhere on the map (no maxRange cap) and any portion
+    // visibly poking above an intervening wall is fair game — the renderer
+    // already draws that silhouette, so the hit detection has to match.
+    const wall = raycastWall(p.x, p.y, dirX, dirY, Infinity);
+    const wallDist = wall.dist;
+    const wallH = wall.h;
     const rangeCap = Math.min(maxRange, wallDist);
 
     // Check enemies — sort by distance
@@ -208,7 +211,7 @@ const Player = (() => {
       const ey = e.y - p.y;
       // Project onto ray
       const proj = ex * dirX + ey * dirY;
-      const cap = e.type.isBoss ? wallDist : rangeCap;
+      const cap = e.type.isBoss ? Infinity : rangeCap;
       if (proj < 0 || proj > cap) continue;
       // Perpendicular distance
       const perpX = ex - dirX * proj;
@@ -225,9 +228,19 @@ const Player = (() => {
       // crosshair (which is offset from the world horizon by verticalOffset)
       // into 0..1 across the visible sprite — 0 = head top, 1 = feet.
       const hitFrac = 1 - 1 / (2 * scale) - (verticalOffset * proj) / (H * scale);
-      // The boss is forgiving on vertical aim: any ray inside its cylinder
-      // counts as a body hit so long-range pitch error doesn't erase shots.
-      if (!e.type.isBoss && (hitFrac < 0 || hitFrac > 1)) continue;
+      if (e.type.isBoss) {
+        // Boss is forgiving on vertical aim: any ray inside its cylinder
+        // counts so long-range pitch error doesn't erase shots. But if a wall
+        // sits between the player and the boss, only the portion above the
+        // wall's top is hittable — matches what the renderer actually shows.
+        if (proj > wallDist) {
+          const wallTopFrac = 1 - 0.5 / scale - (wallH - 0.5) * proj / (scale * wallDist);
+          if (wallTopFrac <= 0) continue;
+          if (hitFrac >= wallTopFrac) continue;
+        }
+      } else if (hitFrac < 0 || hitFrac > 1) {
+        continue;
+      }
       const headshot = hitFrac < 0.3 && hitFrac >= 0;
       candidates.push({ e, proj, headshot });
     }
@@ -355,15 +368,18 @@ const Player = (() => {
         mapY += stepY;
         dist = sideDistY - deltaDistY;
       }
-      if (dist > maxDist) return maxDist;
+      if (dist > maxDist) return { dist: maxDist, h: 0 };
       const t = GameMap.getTile(mapX, mapY);
       // Stop the bullet at any wall that isn't explicitly chest-high cover.
       // Previously this only checked types 1..4, which silently let bullets
       // (and sight) pass through comms towers / hazard panels / wrecks even
       // though they're full-height structures.
-      if (t >= 1 && t <= 8 && !GameMap.getShape(t).seeOver) return dist;
+      if (t >= 1 && t <= 8) {
+        const shape = GameMap.getShape(t);
+        if (!shape.seeOver) return { dist, h: shape.heightFactor };
+      }
     }
-    return maxDist;
+    return { dist: maxDist, h: 0 };
   }
 
   // ---------- Particle spawners ----------
