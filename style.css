@@ -680,6 +680,10 @@ html, body {
 .upgrade-card.attack { border-color: #aa3344; }
 .upgrade-card.defense { border-color: #3366aa; }
 .upgrade-card.utility { border-color: #33aa66; }
+.upgrade-card.gutpan {
+  border-color: #ff7733;
+  box-shadow: 0 0 12px rgba(255, 110, 50, 0.45);
+}
 
 .result {
   font-size: clamp(14px, 2.8vmin, 22px);

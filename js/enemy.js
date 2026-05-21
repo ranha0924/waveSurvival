@@ -3,7 +3,7 @@ const Enemies = (() => {
   // ---------- Type catalog ----------
   const types = {
     grunt: {
-      id: 'grunt', name: '졸개',
+      id: 'grunt', name: '처녀귀신',
       hp: 30, speed: 1.6, damage: 10, score: 100,
       attackRange: 0.7, attackCooldown: 1.0,
       ranged: false, radius: 0.35,
@@ -11,7 +11,7 @@ const Enemies = (() => {
       eyeColor: '#ff3333', bloodColor: [180, 30, 30]
     },
     rusher: {
-      id: 'rusher', name: '돌진형',
+      id: 'rusher', name: '몽달귀신',
       hp: 20, speed: 3.4, damage: 20, score: 150,
       attackRange: 0.7, attackCooldown: 0.8,
       ranged: false, radius: 0.3,
@@ -19,7 +19,7 @@ const Enemies = (() => {
       eyeColor: '#ffaa00', bloodColor: [200, 60, 20]
     },
     tank: {
-      id: 'tank', name: '탱커',
+      id: 'tank', name: '도깨비',
       hp: 100, speed: 0.9, damage: 15, score: 300,
       attackRange: 0.9, attackCooldown: 1.5,
       ranged: false, radius: 0.45,
@@ -27,7 +27,7 @@ const Enemies = (() => {
       eyeColor: '#88ff88', bloodColor: [80, 140, 80]
     },
     ranger: {
-      id: 'ranger', name: '원거리',
+      id: 'ranger', name: '저승사자',
       hp: 40, speed: 1.3, damage: 12, score: 200,
       attackRange: 6.0, attackCooldown: 2.0,
       preferredDist: 4.5,
@@ -37,7 +37,7 @@ const Enemies = (() => {
       projectileSpeed: 7.0
     },
     boss: {
-      id: 'boss', name: '보스',
+      id: 'boss', name: '구미호',
       hp: 350, speed: 1.1, damage: 25, score: 1000,
       attackRange: 1.4, attackCooldown: 1.6,
       ranged: false, radius: 0.45,
@@ -49,7 +49,7 @@ const Enemies = (() => {
     // Suicide bomber. Low HP, fast, explodes on death OR when it gets too
     // close to the player. Damages player + nearby enemies (chain potential).
     bomber: {
-      id: 'bomber', name: '자폭형',
+      id: 'bomber', name: '객귀',
       hp: 25, speed: 2.6, damage: 35, score: 220,
       attackRange: 0.6, attackCooldown: 0.5,
       ranged: false, radius: 0.32,
@@ -61,7 +61,7 @@ const Enemies = (() => {
     // Splitter. Medium stats; on death spawns 2 smaller, faster children
     // that do not split again (capped at one generation).
     splitter: {
-      id: 'splitter', name: '분열형',
+      id: 'splitter', name: '도깨비불',
       hp: 50, speed: 1.7, damage: 12, score: 250,
       attackRange: 0.7, attackCooldown: 1.0,
       ranged: false, radius: 0.4,
@@ -71,7 +71,7 @@ const Enemies = (() => {
       splitCount: 2
     },
     splitterChild: {
-      id: 'splitterChild', name: '분열체',
+      id: 'splitterChild', name: '작은 도깨비불',
       hp: 14, speed: 2.6, damage: 7, score: 80,
       attackRange: 0.55, attackCooldown: 0.9,
       ranged: false, radius: 0.22,
@@ -184,7 +184,12 @@ const Enemies = (() => {
       }
     }
 
-    const speed = e.type.speed;
+    // 한(恨) 서림 — card-set slow tick. While slowTimer > 0 the enemy moves
+    // at 50% speed; the timer decays in real time so the slow auto-clears
+    // a second after the last hit.
+    if (e.slowTimer && e.slowTimer > 0) e.slowTimer -= dt;
+    const slowed = e.slowTimer && e.slowTimer > 0;
+    const speed = e.type.speed * (slowed ? 0.5 : 1);
     const dxs = moveX * speed * dt;
     const dys = moveY * speed * dt;
     const moved = GameMap.tryMove(e.x, e.y, dxs, dys, e.type.radius);
@@ -279,7 +284,7 @@ const Enemies = (() => {
   function awardChainKill(player, victim, scoreCallback) {
     if (!scoreCallback) return;
     const t = performance.now() / 1000;
-    if (t - player.lastKillTime < 3.0) {
+    if (t - player.lastKillTime < (3.0 + (player.comboTimeoutBonus || 0))) {
       player.comboCount = player.comboCount + 1;
     } else {
       player.comboCount = 1;
