@@ -36,6 +36,22 @@ const Player = (() => {
       explosive: false,
       autoHeal: false,
       autoHealTimer: 0,
+      // Card-driven extras — all start neutral; cards bump these fields.
+      // headshotMult stacks ON TOP of the built-in ×2 headshot bonus.
+      // comboTimeoutBonus extends how long the streak survives between kills.
+      // gutpanThresholdReduction lowers the streak needed to fire 굿판.
+      // gutpanDurationBonus extends the base 5s window for new activations.
+      // critChance is rolled per-hit; on a hit the damage gets ×1.5.
+      // soulSiphon and slowOnHit are simple booleans the kill / hit paths
+      // check; doubleShot adds a probabilistic extra hitscan in shoot().
+      headshotMult: 1.0,
+      comboTimeoutBonus: 0,
+      gutpanThresholdReduction: 0,
+      gutpanDurationBonus: 0,
+      critChance: 0,
+      soulSiphon: false,
+      slowOnHit: false,
+      doubleShot: false,
       // Effects
       kickback: 0,
       bobPhase: 0,
@@ -158,9 +174,9 @@ const Player = (() => {
       }
     }
 
-    // Combo timeout — 3 seconds per spec (was 2). Streak resets to zero so
-    // the next kill starts a fresh count from 1.
-    if (performance.now() / 1000 - p.lastKillTime > 3.0) {
+    // Combo timeout — 3 seconds per spec + any card bonus (굿판 연). Streak
+    // resets to zero so the next kill starts a fresh count from 1.
+    if (performance.now() / 1000 - p.lastKillTime > (3.0 + p.comboTimeoutBonus)) {
       p.comboCount = 0;
     }
   }
@@ -203,10 +219,16 @@ const Player = (() => {
     const damage = w.damage * p.damageMult * dmgBonus;
     const pierceCount = (w.pierce || 0) + p.pierce;
 
-    for (let i = 0; i < w.pellets; i++) {
-      const spread = (Math.random() - 0.5) * w.spread + (Math.random() - 0.5) * w.spread;
-      const a = p.angle + spread;
-      hitscan(p, a, w.maxRange, damage, pierceCount, p.explosive, enemies, particles, scoreCallback);
+    // 분신부 — 50% chance the volley fires twice. Cheaper than fully
+    // doubling pellets/damage and reads as a "ghostly extra shot" tied to
+    // the card name; recoil/ammo aren't doubled so it stays a clean bonus.
+    const volleys = p.doubleShot && Math.random() < 0.5 ? 2 : 1;
+    for (let v = 0; v < volleys; v++) {
+      for (let i = 0; i < w.pellets; i++) {
+        const spread = (Math.random() - 0.5) * w.spread + (Math.random() - 0.5) * w.spread;
+        const a = p.angle + spread;
+        hitscan(p, a, w.maxRange, damage, pierceCount, p.explosive, enemies, particles, scoreCallback);
+      }
     }
   }
 
@@ -272,8 +294,16 @@ const Player = (() => {
     const maxHits = 1 + pierceCount;
     for (const c of candidates) {
       if (hits >= maxHits) break;
-      const dmg = c.headshot ? damage * 2 : damage;
+      // Base damage → headshot bonus (×2 baseline × card multi) → crit roll.
+      // Crit is a flat ×1.5 multiplier; gated by p.critChance so a player
+      // without 살 명중 never rolls. Slow lasts 1.0s and stacks by refresh.
+      let dmg = c.headshot ? damage * 2 * p.headshotMult : damage;
+      const isCrit = p.critChance > 0 && Math.random() < p.critChance;
+      if (isCrit) dmg *= 1.5;
       damageEnemy(p, c.e, dmg, c.headshot, particles, enemies, scoreCallback);
+      if (p.slowOnHit) {
+        c.e.slowTimer = Math.max(c.e.slowTimer || 0, 1.0);
+      }
       // Spawn impact particles at hit point
       const ix = p.x + dirX * c.proj;
       const iy = p.y + dirY * c.proj;
@@ -337,7 +367,7 @@ const Player = (() => {
       // resets after the 3s timeout. Score multiplier caps at ×3 via
       // comboMultFor; the unclamped count is what 굿판 모드 watches for ≥5.
       const t = performance.now() / 1000;
-      if (t - p.lastKillTime < 3.0) {
+      if (t - p.lastKillTime < (3.0 + p.comboTimeoutBonus)) {
         p.comboCount = p.comboCount + 1;
       } else {
         p.comboCount = 1;
@@ -352,6 +382,12 @@ const Player = (() => {
       p.kills++;
       if (headshot) p.headshots++;
       if (e.type.isBoss) p.bossKills++;
+      // 혼(魂) 흡수 — heal a tiny amount per kill while the card is owned.
+      // Boss kills give a larger chunk so the card stays meaningful on
+      // long boss fights, not just trash waves.
+      if (p.soulSiphon) {
+        p.hp = Math.min(p.maxHp, p.hp + (e.type.isBoss ? 25 : 5));
+      }
       // Two-layer death burst (airborne spray + lingering ground stains).
       // Boss / headshot variants are handled inside the helper.
       spawnDeathBurst(

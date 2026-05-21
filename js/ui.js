@@ -315,26 +315,62 @@ const UI = (() => {
   function hideGameOver() { $('gameover-screen').classList.add('hidden'); }
 
   // ---------- Upgrade selection ----------
+  // ---------- Upgrade card pool ----------
+  // Categories drive the card border colour; titles use 무속 vocabulary
+  // (신기, 살, 굿판 연…) so even brand-new cards read as in-world items
+  // rather than generic stat upgrades. Card effects mutate player fields
+  // that player.shoot / damageEnemy and main.updateGutpan read live, so
+  // adding a new card is just: write the apply() and surface the field.
   const upgrades = [
-    // Attack
-    { cat: 'attack', icon: '⚔', title: '데미지 +15%', desc: '모든 무기 데미지 증가', apply: (p) => p.damageMult *= 1.15 },
-    { cat: 'attack', icon: '⚡', title: '발사속도 +10%', desc: '모든 무기 발사 속도 증가', apply: (p) => p.fireRateMult *= 1.10 },
-    { cat: 'attack', icon: '🎯', title: '관통탄', desc: '총알이 적을 1명 더 관통', apply: (p) => p.pierce += 1 },
-    { cat: 'attack', icon: '💥', title: '폭발탄', desc: '맞은 지점에 범위 피해', apply: (p) => p.explosive = true },
-    // Defense
-    { cat: 'defense', icon: '✚', title: '체력 +25 회복', desc: '체력을 25만큼 즉시 회복', apply: (p) => p.hp = Math.min(p.maxHp, p.hp + 25) },
-    { cat: 'defense', icon: '❤', title: '최대체력 +20', desc: '최대 체력 증가 + 풀회복', apply: (p) => { p.maxHp += 20; p.hp = p.maxHp; } },
-    { cat: 'defense', icon: '👟', title: '이동속도 +10%', desc: '이동/달리기 속도 증가', apply: (p) => p.moveSpeedMult *= 1.10 },
-    { cat: 'defense', icon: '🛡', title: '방어력 +10%', desc: '받는 피해 감소', apply: (p) => p.defenseMult *= 1.10 },
-    // Utility
-    { cat: 'utility', icon: '🔫', title: '탄약 보급', desc: '모든 무기 탄약 풀로 채움', apply: (p) => {
-      for (const k in p.loadout) {
-        const w = p.loadout[k];
-        w.currentAmmo = w.magSize;
-        if (!w.ammoInfinite) w.reserveAmmo = Math.max(w.reserveAmmo, w.magSize * 4);
-      }
-    }},
-    { cat: 'utility', icon: '♥', title: '자동 회복', desc: '3초마다 체력 1 회복', apply: (p) => { p.autoHeal = true; p.autoHealTimer = 3.0; } }
+    // ── 공격 ──
+    { cat: 'attack', icon: '⚔', title: '신기(神氣) 강화', desc: '모든 무기 데미지 +15%',
+      apply: (p) => { p.damageMult *= 1.15; } },
+    { cat: 'attack', icon: '⚡', title: '박수의 손놀림', desc: '모든 무기 발사 속도 +10%',
+      apply: (p) => { p.fireRateMult *= 1.10; } },
+    { cat: 'attack', icon: '🎯', title: '정수리 일격', desc: '헤드샷 데미지 ×3 (기본 ×2)',
+      apply: (p) => { p.headshotMult *= 1.5; } },
+    { cat: 'attack', icon: '🔥', title: '살(煞) 명중', desc: '20% 확률로 치명타 ×1.5',
+      apply: (p) => { p.critChance = Math.min(1, p.critChance + 0.20); } },
+    { cat: 'attack', icon: '🏹', title: '천도부(薦度符)', desc: '공격이 적을 1명 더 관통',
+      apply: (p) => { p.pierce += 1; } },
+
+    // ── 방어 ──
+    { cat: 'defense', icon: '✚', title: '영약 한 모금', desc: '체력 +25 즉시 회복',
+      apply: (p) => { p.hp = Math.min(p.maxHp, p.hp + 25); } },
+    { cat: 'defense', icon: '❤', title: '명(命) 확장', desc: '최대 체력 +20 · 풀회복',
+      apply: (p) => { p.maxHp += 20; p.hp = p.maxHp; } },
+    { cat: 'defense', icon: '🛡', title: '부적 갑주', desc: '받는 피해 -10%',
+      apply: (p) => { p.defenseMult *= 1.10; } },
+    { cat: 'defense', icon: '👟', title: '신령한 발걸음', desc: '이동·달리기 속도 +10%',
+      apply: (p) => { p.moveSpeedMult *= 1.10; } },
+
+    // ── 굿판 / 콤보 ──
+    { cat: 'gutpan', icon: '🥁', title: '굿판 연(連)', desc: '콤보 유지 시간 +1초',
+      apply: (p) => { p.comboTimeoutBonus += 1.0; } },
+    { cat: 'gutpan', icon: '🎶', title: '무당의 흥', desc: '굿판 모드 지속 +2초',
+      apply: (p) => { p.gutpanDurationBonus += 2.0; } },
+    { cat: 'gutpan', icon: '🪘', title: '사물놀이', desc: '굿판 발동 임계 콤보 -1',
+      apply: (p) => { p.gutpanThresholdReduction += 1; } },
+
+    // ── 특수 ──
+    { cat: 'utility', icon: '💥', title: '부적 폭(爆)', desc: '명중 지점에 범위 피해',
+      apply: (p) => { p.explosive = true; } },
+    { cat: 'utility', icon: '👻', title: '분신부(分身符)', desc: '50% 확률로 추가 1발',
+      apply: (p) => { p.doubleShot = true; } },
+    { cat: 'utility', icon: '🕸', title: '한(恨) 서림', desc: '명중 시 적 1초 둔화',
+      apply: (p) => { p.slowOnHit = true; } },
+    { cat: 'utility', icon: '🌀', title: '혼(魂) 흡수', desc: '처치 시 체력 +5 (보스 +25)',
+      apply: (p) => { p.soulSiphon = true; } },
+    { cat: 'utility', icon: '♥', title: '회생부(回生符)', desc: '3초마다 체력 +1',
+      apply: (p) => { p.autoHeal = true; p.autoHealTimer = 3.0; } },
+    { cat: 'utility', icon: '📜', title: '부적 다발', desc: '모든 무기 탄약 풀충전',
+      apply: (p) => {
+        for (const k in p.loadout) {
+          const w = p.loadout[k];
+          w.currentAmmo = w.magSize;
+          if (!w.ammoInfinite) w.reserveAmmo = Math.max(w.reserveAmmo, w.magSize * 4);
+        }
+      }}
   ];
 
   function getWeaponUnlockUpgrades(player) {
@@ -347,13 +383,13 @@ const UI = (() => {
       p.shootCooldown = 0.2;
     };
     if (!player.loadout.shotgun.unlocked) {
-      out.push({ cat: 'utility', icon: '💣', title: '샷건 해금', desc: '근거리 광역 무기 (키 2)', apply: (p) => swap(p, 'shotgun') });
+      out.push({ cat: 'attack', icon: '🧂', title: '소금총 해금', desc: '묵직한 산탄 한 방 결정타 (키 2)', apply: (p) => swap(p, 'shotgun') });
     }
     if (!player.loadout.machinegun.unlocked) {
-      out.push({ cat: 'utility', icon: '🔥', title: '기관총 해금', desc: '연사력 높은 무기 (키 3)', apply: (p) => swap(p, 'machinegun') });
+      out.push({ cat: 'attack', icon: '🔔', title: '방울총 해금', desc: '빠른 산탄 잡몹 정리 (키 3)', apply: (p) => swap(p, 'machinegun') });
     }
     if (!player.loadout.sniper.unlocked) {
-      out.push({ cat: 'utility', icon: '🎯', title: '저격총 해금', desc: '원거리 고데미지 (키 4)', apply: (p) => swap(p, 'sniper') });
+      out.push({ cat: 'attack', icon: '🍑', title: '복숭아 활 해금', desc: '정밀 저격 한 방 (키 4)', apply: (p) => swap(p, 'sniper') });
     }
     return out;
   }
@@ -363,8 +399,18 @@ const UI = (() => {
     const opts = $('upgrade-options');
     opts.innerHTML = '';
 
-    // Build pool: standard + weapon unlocks
-    const pool = [...upgrades, ...getWeaponUnlockUpgrades(player)];
+    // Build pool: standard + weapon unlocks. Boolean toggle cards (분신부,
+    // 부적 폭, 한 서림, 혼 흡수, 회생부) become dead picks once owned, so we
+    // strip them from the pool when the player already has them. Repeatable
+    // cards (stat bumps) stay in.
+    const ownedToggles = new Set();
+    if (player.explosive) ownedToggles.add('부적 폭(爆)');
+    if (player.doubleShot) ownedToggles.add('분신부(分身符)');
+    if (player.slowOnHit) ownedToggles.add('한(恨) 서림');
+    if (player.soulSiphon) ownedToggles.add('혼(魂) 흡수');
+    if (player.autoHeal) ownedToggles.add('회생부(回生符)');
+    const filtered = upgrades.filter((u) => !ownedToggles.has(u.title));
+    const pool = [...filtered, ...getWeaponUnlockUpgrades(player)];
 
     // Pick 3 random unique
     const picks = [];

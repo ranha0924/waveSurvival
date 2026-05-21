@@ -3,7 +3,7 @@ const Weapons = (() => {
   const defs = {
     pistol: {
       id: 'pistol',
-      name: '권총',
+      name: '부적총',
       damage: 15,
       fireRate: 0.35,        // seconds between shots
       magSize: 12,
@@ -21,7 +21,7 @@ const Weapons = (() => {
     },
     shotgun: {
       id: 'shotgun',
-      name: '샷건',
+      name: '소금총',
       damage: 14,            // per pellet
       fireRate: 0.85,
       magSize: 6,
@@ -37,27 +37,30 @@ const Weapons = (() => {
       color: '#aa6633',
       unlocked: false
     },
+    // Fast / light shotgun — narrow spread, low damage per pellet, quick
+    // rhythm. The 방울 (shaman bell) is the matching motif; mechanically
+    // this is the swarm-clearing counterpart to the heavier 소금총.
     machinegun: {
       id: 'machinegun',
-      name: '기관총',
-      damage: 10,
-      fireRate: 0.08,
-      magSize: 30,
-      reloadTime: 1.8,
-      spread: 0.05,
-      pellets: 1,
-      maxRange: 22,
+      name: '방울총',
+      damage: 4,             // per pellet
+      fireRate: 0.25,
+      magSize: 12,
+      reloadTime: 1.5,
+      spread: 0.08,
+      pellets: 5,
+      maxRange: 16,
       ammoInfinite: false,
-      reserveAmmo: 90,
-      currentAmmo: 30,
+      reserveAmmo: 60,
+      currentAmmo: 12,
       sound: 'shootMachineGun',
-      kickback: 5,
+      kickback: 7,
       color: '#445566',
       unlocked: false
     },
     sniper: {
       id: 'sniper',
-      name: '저격총',
+      name: '복숭아 활',
       damage: 80,
       fireRate: 1.2,
       magSize: 5,

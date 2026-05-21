@@ -603,15 +603,19 @@
     // Trigger / extension. We check every multiple of 5 the streak has
     // reached since the last award, so a single big chain (e.g. an
     // explosion crossing from 4 → 8) still triggers correctly.
+    // Card bonuses: 사물놀이 lowers the trigger threshold; 무당의 흥 adds
+    // to the initial duration. Extensions use the same step (every +5).
+    const trigCombo = Math.max(2, GUTPAN_TRIGGER_COMBO - (p ? p.gutpanThresholdReduction || 0 : 0));
+    const baseDur = GUTPAN_BASE_DURATION + (p ? p.gutpanDurationBonus || 0 : 0);
     const c = p ? p.comboCount : 0;
-    if (c >= GUTPAN_TRIGGER_COMBO) {
+    if (c >= trigCombo) {
       // Walk every milestone we've passed since the last awarded one.
       let next = g.lastTriggerCombo + GUTPAN_EXTEND_STEP;
-      if (g.lastTriggerCombo === 0) next = GUTPAN_TRIGGER_COMBO;
+      if (g.lastTriggerCombo === 0) next = trigCombo;
       while (next <= c) {
         if (!g.active) {
           g.active = true;
-          g.timer = GUTPAN_BASE_DURATION;
+          g.timer = baseDur;
           g.bannerPulse = 1;
           Audio.gutpanTrigger && Audio.gutpanTrigger();
         } else {
@@ -623,7 +627,7 @@
       }
     } else if (c === 0) {
       // Streak fully dropped — reset milestone tracker so the next streak
-      // re-triggers from 5 again.
+      // re-triggers from the (possibly card-lowered) threshold again.
       g.lastTriggerCombo = 0;
     }
 

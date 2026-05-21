@@ -11,11 +11,11 @@
 // until its life timer expires (~45s) or the player comes back for it.
 const Pickups = (() => {
   const types = {
-    bandage:     { name: '붕대',       effect: 'heal', amount: 30 },
-    medkit:      { name: '구급상자',   effect: 'heal', amount: 50 },
-    ammo_mg:     { name: '기관총 탄약', effect: 'ammo', weapon: 'machinegun', amount: 30 },
-    ammo_sg:     { name: '샷건 탄약',   effect: 'ammo', weapon: 'shotgun',    amount: 12 },
-    ammo_sniper: { name: '저격총 탄약', effect: 'ammo', weapon: 'sniper',     amount: 5  }
+    bandage:     { name: '영약(靈藥)',  effect: 'heal', amount: 30 },
+    medkit:      { name: '한약 한 첩',  effect: 'heal', amount: 50 },
+    ammo_mg:     { name: '방울 다발',   effect: 'ammo', weapon: 'machinegun', amount: 30 },
+    ammo_sg:     { name: '소금 한 줌',  effect: 'ammo', weapon: 'shotgun',    amount: 12 },
+    ammo_sniper: { name: '복숭아 화살', effect: 'ammo', weapon: 'sniper',     amount: 5  }
   };
 
   const canvases = {};
