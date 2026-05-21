@@ -10,58 +10,64 @@ const Environment = (() => {
   // Per-theme palette. `name` is read by the raycaster's sky pass to pick
   // which celestial bodies / lightning to draw. `haze` is an rgb triplet
   // used for the ground-fog band right at the horizon.
+  // All four themes are now Korean mountain-forest at night — cold blue
+  // sky, mossy-blue forest haze, dark earth floor — and just get a touch
+  // darker / colder as the wave number climbs. The 'storm' band keeps a
+  // faint red bleed at the very bottom so the player can still feel a
+  // shift after wave 15, but the dominant palette stays blue-night.
   const themes = {
-    // Waves 1–5 — 황혼 (dusk). Smoky-red sky over a brown earthen floor.
+    // Waves 1–5 — 산속 어둑한 밤. Deep blue sky over damp forest earth.
     sunset: {
       name: 'sunset',
-      skyTop: '#0e0610',
-      skyMid: '#5a1a1f',
-      skyBottom: '#a13a2c',
-      floorNear: '#3a2a1c',
-      floorFar: '#10090a',
-      ambient: 1.0,
-      fogDist: 32,
-      haze: '180,80,60',
-      concreteTint: '90,55,40'
+      skyTop:    '#02030a',
+      skyMid:    '#080f22',
+      skyBottom: '#101a30',
+      floorNear: '#1a1208',
+      floorFar:  '#060403',
+      ambient: 0.75,
+      fogDist: 22,
+      haze: '40,60,90',
+      concreteTint: '90,60,30'
     },
-    // Waves 6–10 — 저녁 굿당. Purple-rose sky with incense haze.
+    // Waves 6–10 — 더 깊은 밤. Tighter fog, slightly cooler.
     dusk: {
       name: 'dusk',
-      skyTop: '#08050f',
-      skyMid: '#42164a',
-      skyBottom: '#7e253f',
-      floorNear: '#2a1f22',
-      floorFar: '#08050a',
-      ambient: 0.85,
-      fogDist: 26,
-      haze: '140,70,90',
-      concreteTint: '70,45,55'
+      skyTop:    '#01020a',
+      skyMid:    '#05091e',
+      skyBottom: '#0c142a',
+      floorNear: '#15100a',
+      floorFar:  '#040302',
+      ambient: 0.68,
+      fogDist: 20,
+      haze: '35,55,85',
+      concreteTint: '80,55,28'
     },
-    // Waves 11–15 — 삼경. Full-moon night, cold blue fog.
+    // Waves 11–15 — 삼경. Cold moonlit night, ground steeped in blue mist.
     night: {
       name: 'night',
-      skyTop: '#01010a',
-      skyMid: '#080d22',
-      skyBottom: '#1a2042',
-      floorNear: '#10141c',
-      floorFar: '#03040a',
-      ambient: 0.65,
-      fogDist: 20,
-      haze: '60,80,120',
-      concreteTint: '40,50,70'
+      skyTop:    '#000005',
+      skyMid:    '#02061a',
+      skyBottom: '#080f22',
+      floorNear: '#100a06',
+      floorFar:  '#020203',
+      ambient: 0.60,
+      fogDist: 18,
+      haze: '28,48,80',
+      concreteTint: '70,48,25'
     },
-    // Waves 16+ — 검은 굿판. Near-pitch sky bleeding red at the horizon.
+    // Waves 16+ — 검은 굿판. Near-pitch with the faintest blood bleed at
+    // the horizon — atmosphere shifts, palette stays blue-night.
     storm: {
       name: 'storm',
-      skyTop: '#000004',
-      skyMid: '#0a040a',
-      skyBottom: '#2a0608',
-      floorNear: '#0a0506',
-      floorFar: '#020102',
-      ambient: 0.55,
-      fogDist: 16,
-      haze: '120,30,30',
-      concreteTint: '50,20,20'
+      skyTop:    '#000003',
+      skyMid:    '#010312',
+      skyBottom: '#06081c',
+      floorNear: '#0a0604',
+      floorFar:  '#010102',
+      ambient: 0.52,
+      fogDist: 15,
+      haze: '25,40,70',
+      concreteTint: '60,38,20'
     }
   };
 

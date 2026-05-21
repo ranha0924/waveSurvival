@@ -170,57 +170,72 @@ const Raycaster = (() => {
     };
   }
 
-  // Build a 128×128 concrete tile: cool gray base, scattered light/dark
-  // speckles, two expansion joints crossing it, a couple of hairline cracks.
+  // Build a 128×128 earth-floor tile. Dark damp brown base with mineral
+  // grain, scattered pebbles, embedded straw fibres, and a few darker
+  // wet patches — reads as forest soil rather than concrete when tinted
+  // by each theme's concreteTint. Name kept as concreteTile so the
+  // existing per-pixel floor sampler doesn't need to be rewired.
   function buildConcreteTile() {
     const cv = document.createElement('canvas');
     cv.width = 128; cv.height = 128;
     const c = cv.getContext('2d');
     const r = rng(9911);
-    // Base — darker concrete so close-range pixels don't blow out against
-    // the gradient + lighting.
-    c.fillStyle = '#5a5a5c';
+    // Base — dark damp earth
+    c.fillStyle = '#2a1a0c';
     c.fillRect(0, 0, 128, 128);
-    // Light blotches
-    for (let i = 0; i < 70; i++) {
+    // Fine grain (lighter)
+    for (let i = 0; i < 240; i++) {
       const x = r() * 128, y = r() * 128;
-      c.fillStyle = `rgba(255,255,255,${(0.03 + r() * 0.05).toFixed(3)})`;
-      c.fillRect(Math.floor(x), Math.floor(y), 1 + Math.floor(r() * 3), 1 + Math.floor(r() * 3));
-    }
-    // Dark grain — slightly stronger to read against the darker base
-    for (let i = 0; i < 380; i++) {
-      const x = r() * 128, y = r() * 128;
-      c.fillStyle = `rgba(0,0,0,${(0.10 + r() * 0.20).toFixed(3)})`;
+      c.fillStyle = `rgba(180,140,90,${(0.04 + r() * 0.10).toFixed(3)})`;
       c.fillRect(Math.floor(x), Math.floor(y), 1, 1);
     }
-    // Stains
+    // Coarse mineral grain (darker)
+    for (let i = 0; i < 480; i++) {
+      const x = r() * 128, y = r() * 128;
+      c.fillStyle = `rgba(0,0,0,${(0.15 + r() * 0.25).toFixed(3)})`;
+      c.fillRect(Math.floor(x), Math.floor(y), 1, 1);
+    }
+    // Pebbles — small grey-brown dots
+    for (let i = 0; i < 22; i++) {
+      const x = r() * 128, y = r() * 128;
+      const sz = 1 + Math.floor(r() * 2);
+      const shade = 80 + Math.floor(r() * 40);
+      c.fillStyle = `rgb(${shade},${shade - 10},${shade - 25})`;
+      c.beginPath();
+      c.arc(x, y, sz, 0, Math.PI * 2);
+      c.fill();
+      // Tiny highlight
+      c.fillStyle = 'rgba(255,255,255,0.18)';
+      c.fillRect(Math.floor(x - sz / 2), Math.floor(y - sz / 2), 1, 1);
+    }
+    // Straw / leaf litter — short bright streaks
+    for (let i = 0; i < 28; i++) {
+      const x = Math.floor(r() * 128);
+      const y = Math.floor(r() * 128);
+      const len = 3 + Math.floor(r() * 5);
+      const angle = r() * Math.PI * 2;
+      c.save();
+      c.translate(x, y);
+      c.rotate(angle);
+      c.fillStyle = `rgba(170,130,60,${(0.30 + r() * 0.25).toFixed(3)})`;
+      c.fillRect(-len / 2, 0, len, 1);
+      c.restore();
+    }
+    // Wet / muddy patches — irregular dark blobs
     for (let i = 0; i < 6; i++) {
       const x = r() * 128, y = r() * 128;
-      const w = 6 + r() * 22, h = 6 + r() * 22;
-      c.fillStyle = `rgba(40,30,20,${(0.05 + r() * 0.08).toFixed(3)})`;
+      const w = 12 + r() * 28, h = 8 + r() * 22;
+      c.fillStyle = `rgba(0,0,0,${(0.18 + r() * 0.18).toFixed(3)})`;
       c.beginPath();
       c.ellipse(x, y, w / 2, h / 2, r() * Math.PI, 0, Math.PI * 2);
       c.fill();
     }
-    // Expansion joints (one horizontal, one vertical, slightly off-center)
-    c.fillStyle = 'rgba(0,0,0,0.55)';
-    c.fillRect(0, 62, 128, 2);
-    c.fillRect(64, 0, 2, 128);
-    c.fillStyle = 'rgba(255,255,255,0.10)';
-    c.fillRect(0, 64, 128, 1);
-    c.fillRect(66, 0, 1, 128);
-    // Hairline cracks
-    c.strokeStyle = 'rgba(0,0,0,0.45)';
-    c.lineWidth = 1;
-    for (let i = 0; i < 3; i++) {
-      let cx = r() * 128, cy = r() * 128;
-      c.beginPath(); c.moveTo(cx, cy);
-      for (let j = 0; j < 5; j++) {
-        cx += (r() - 0.5) * 22;
-        cy += (r() - 0.5) * 22;
-        c.lineTo(cx, cy);
-      }
-      c.stroke();
+    // Scattered tiny moss specks (forest floor)
+    for (let i = 0; i < 18; i++) {
+      const x = Math.floor(r() * 128);
+      const y = Math.floor(r() * 128);
+      c.fillStyle = `rgba(60,90,40,${(0.30 + r() * 0.30).toFixed(3)})`;
+      c.fillRect(x, y, 1 + Math.floor(r() * 2), 1);
     }
     return cv;
   }
@@ -275,9 +290,46 @@ const Raycaster = (() => {
     ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
 
     const name = theme.name || 'sunset';
-    if (name === 'dusk') drawStars(horizon, 25, 0.35);
+    // All 굿판 themes are night-time, so every wave gets stars; the count /
+    // intensity climbs with darkness. Storm still pulses with lightning on
+    // top of its faint star field.
+    if (name === 'sunset') drawStars(horizon, 45, 0.6);
+    else if (name === 'dusk') drawStars(horizon, 55, 0.8);
     else if (name === 'night') drawStars(horizon, 70, 1.0);
-    else if (name === 'storm') drawStormSky(horizon);
+    else if (name === 'storm') { drawStars(horizon, 30, 0.5); drawStormSky(horizon); }
+    drawMoon(horizon, name);
+  }
+
+  // Full moon — same position every frame so the player can use it as a
+  // landmark while sprinting. Pulled up high enough that the player's
+  // pitch range can't bring it under the horizon at any reasonable
+  // playing angle. The 'storm' band suppresses it (the sky is supposed
+  // to be pitch black with red bleed) — a faint disc through cloud is
+  // drawn instead.
+  function drawMoon(horizon, themeName) {
+    const cx = Math.floor(W * 0.72);
+    const cy = Math.floor(horizon * 0.32);
+    const r = 22;
+    if (themeName === 'storm') {
+      ctx.fillStyle = 'rgba(180,180,200,0.18)';
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.9, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+    // Outer glow
+    const glow = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 3);
+    glow.addColorStop(0, 'rgba(220,225,240,0.30)');
+    glow.addColorStop(1, 'rgba(220,225,240,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(cx - r * 3, cy - r * 3, r * 6, r * 6);
+    // Disc
+    ctx.fillStyle = '#e8eaf2';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    // Cratery shading — a slight grey blotch off-centre so the moon isn't
+    // a flat disc.
+    ctx.fillStyle = 'rgba(120,130,150,0.22)';
+    ctx.beginPath(); ctx.arc(cx - r * 0.25, cy + r * 0.18, r * 0.55, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(120,130,150,0.18)';
+    ctx.beginPath(); ctx.arc(cx + r * 0.32, cy - r * 0.30, r * 0.30, 0, Math.PI * 2); ctx.fill();
   }
 
   function drawStormSky(horizon) {
