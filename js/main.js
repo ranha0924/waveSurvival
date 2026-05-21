@@ -946,7 +946,7 @@
     ctx.fillStyle = `rgba(255, 240, 200, ${0.95 * intensity})`;
     ctx.font = '900 16px "Noto Serif KR", "Gowun Batang", serif';
     const remain = Math.max(0, g.timer).toFixed(1);
-    ctx.fillText(`데미지 ×1.5 · 점수 ×2.0 · ${remain}s`, 0, 58);
+    ctx.fillText(`데미지 ×1.5 · 점수 ×2.0 · ${remain}s`, 0, 82);
 
     ctx.restore();
   }
