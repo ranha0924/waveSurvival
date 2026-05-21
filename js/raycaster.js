@@ -93,6 +93,8 @@ const Raycaster = (() => {
 
   // Collect every billboarded thing in the world, sort far→near so closer
   // sprites overdraw farther ones, then dispatch to its type-specific draw.
+  // Trees are static decoration from Environment — added to the same pool
+  // so they z-sort against enemies/pickups/particles correctly.
   function drawSprites(player, enemies, particles, horizonOffset, theme) {
     const sprites = [];
     const push = (x, y, type, ref) => {
@@ -106,13 +108,66 @@ const Raycaster = (() => {
     if (typeof Pickups !== 'undefined') {
       for (const k of Pickups.getList()) push(k.x, k.y, 'pickup', k);
     }
+    if (typeof Environment !== 'undefined' && Environment.getTrees) {
+      for (const t of Environment.getTrees()) push(t.x, t.y, 'tree', t);
+    }
     sprites.sort((a, b) => b.dist - a.dist);
 
     for (const s of sprites) {
       if (s.type === 'enemy') drawEnemySprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'pickup') drawPickupSprite(player, s.ref, horizonOffset, theme);
+      else if (s.type === 'tree') drawTreeSprite(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
     }
+  }
+
+  // Tree billboards. Behave like pickups (column-by-column with zBuffer
+  // clipping) but anchored such that the trunk base sits on the floor at
+  // the projected distance — bottom of the sprite goes at horizon + lineH/2,
+  // top at horizon + lineH/2 - treeH. Per-tile scale variance keeps them
+  // from looking like a cloned forest.
+  function drawTreeSprite(player, t, horizonOffset, theme) {
+    const proj = projectSprite(player, t.x, t.y);
+    if (!proj) return;
+    const canvas = Environment.getTreeCanvas(t.variant);
+    if (!canvas) return;
+
+    const horizon = H / 2 + horizonOffset;
+    const lineH = H / proj.dist;
+    const aspect = canvas.width / canvas.height;
+    // Trees are tall: ~1.6× the wall column height feels right for a 64-px
+    // sprite that's meant to read as a 5–6m tree against a 2m wall.
+    const treeH = Math.floor(lineH * 1.6 * (t.scale || 1));
+    const treeW = Math.floor(treeH * aspect);
+    const groundedBottom = horizon + lineH / 2;
+    const drawStartY = Math.floor(groundedBottom - treeH);
+    const drawStartX = Math.floor(proj.screenX - treeW / 2);
+
+    const xStart = Math.max(0, drawStartX);
+    const xEnd = Math.min(W, drawStartX + treeW);
+
+    // Forest fog: alpha falls off with distance so far trees melt into
+    // the haze layer instead of stamping hard silhouettes.
+    const fogD = (theme && theme.fogDist) || 22;
+    const fade = Math.max(0, Math.min(1, 1 - (proj.dist - fogD * 0.3) / fogD));
+    if (fade <= 0.02) return;
+
+    ctx.save();
+    ctx.globalAlpha = fade;
+    for (let x = xStart; x < xEnd; x++) {
+      // Tree fully occludes anything behind it on this column, so respect
+      // the wall zBuffer the same way other sprites do.
+      let dstY1 = drawStartY + treeH;
+      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
+      if (proj.dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
+      if (dstY1 <= drawStartY) continue;
+      const u = (x - drawStartX) / treeW;
+      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
+      const dstH = dstY1 - drawStartY;
+      const srcH = Math.max(1, Math.floor((dstH / treeH) * canvas.height));
+      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
+    }
+    ctx.restore();
   }
 
   // ---------- Pickup sprites ----------
@@ -170,57 +225,72 @@ const Raycaster = (() => {
     };
   }
 
-  // Build a 128×128 concrete tile: cool gray base, scattered light/dark
-  // speckles, two expansion joints crossing it, a couple of hairline cracks.
+  // Build a 128×128 earth-floor tile. Dark damp brown base with mineral
+  // grain, scattered pebbles, embedded straw fibres, and a few darker
+  // wet patches — reads as forest soil rather than concrete when tinted
+  // by each theme's concreteTint. Name kept as concreteTile so the
+  // existing per-pixel floor sampler doesn't need to be rewired.
   function buildConcreteTile() {
     const cv = document.createElement('canvas');
     cv.width = 128; cv.height = 128;
     const c = cv.getContext('2d');
     const r = rng(9911);
-    // Base — darker concrete so close-range pixels don't blow out against
-    // the gradient + lighting.
-    c.fillStyle = '#5a5a5c';
+    // Base — dark damp earth
+    c.fillStyle = '#2a1a0c';
     c.fillRect(0, 0, 128, 128);
-    // Light blotches
-    for (let i = 0; i < 70; i++) {
+    // Fine grain (lighter)
+    for (let i = 0; i < 240; i++) {
       const x = r() * 128, y = r() * 128;
-      c.fillStyle = `rgba(255,255,255,${(0.03 + r() * 0.05).toFixed(3)})`;
-      c.fillRect(Math.floor(x), Math.floor(y), 1 + Math.floor(r() * 3), 1 + Math.floor(r() * 3));
-    }
-    // Dark grain — slightly stronger to read against the darker base
-    for (let i = 0; i < 380; i++) {
-      const x = r() * 128, y = r() * 128;
-      c.fillStyle = `rgba(0,0,0,${(0.10 + r() * 0.20).toFixed(3)})`;
+      c.fillStyle = `rgba(180,140,90,${(0.04 + r() * 0.10).toFixed(3)})`;
       c.fillRect(Math.floor(x), Math.floor(y), 1, 1);
     }
-    // Stains
+    // Coarse mineral grain (darker)
+    for (let i = 0; i < 480; i++) {
+      const x = r() * 128, y = r() * 128;
+      c.fillStyle = `rgba(0,0,0,${(0.15 + r() * 0.25).toFixed(3)})`;
+      c.fillRect(Math.floor(x), Math.floor(y), 1, 1);
+    }
+    // Pebbles — small grey-brown dots
+    for (let i = 0; i < 22; i++) {
+      const x = r() * 128, y = r() * 128;
+      const sz = 1 + Math.floor(r() * 2);
+      const shade = 80 + Math.floor(r() * 40);
+      c.fillStyle = `rgb(${shade},${shade - 10},${shade - 25})`;
+      c.beginPath();
+      c.arc(x, y, sz, 0, Math.PI * 2);
+      c.fill();
+      // Tiny highlight
+      c.fillStyle = 'rgba(255,255,255,0.18)';
+      c.fillRect(Math.floor(x - sz / 2), Math.floor(y - sz / 2), 1, 1);
+    }
+    // Straw / leaf litter — short bright streaks
+    for (let i = 0; i < 28; i++) {
+      const x = Math.floor(r() * 128);
+      const y = Math.floor(r() * 128);
+      const len = 3 + Math.floor(r() * 5);
+      const angle = r() * Math.PI * 2;
+      c.save();
+      c.translate(x, y);
+      c.rotate(angle);
+      c.fillStyle = `rgba(170,130,60,${(0.30 + r() * 0.25).toFixed(3)})`;
+      c.fillRect(-len / 2, 0, len, 1);
+      c.restore();
+    }
+    // Wet / muddy patches — irregular dark blobs
     for (let i = 0; i < 6; i++) {
       const x = r() * 128, y = r() * 128;
-      const w = 6 + r() * 22, h = 6 + r() * 22;
-      c.fillStyle = `rgba(40,30,20,${(0.05 + r() * 0.08).toFixed(3)})`;
+      const w = 12 + r() * 28, h = 8 + r() * 22;
+      c.fillStyle = `rgba(0,0,0,${(0.18 + r() * 0.18).toFixed(3)})`;
       c.beginPath();
       c.ellipse(x, y, w / 2, h / 2, r() * Math.PI, 0, Math.PI * 2);
       c.fill();
     }
-    // Expansion joints (one horizontal, one vertical, slightly off-center)
-    c.fillStyle = 'rgba(0,0,0,0.55)';
-    c.fillRect(0, 62, 128, 2);
-    c.fillRect(64, 0, 2, 128);
-    c.fillStyle = 'rgba(255,255,255,0.10)';
-    c.fillRect(0, 64, 128, 1);
-    c.fillRect(66, 0, 1, 128);
-    // Hairline cracks
-    c.strokeStyle = 'rgba(0,0,0,0.45)';
-    c.lineWidth = 1;
-    for (let i = 0; i < 3; i++) {
-      let cx = r() * 128, cy = r() * 128;
-      c.beginPath(); c.moveTo(cx, cy);
-      for (let j = 0; j < 5; j++) {
-        cx += (r() - 0.5) * 22;
-        cy += (r() - 0.5) * 22;
-        c.lineTo(cx, cy);
-      }
-      c.stroke();
+    // Scattered tiny moss specks (forest floor)
+    for (let i = 0; i < 18; i++) {
+      const x = Math.floor(r() * 128);
+      const y = Math.floor(r() * 128);
+      c.fillStyle = `rgba(60,90,40,${(0.30 + r() * 0.30).toFixed(3)})`;
+      c.fillRect(x, y, 1 + Math.floor(r() * 2), 1);
     }
     return cv;
   }
@@ -241,6 +311,31 @@ const Raycaster = (() => {
     return stars;
   }
 
+  // Pre-sampled tree-line height profile. Each entry is "how many pixels
+  // does the canopy rise above the horizon at this U coord". Built once
+  // from layered sine waves + per-x noise so the silhouette stays stable
+  // across frames (no twitching) but reads as a chaotic ridge of trees.
+  // Long enough that any reasonable canvas width can sample it without
+  // wrapping noticeably.
+  let forestProfile = null;
+  function buildForestProfile() {
+    const LEN = 2048;
+    const r = rng(31415);
+    const a = new Float32Array(LEN + 1);
+    for (let i = 0; i <= LEN; i++) {
+      const t = i / LEN;
+      // Three layered sines for a believable canopy ridge; a few sharper
+      // spikes (Math.pow on a sine) drop in pointed conifer crowns.
+      const base   = 22 + Math.sin(t * Math.PI * 4.3 + 1.1) * 6;
+      const mid    = Math.sin(t * Math.PI * 11.0 + 2.7) * 4;
+      const detail = Math.sin(t * Math.PI * 29.0 + 4.3) * 3;
+      const conifer = Math.pow(Math.max(0, Math.sin(t * Math.PI * 47 + 0.7)), 6) * 14;
+      const noise = (r() - 0.5) * 5;
+      a[i] = Math.max(0, base + mid + detail + conifer + noise);
+    }
+    return a;
+  }
+
   function ensureBakedAssets() {
     if (!concreteTile) {
       concreteTile = buildConcreteTile();
@@ -250,6 +345,7 @@ const Raycaster = (() => {
         .getImageData(0, 0, concreteTile.width, concreteTile.height).data;
     }
     if (!starField) starField = buildStarField();
+    if (!forestProfile) forestProfile = buildForestProfile();
   }
 
   // ---------- Sky pass ----------
@@ -275,9 +371,107 @@ const Raycaster = (() => {
     ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
 
     const name = theme.name || 'sunset';
-    if (name === 'dusk') drawStars(horizon, 25, 0.35);
+    // All 굿판 themes are night-time, so every wave gets stars; the count /
+    // intensity climbs with darkness. Storm still pulses with lightning on
+    // top of its faint star field.
+    if (name === 'sunset') drawStars(horizon, 45, 0.6);
+    else if (name === 'dusk') drawStars(horizon, 55, 0.8);
     else if (name === 'night') drawStars(horizon, 70, 1.0);
-    else if (name === 'storm') drawStormSky(horizon);
+    else if (name === 'storm') { drawStars(horizon, 30, 0.5); drawStormSky(horizon); }
+    drawMoon(horizon, name);
+    // Forest silhouette sits in front of the celestial layer (so trees
+    // occlude any star they overlap) but behind the walls + floor pass
+    // (so any in-world wall taller than the horizon naturally hides the
+    // corresponding chunk of forest).
+    drawForestSilhouette(horizon, name, player);
+  }
+
+  // Distant forest ridge — opaque tree-line drawn from the precomputed
+  // height profile, plus a softer pre-pass behind it so the ridge reads
+  // as deep multiple-row forest rather than a single picket fence. The
+  // player.angle shifts the sample window so when the player turns the
+  // canopy stays anchored to the world rather than scrolling with the
+  // view — gives the sense of being surrounded.
+  function drawForestSilhouette(horizon, themeName, player) {
+    if (!forestProfile) return;
+    const len = forestProfile.length - 1;
+    // World-space anchored: 1 radian of player yaw → samplePerRadian px
+    // of profile scroll. Picked so a full 2π yaw walks ~8 canvas widths
+    // of profile, giving every direction a different ridge shape.
+    const yaw = (player && typeof player.angle === 'number') ? player.angle : 0;
+    const samplePerRadian = (len / (Math.PI * 2)) * 8;
+    const scrollNear = yaw * samplePerRadian;
+    const scrollFar = yaw * samplePerRadian * 0.55;
+    function sample(scroll, x) {
+      let idx = ((x + scroll) % len + len) % len;
+      return forestProfile[Math.floor(idx)];
+    }
+    // Far row — shorter, lighter, behind. Pulls toward the horizon haze
+    // so it doesn't fight the sky gradient.
+    ctx.save();
+    ctx.fillStyle = themeName === 'storm' ? '#040508' : '#060a14';
+    ctx.beginPath();
+    ctx.moveTo(0, horizon + 1);
+    for (let x = 0; x <= W; x++) {
+      const h = sample(scrollFar, x) * 0.55;
+      ctx.lineTo(x, horizon - h);
+    }
+    ctx.lineTo(W, horizon + 1);
+    ctx.closePath();
+    ctx.fill();
+    // Near row — taller, deeper black, in front. Two offset samples
+    // give pointed conifer crowns more bite.
+    ctx.fillStyle = themeName === 'storm' ? '#010103' : '#020306';
+    ctx.beginPath();
+    ctx.moveTo(0, horizon + 1);
+    for (let x = 0; x <= W; x++) {
+      const h = sample(scrollNear, x);
+      ctx.lineTo(x, horizon - h);
+    }
+    ctx.lineTo(W, horizon + 1);
+    ctx.closePath();
+    ctx.fill();
+    // Ground mist right at the tree feet so the ridge melts into the
+    // floor instead of cutting hard.
+    const mist = ctx.createLinearGradient(0, horizon - 8, 0, horizon + 14);
+    mist.addColorStop(0, 'rgba(20,30,55,0)');
+    mist.addColorStop(0.5, 'rgba(20,30,55,0.45)');
+    mist.addColorStop(1, 'rgba(20,30,55,0)');
+    ctx.fillStyle = mist;
+    ctx.fillRect(0, horizon - 8, W, 22);
+    ctx.restore();
+  }
+
+  // Full moon — same position every frame so the player can use it as a
+  // landmark while sprinting. Pulled up high enough that the player's
+  // pitch range can't bring it under the horizon at any reasonable
+  // playing angle. The 'storm' band suppresses it (the sky is supposed
+  // to be pitch black with red bleed) — a faint disc through cloud is
+  // drawn instead.
+  function drawMoon(horizon, themeName) {
+    const cx = Math.floor(W * 0.72);
+    const cy = Math.floor(horizon * 0.32);
+    const r = 22;
+    if (themeName === 'storm') {
+      ctx.fillStyle = 'rgba(180,180,200,0.18)';
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.9, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+    // Outer glow
+    const glow = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 3);
+    glow.addColorStop(0, 'rgba(220,225,240,0.30)');
+    glow.addColorStop(1, 'rgba(220,225,240,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(cx - r * 3, cy - r * 3, r * 6, r * 6);
+    // Disc
+    ctx.fillStyle = '#e8eaf2';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    // Cratery shading — a slight grey blotch off-centre so the moon isn't
+    // a flat disc.
+    ctx.fillStyle = 'rgba(120,130,150,0.22)';
+    ctx.beginPath(); ctx.arc(cx - r * 0.25, cy + r * 0.18, r * 0.55, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(120,130,150,0.18)';
+    ctx.beginPath(); ctx.arc(cx + r * 0.32, cy - r * 0.30, r * 0.30, 0, Math.PI * 2); ctx.fill();
   }
 
   function drawStormSky(horizon) {

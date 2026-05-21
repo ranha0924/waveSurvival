@@ -1,15 +1,26 @@
-// Map data and collision system
-// Tile types:
-//   0  = empty floor
-//   1  = concrete blast wall (cracked gray)
-//   2  = hangar wall (riveted military green metal)
-//   3  = watchtower stone (dark gray)
-//   4  = shipping container (corrugated rusted brown/green)
-//   5  = sandbag barricade (khaki bands)
-//   6  = destroyed vehicle (olive)
-//   7  = comms tower / steel pillar (dark steel)
-//   8  = hazard stripe panel (yellow-black diagonal)
-//   9  = enemy spawn gate (walkable; rendered as gate decal)
+// Map data and collision system.
+//
+// Setting: 산속 외딴 굿당 — a remote shamanic shrine deep in the woods.
+// A 한옥 main hall sits at the centre of a small forest clearing, ringed
+// by 장독 jars, 솟대 spirit poles, and 짚단 straw bundles. 부적 토담
+// (paper-talisman mud walls) form a half-collapsed protective ring;
+// stacked timber + roof-tile rubble (폐 한옥 자재) is strewn across the
+// grounds. The whole site is fenced by a 흙담 (earth wall) perimeter,
+// beyond which Environment.placeTrees plants a wall of pine and broadleaf
+// trees so the player always reads the level as "small ritual ground
+// surrounded by woods".
+//
+// Tile types (numeric IDs match WallTextures + raycaster lookups):
+//   0  = empty floor (forest earth)
+//   1  = 흙담 (hwangto perimeter wall)
+//   2  = 한옥 기와벽 (main hall — only the central building uses this)
+//   3  = 이끼 낀 돌담 (mossy stone piles)
+//   4  = 부적 토담 (talisman-papered mud wall)
+//   5  = 짚단 묶음 (woven straw bundles — chest-high cover)
+//   6  = 폐 한옥 자재 (collapsed timber + tile rubble)
+//   7  = 솟대 (sotdae spirit pole — tall vertical landmark)
+//   8  = 장독대 항아리 (jangdok ceramic jar — short ring around the hall)
+//   9  = 적 spawn gate (walkable; rendered as a gate decal)
 const GameMap = (() => {
   function build() {
     const W = 42, H = 42;
@@ -34,64 +45,68 @@ const GameMap = (() => {
           if (inb(x, y)) data[y][x] = 0;
     }
 
-    // Perimeter concrete wall
+    // ── 1. Perimeter earth wall (흙담) ────────────────────────────────
     hollow(0, 0, W - 1, H - 1, 1);
 
-    // Hangar (east side) — 11×11 with an open south face
-    hollow(28, 6, 38, 16, 2);
-    clear(32, 16, 34, 16); // open gate
+    // ── 2. Central 한옥 main hall ────────────────────────────────────
+    // 9×7 hollow ceramic-roof building, south-facing entrance.
+    hollow(17, 13, 25, 19, 2);
+    // South entrance — three tiles wide
+    data[19][20] = 0;
+    data[19][21] = 0;
+    data[19][22] = 0;
+    // A second small back exit so the boss has somewhere to flank from
+    data[13][21] = 0;
 
-    // Corner watchtowers (3x3 hollow stone shells with doorways inward)
-    hollow(3, 3, 5, 5, 3);   data[5][4] = 0;
-    hollow(36, 3, 38, 5, 3); data[5][37] = 0;
-    hollow(3, 36, 5, 38, 3); data[36][4] = 0;
-    hollow(36, 36, 38, 38, 3); data[36][37] = 0;
+    // ── 3. Jangdok jar ring (8) — line of jars hugging the main hall ──
+    // East flank
+    for (let y = 14; y <= 18; y += 2) data[y][27] = 8;
+    // West flank
+    for (let y = 14; y <= 18; y += 2) data[y][15] = 8;
+    // North side (back of the hall) — only a couple, less dense
+    data[11][19] = 8; data[11][23] = 8;
 
-    // Container alleys (sets of paired blocks creating corridors)
-    rect(9, 18, 11, 19, 4);
-    rect(9, 22, 11, 23, 4);
-    rect(9, 26, 11, 27, 4);
+    // ── 4. Sotdae spirit poles (7) — two flanking the south courtyard ─
+    data[22][19] = 7;
+    data[22][23] = 7;
 
-    rect(15, 30, 17, 31, 4);
-    rect(19, 30, 21, 31, 4);
-    rect(23, 30, 25, 31, 4);
+    // ── 5. Straw bundles (5) — chest-high cover scattered in the yard ─
+    rect(19, 25, 23, 25, 5);     // straight line in front of hall
+    rect(13, 28, 15, 28, 5);     // west yard
+    rect(28, 28, 30, 28, 5);     // east yard
+    rect(11, 17, 11, 19, 5);     // small west pile
+    rect(31, 17, 31, 19, 5);     // small east pile
 
-    rect(15, 8, 17, 9, 4);
+    // ── 6. 부적 토담 ring (4) — half-collapsed talisman mud-wall arcs
+    //         that suggest a protective barrier without sealing the play
+    //         area. Left intentionally with gaps so enemies path through.
+    rect(13, 9, 17, 9, 4);       // NW arc
+    rect(25, 9, 29, 9, 4);       // NE arc
+    rect(8, 13, 8, 17, 4);       // W arc
+    rect(34, 13, 34, 17, 4);     // E arc
+    rect(13, 32, 17, 32, 4);     // SW arc
+    rect(25, 32, 29, 32, 4);     // SE arc
 
-    // Concrete blast walls (T and L shapes for cover)
-    rect(20, 12, 20, 16, 1);  // vertical
-    rect(18, 14, 22, 14, 1);  // crossbar of T
+    // ── 7. Collapsed hanok material (6) — stacked beams + tile rubble ─
+    rect(10, 23, 12, 24, 6);
+    rect(30, 23, 32, 24, 6);
+    rect(20, 35, 22, 36, 6);
+    rect(5, 5, 7, 6, 6);
+    rect(35, 5, 37, 6, 6);
+    rect(5, 35, 7, 36, 6);
+    rect(35, 35, 37, 36, 6);
 
-    rect(26, 22, 30, 22, 1);  // L shape
-    rect(30, 22, 30, 25, 1);
+    // ── 8. Mossy stone heaps (3) — small clusters around the grounds ──
+    rect(15, 5, 16, 5, 3);
+    rect(26, 5, 27, 5, 3);
+    rect(5, 25, 5, 27, 3);
+    rect(36, 25, 36, 27, 3);
+    rect(15, 38, 18, 38, 3);
+    rect(24, 38, 27, 38, 3);
 
-    rect(8, 35, 12, 35, 1);
-    rect(8, 33, 8, 35, 1);
-
-    // Sandbag barricades (half-height look, full collision)
-    rect(13, 20, 18, 20, 5);
-    rect(22, 18, 26, 18, 5);
-    rect(30, 30, 33, 30, 5);
-    rect(7, 14, 7, 17, 5);
-
-    // Destroyed vehicles scattered as cover
-    rect(7, 11, 9, 12, 6);
-    rect(24, 25, 26, 26, 6);
-    rect(32, 19, 34, 20, 6);
-    rect(13, 35, 15, 36, 6);
-
-    // Comms tower (landmark) — single tile near map middle
-    data[15][24] = 7;
-    data[26][16] = 7;
-
-    // Hazard panels near gate approaches
-    data[2][20] = 8; data[2][21] = 8;
-    data[H - 3][20] = 8; data[H - 3][21] = 8;
-    data[20][2] = 8; data[21][2] = 8;
-    data[20][W - 3] = 8; data[21][W - 3] = 8;
-
-    // Enemy spawn gates: 8 along the perimeter, just inside the outer wall.
-    // Spawn tiles must be walkable, so they overwrite any existing wall.
+    // ── 9. Spawn gates (9) — 8 around the perimeter so enemies can come
+    //         from any direction relative to the player at the courtyard.
+    //         Tiles must be walkable so they overwrite any earth-wall.
     const gates = [
       [Math.floor(W / 2), 1],
       [Math.floor(W / 2) + 1, 1],
@@ -112,35 +127,38 @@ const GameMap = (() => {
   const H = built.H;
   const data = built.data;
 
-  // Wall colors per type. Each entry: { light, dark, pattern }
-  // pattern hint is consumed by the raycaster for texture variation.
+  // Wall colors per type. Each entry: { light, dark, pattern }. The
+  // raycaster only uses these as a fallback tint when the textured
+  // WallTextures pass doesn't run; the actual look comes from
+  // walltextures.js which paints the 굿판 motifs.
   const wallColors = {
-    1: { light: '#7d7a76', dark: '#3d3b38', pattern: 'concrete' },   // blast wall
-    2: { light: '#5a6b48', dark: '#2c351f', pattern: 'rivet' },      // hangar
-    3: { light: '#4a4a4a', dark: '#222222', pattern: 'stone' },      // watchtower
-    4: { light: '#7a4a30', dark: '#3a2010', pattern: 'corrugated' }, // container
-    5: { light: '#a08a55', dark: '#5a4a28', pattern: 'sandbag' },    // sandbag
-    6: { light: '#5d5a32', dark: '#26241a', pattern: 'vehicle' },    // vehicle
-    7: { light: '#3a3d44', dark: '#16181c', pattern: 'steel' },      // comms tower
-    8: { light: '#d4b020', dark: '#16140a', pattern: 'hazard' }      // hazard
+    1: { light: '#8a6a3a', dark: '#3a2818', pattern: 'concrete'   }, // 흙담
+    2: { light: '#3a3a3e', dark: '#15151a', pattern: 'rivet'      }, // 한옥 기와
+    3: { light: '#5a655a', dark: '#252a25', pattern: 'stone'      }, // 돌담
+    4: { light: '#6e5230', dark: '#322010', pattern: 'corrugated' }, // 부적 토담
+    5: { light: '#b89438', dark: '#3a2810', pattern: 'sandbag'    }, // 짚단
+    6: { light: '#4a2614', dark: '#1c0c06', pattern: 'vehicle'    }, // 폐 자재
+    7: { light: '#3a2010', dark: '#0a0604', pattern: 'steel'      }, // 솟대
+    8: { light: '#7a4a20', dark: '#1a0c06', pattern: 'hazard'     }  // 장독
   };
 
   // Structural silhouette per wall type, read by the raycaster.
-  //   heightFactor — vertical extent vs the default unit cube (1.0). >1 grows
-  //                  upward (towers, antennas); <1 is short cover.
-  //   seeOver       — ray continues past the wall so the world behind still
-  //                  renders. Used for chest-high cover (sandbags, wrecks).
-  //   topDeco       — name of the silhouette drawn above the wall body. See
-  //                  drawTopDeco() in raycaster.js for the catalogue.
+  //   heightFactor — vertical extent vs the default unit cube (1.0). >1
+  //                  grows upward (sotdae spirit poles); <1 is short
+  //                  cover (jars, straw bundles, rubble).
+  //   seeOver       — ray continues past the wall so the world behind
+  //                  still renders. Used for chest-high cover.
+  //   topDeco       — silhouette drawn above the wall body; catalogue in
+  //                  drawTopDeco() inside raycaster.js.
   const wallShapes = {
-    1: { heightFactor: 1.00, seeOver: false, topDeco: 'jagged'  },  // broken-top concrete + barbed wire
-    2: { heightFactor: 1.05, seeOver: false, topDeco: 'roof'    },  // hangar with slight roofline cap
-    3: { heightFactor: 1.30, seeOver: false, topDeco: 'crenel'  },  // crenellated watchtower
-    4: { heightFactor: 1.00, seeOver: false, topDeco: 'corners' },  // container corner caps
-    5: { heightFactor: 0.50, seeOver: true,  topDeco: null      },  // sandbag, low cover
-    6: { heightFactor: 1.00, seeOver: false, topDeco: 'turret'  },  // stacked wreck — full cover, cab still pokes up
-    7: { heightFactor: 1.55, seeOver: false, topDeco: 'antenna' },  // comms pillar + spire
-    8: { heightFactor: 1.00, seeOver: false, topDeco: 'beacon'  }   // hazard panel with warning light
+    1: { heightFactor: 1.00, seeOver: false, topDeco: 'jagged'  }, // 흙담 — uneven crest
+    2: { heightFactor: 1.25, seeOver: false, topDeco: 'roof'    }, // 한옥 — pitched roofline
+    3: { heightFactor: 0.65, seeOver: true,  topDeco: null      }, // 돌담 — chest-high stones, see over
+    4: { heightFactor: 1.00, seeOver: false, topDeco: 'jagged'  }, // 부적 토담 — half-broken mud
+    5: { heightFactor: 0.50, seeOver: true,  topDeco: null      }, // 짚단 — low cover
+    6: { heightFactor: 0.55, seeOver: true,  topDeco: null      }, // 폐 자재 — debris pile, see over
+    7: { heightFactor: 1.60, seeOver: false, topDeco: 'antenna' }, // 솟대 — tall pole + bird
+    8: { heightFactor: 0.65, seeOver: true,  topDeco: null      }  // 장독 — jar height, see over
   };
 
   function getTile(x, y) {
@@ -166,11 +184,14 @@ const GameMap = (() => {
     return pts;
   }
 
-  // Player start: open zone west-center of the map, away from structures.
-  const PLAYER_START = { x: 5.5, y: 20.5 };
-  // Guarantee a clear pocket around the spawn so we never start inside a wall.
-  for (let y = 19; y <= 22; y++)
-    for (let x = 4; x <= 7; x++)
+  // Player start: south courtyard, in front of the main hall, so the
+  // opening view frames the 한옥 between the two sotdae poles.
+  const PLAYER_START = { x: 21.5, y: 27.5 };
+  // Guarantee a clear pocket around the spawn so we never start inside
+  // a wall (the straw row in front of the hall is intentionally close
+  // to the spawn, but the pocket carves a clear space).
+  for (let y = 26; y <= 29; y++)
+    for (let x = 19; x <= 24; x++)
       if (data[y][x] >= 1 && data[y][x] <= 8) data[y][x] = 0;
 
   function canMove(x, y, radius = 0.25) {
