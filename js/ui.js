@@ -44,11 +44,22 @@ const UI = (() => {
       $('score').classList.toggle('beat-best', bv > 0 && scoreState.score > bv);
     }
 
-    // Combo
+    // Combo — comboCount is now the raw streak length; mult is capped by
+    // Player.comboMultFor. Show both: large streak count, smaller multiplier.
     if (player.comboCount > 0) {
-      const mults = [1, 1.5, 2, 3];
       $('combo-info').classList.remove('hidden');
-      $('combo-mult').textContent = mults[player.comboCount] || 1;
+      $('combo-mult').textContent = player.comboCount;
+      const mult = Player.comboMultFor(player.comboCount);
+      const sub = document.getElementById('combo-sub');
+      if (sub) {
+        if (player.gutpanActive) {
+          sub.textContent = `굿판 ×${(mult * Player.GUTPAN_SCORE_MULT).toFixed(1)}`;
+          sub.classList.add('gutpan');
+        } else {
+          sub.textContent = mult >= 1.5 ? `점수 ×${mult}` : '';
+          sub.classList.remove('gutpan');
+        }
+      }
     } else {
       $('combo-info').classList.add('hidden');
     }
@@ -265,7 +276,8 @@ const UI = (() => {
     $('final-kills').textContent = stats.kills;
     $('final-headshots').textContent = stats.headshots || 0;
     $('final-boss').textContent  = stats.bossKills || 0;
-    $('final-combo').textContent = `×${[1,1.5,2,3][stats.maxCombo || 0]}`;
+    // maxCombo is now the raw streak length, not a bucket index.
+    $('final-combo').textContent = `${stats.maxCombo || 0} 연속`;
 
     // NEW RECORD header.
     const hdr = $('new-record-header');
@@ -282,7 +294,7 @@ const UI = (() => {
       { id: 'cmp-wave',  prev: prevRecords.bestWave.value,  cur: stats.wave,     broke: broken.wave,  fmt: (n) => n },
       { id: 'cmp-score', prev: prevRecords.bestScore.value, cur: stats.score,    broke: broken.score, fmt: (n) => n.toLocaleString() },
       { id: 'cmp-kills', prev: prevRecords.bestKills.value, cur: stats.kills,    broke: broken.kills, fmt: (n) => n },
-      { id: 'cmp-combo', prev: prevRecords.bestCombo.value, cur: stats.maxCombo, broke: broken.combo, fmt: (n) => `×${[1,1.5,2,3][n] || 1}` }
+      { id: 'cmp-combo', prev: prevRecords.bestCombo.value, cur: stats.maxCombo, broke: broken.combo, fmt: (n) => `${n} 연속` }
     ];
     for (const r of rows) {
       const el = $(r.id);

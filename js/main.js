@@ -153,6 +153,19 @@
   }
   const anyBroken = (b) => b.wave || b.score || b.kills || b.combo;
 
+  // ---------- 굿판 mode constants ----------
+  // Streak threshold to first fire 굿판 mode, and the streak step at which
+  // it extends thereafter (5, 10, 15, ...). 5 was picked to land roughly
+  // every other wave's worth of clean play — high enough to feel earned,
+  // low enough that mid-streak extensions are common.
+  const GUTPAN_TRIGGER_COMBO = 5;
+  const GUTPAN_EXTEND_STEP = 5;
+  const GUTPAN_BASE_DURATION = 5.0;   // seconds on first trigger
+  const GUTPAN_EXTENSION = 3.0;       // seconds added at each ×5 milestone
+  // Cap so a 60+ streak can't accumulate a minute-long 굿판 — extensions
+  // beyond this are silently ignored.
+  const GUTPAN_MAX_DURATION = 15.0;
+
   // ---------- Game state ----------
   const game = {
     state: STATE.TITLE,
@@ -173,13 +186,33 @@
     runBest: null,
     // One-shot triggers per run for the "신기록" banner.
     recordFired: { score: false, wave: false },
-    nick: ''
+    nick: '',
+    // 굿판 모드 — fired when player.comboCount crosses a multiple of 5.
+    // `lastTriggerCombo` remembers the last streak value we already awarded
+    // so a single kill doesn't re-fire while the count stays at 5/10/...
+    // talismanParticles is its own pool so combat blood/impacts can't slow
+    // it down (and so it lives in screen space rather than world space).
+    gutpan: {
+      active: false,
+      timer: 0,
+      lastTriggerCombo: 0,
+      bannerPulse: 0,           // 0..1, fades over first ~0.8s of activation
+      tintIntensity: 0          // smoothed 0..1 used by the screen-tint shader
+    },
+    talismanParticles: []
   };
 
   // ---------- Init / UI wiring ----------
   function init() {
     Audio.init();
     UI.init();
+    // Trigger an early font fetch so the first 굿판 banner already has the
+    // brush face cached. The CSS @font-face directive only loads on first
+    // *use*, so without this the headline pops in mid-effect.
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load('100px "Nanum Brush Script"');
+      document.fonts.load('100px "Black Han Sans"');
+    }
 
     game.canvas = document.getElementById('game-canvas');
     game.ctx = game.canvas.getContext('2d');
@@ -382,6 +415,14 @@
     if (typeof Pickups !== 'undefined') Pickups.clear();
     game.score = { score: 0 };
     game.wave = { number: 0, enemiesAlive: 0, queue: [], spawnTimer: 0, spawnInterval: 0.6 };
+    // 굿판 — reset every run so a leftover timer from a previous run can't
+    // bleed into the new one.
+    game.gutpan.active = false;
+    game.gutpan.timer = 0;
+    game.gutpan.lastTriggerCombo = 0;
+    game.gutpan.bannerPulse = 0;
+    game.gutpan.tintIntensity = 0;
+    game.talismanParticles.length = 0;
     // Clear any stale input state from previous run / menu interaction
     game.keys = {};
     game.mouseDown = false;
@@ -530,6 +571,141 @@
     }
   }
 
+  // ---------- 굿판 모드 ----------
+  // Preload talisman sprites for the on-screen falling-paper effect.
+  // Drawn in screen space (not raycast world space) so they always read
+  // regardless of camera angle. Missing files just leave the slot null
+  // and renderTalismans falls back to a flat colored rect with the
+  // hanja drawn in. The asset names are reserved so the player can drop
+  // 1..3 files in and have them picked up without a code change.
+  const TALISMAN_SRCS = [
+    { src: 'assets/talisman_01.png', char: '長壽' },
+    { src: 'assets/talisman_02.png', char: '護身' },
+    { src: 'assets/talisman_03.png', char: '氣福' }
+  ];
+  const TALISMAN_IMAGES = TALISMAN_SRCS.map((entry) => {
+    const img = new Image();
+    const slot = { img, loaded: false, char: entry.char };
+    img.onload = () => { slot.loaded = true; };
+    img.onerror = () => { /* leave loaded=false; renderer uses fallback */ };
+    img.src = entry.src;
+    return slot;
+  });
+
+  // Drive the active flag + remaining timer from the player's current streak,
+  // and spawn falling-talisman particles while active. Called from the main
+  // loop with dt seconds. Mirrors active flag onto game.player so
+  // player.shoot / damageEnemy can read it without knowing about game state.
+  function updateGutpan(dt) {
+    const g = game.gutpan;
+    const p = game.player;
+
+    // Trigger / extension. We check every multiple of 5 the streak has
+    // reached since the last award, so a single big chain (e.g. an
+    // explosion crossing from 4 → 8) still triggers correctly.
+    const c = p ? p.comboCount : 0;
+    if (c >= GUTPAN_TRIGGER_COMBO) {
+      // Walk every milestone we've passed since the last awarded one.
+      let next = g.lastTriggerCombo + GUTPAN_EXTEND_STEP;
+      if (g.lastTriggerCombo === 0) next = GUTPAN_TRIGGER_COMBO;
+      while (next <= c) {
+        if (!g.active) {
+          g.active = true;
+          g.timer = GUTPAN_BASE_DURATION;
+          g.bannerPulse = 1;
+          Audio.gutpanTrigger && Audio.gutpanTrigger();
+        } else {
+          g.timer = Math.min(GUTPAN_MAX_DURATION, g.timer + GUTPAN_EXTENSION);
+          g.bannerPulse = Math.max(g.bannerPulse, 0.7);
+        }
+        g.lastTriggerCombo = next;
+        next += GUTPAN_EXTEND_STEP;
+      }
+    } else if (c === 0) {
+      // Streak fully dropped — reset milestone tracker so the next streak
+      // re-triggers from 5 again.
+      g.lastTriggerCombo = 0;
+    }
+
+    // Timer decay.
+    if (g.active) {
+      g.timer -= dt;
+      if (g.timer <= 0) {
+        g.active = false;
+        g.timer = 0;
+      }
+    }
+    g.bannerPulse = Math.max(0, g.bannerPulse - dt * 1.5);
+
+    // Smooth tint envelope — ramps up fast on activation, eases out as the
+    // timer drains so the screen doesn't snap-cut back to normal.
+    const target = g.active ? Math.min(1, g.timer / 0.6) : 0;
+    g.tintIntensity += (target - g.tintIntensity) * Math.min(1, dt * 8);
+
+    // Mirror onto the player so shoot/damageEnemy can branch on it.
+    if (p) p.gutpanActive = g.active;
+
+    // Spawn falling talismans at the screen edges while active. Density
+    // scales with intensity so the effect fades out alongside the tint.
+    if (g.active) {
+      const spawnPerSec = 22;
+      // Stochastic spawn — expected spawns per frame = spawnPerSec * dt.
+      const expected = spawnPerSec * dt;
+      let toSpawn = Math.floor(expected);
+      if (Math.random() < (expected - toSpawn)) toSpawn += 1;
+      for (let i = 0; i < toSpawn; i++) spawnTalisman();
+    }
+
+    // Update existing talisman particles regardless of active flag so the
+    // ones already on screen finish their fall after the timer expires.
+    updateTalismans(dt);
+  }
+
+  // Spawn a single talisman particle at a random horizontal position,
+  // starting above the top of the canvas with a small initial sideways
+  // drift. Coordinates are screen-space pixels.
+  function spawnTalisman() {
+    if (!game.canvas) return;
+    const W = game.canvas.width;
+    const H = game.canvas.height;
+    const fromLeftEdge = Math.random() < 0.5;
+    const edgeBand = W * 0.28;
+    const x = fromLeftEdge
+      ? Math.random() * edgeBand
+      : W - Math.random() * edgeBand;
+    game.talismanParticles.push({
+      x,
+      y: -60 - Math.random() * 80,
+      vx: (fromLeftEdge ? 1 : -1) * (10 + Math.random() * 40),
+      vy: 110 + Math.random() * 160,
+      rot: (Math.random() - 0.5) * 0.6,   // mostly upright with slight tilt
+      vrot: (Math.random() - 0.5) * 2.2,
+      scale: 1.4 + Math.random() * 0.9,    // ~1.4–2.3× base size — big and readable
+      life: 1.0,
+      // Decay so the particle fades before it leaves the screen even on
+      // very tall canvases.
+      maxLife: 2.8 + Math.random() * 1.2,
+      imgIdx: Math.floor(Math.random() * TALISMAN_IMAGES.length)
+    });
+    // Hard cap so a very long 굿판 can't grow the pool unboundedly.
+    if (game.talismanParticles.length > 120) game.talismanParticles.shift();
+  }
+
+  function updateTalismans(dt) {
+    const arr = game.talismanParticles;
+    const H = game.canvas ? game.canvas.height : 600;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const p = arr[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += dt * 60;          // gentle gravity
+      p.vx *= Math.exp(-dt * 0.5);
+      p.rot += p.vrot * dt;
+      p.life -= dt / p.maxLife;
+      if (p.life <= 0 || p.y > H + 60) arr.splice(i, 1);
+    }
+  }
+
   // ---------- Game loop + rendering ----------
   function updateParticles(dt) {
     for (let i = game.particles.length - 1; i >= 0; i--) {
@@ -572,6 +748,9 @@
       updateParticles(dt);
       if (typeof Pickups !== 'undefined') Pickups.update(dt, game.player, game.particles);
       Environment.update(dt, game.wave.number, game.particles);
+
+      // 굿판 모드 — combo-driven trigger + timer + visual driver.
+      updateGutpan(dt);
 
       // Spawn next enemy from queue
       spawnFromQueue(dt);
@@ -630,6 +809,141 @@
 
     // Gun overlay
     UI.renderGun(ctx, game.player);
+
+    ctx.restore();
+
+    // 굿판 mode overlay layer — drawn OUTSIDE the shake transform so the
+    // banner / talisman particles stay screen-locked even when the camera
+    // is shaking from recoil.
+    renderGutpan(ctx);
+  }
+
+  // ---------- 굿판 모드 render ----------
+  // Three layers, in order: red multiply tint → falling talisman particles
+  // → top-centre "굿판!" banner with ×1.5 / ×2.0 multiplier sub-text.
+  // Everything reads game.gutpan.tintIntensity rather than the raw active
+  // flag so the effect eases in/out instead of snap-cutting.
+  function renderGutpan(ctx) {
+    const g = game.gutpan;
+    if (g.tintIntensity <= 0.01 && g.talismanParticles && g.talismanParticles.length === 0
+        && game.talismanParticles.length === 0) return;
+
+    const W = game.canvas.width;
+    const H = game.canvas.height;
+    const intensity = g.tintIntensity;
+
+    // Tint — warm red 'multiply' pass biases everything toward 부적 colours,
+    // and a soft outer vignette pulls the eye to the centre of the screen.
+    if (intensity > 0.01) {
+      ctx.save();
+      ctx.globalAlpha = 0.32 * intensity;
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = '#ff5533';
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+
+      // Vignette — radial dark to focus attention.
+      ctx.save();
+      const grad = ctx.createRadialGradient(W / 2, H / 2, W * 0.25, W / 2, H / 2, W * 0.7);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, `rgba(40, 0, 0, ${0.55 * intensity})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+
+    // Falling talisman particles.
+    renderTalismans(ctx);
+
+    // Top-centre banner.
+    if (intensity > 0.02) {
+      renderGutpanBanner(ctx, W, H, intensity);
+    }
+  }
+
+  function renderTalismans(ctx) {
+    const arr = game.talismanParticles;
+    if (arr.length === 0) return;
+    ctx.save();
+    const prevSmooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    for (const p of arr) {
+      const slot = TALISMAN_IMAGES[p.imgIdx % TALISMAN_IMAGES.length];
+      const alpha = Math.min(1, p.life * 1.4);
+      ctx.globalAlpha = alpha;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      if (slot && slot.loaded) {
+        // Base 56×84 so even scale 1.0 reads as a clear tag; with the new
+        // scale range (1.4–2.3) talismans render at roughly 80–130px tall.
+        const w = 56 * p.scale;
+        const h = 84 * p.scale;
+        ctx.drawImage(slot.img, -w / 2, -h / 2, w, h);
+      } else {
+        // Fallback — yellow rect with the hanja drawn so the effect still
+        // reads even before image assets are committed. Same base size as
+        // the sprite path so the layout doesn't jump when images load in.
+        const w = 48 * p.scale;
+        const h = 72 * p.scale;
+        ctx.fillStyle = '#f3d67b';
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+        ctx.fillStyle = '#202020';
+        ctx.fillRect(-w / 2 - 2, -h / 2 - 10, 3, 12);
+        ctx.fillStyle = '#b71c1c';
+        ctx.font = `bold ${Math.floor(26 * p.scale)}px 'Nanum Brush Script', 'Gowun Batang', serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const label = slot ? slot.char : '符';
+        // Hanja is two characters → draw vertically so it reads as a tag.
+        if (label.length > 1) {
+          ctx.fillText(label[0], 0, -h * 0.20);
+          ctx.fillText(label[1], 0,  h * 0.20);
+        } else {
+          ctx.fillText(label, 0, 0);
+        }
+      }
+      // Reset transform for next particle.
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = prevSmooth;
+    ctx.restore();
+  }
+
+  function renderGutpanBanner(ctx, W, H, intensity) {
+    const g = game.gutpan;
+    const pulse = g.bannerPulse;
+    // Banner scale = 1 base + bump on activation pulse.
+    const scale = 1 + pulse * 0.4;
+    const cx = W / 2;
+    const cy = Math.max(70, H * 0.13);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Glow halo behind the text. Drop shadow doubled up by drawing the
+    // headline twice — once as a thick dark stroke (back layer), once as
+    // the warm fill — so the brush strokes stand out against bright walls.
+    ctx.shadowColor = 'rgba(255, 80, 30, 0.95)';
+    ctx.shadowBlur = 32;
+    ctx.font = '140px "Nanum Brush Script", "Gowun Batang", serif';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = `rgba(40, 0, 0, ${0.95 * intensity})`;
+    ctx.strokeText('굿판!', 0, 0);
+    ctx.fillStyle = `rgba(255, 230, 90, ${intensity})`;
+    ctx.fillText('굿판!', 0, 0);
+
+    // Sub-text — multipliers + remaining time. Heavy display font for
+    // legibility under the brush headline.
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillStyle = `rgba(255, 240, 200, ${0.95 * intensity})`;
+    ctx.font = '900 22px "Black Han Sans", "Gowun Batang", sans-serif';
+    const remain = Math.max(0, g.timer).toFixed(1);
+    ctx.fillText(`데미지 ×1.5 · 점수 ×2.0 · ${remain}s`, 0, 78);
 
     ctx.restore();
   }

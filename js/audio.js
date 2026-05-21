@@ -25,6 +25,9 @@ const Audio = (() => {
       loadSample('sniper',     'assets/audio/sniper.mp3');
       loadSample('footstep',   'assets/audio/footstep.wav');
       loadSample('hitFlesh',   'assets/audio/hit_flesh.ogg');
+      // 굿판 mode trigger — reserved slot. Procedural gong fires until a
+      // real sample lands at this path.
+      loadSample('gutpan',     'assets/audio/gutpan.ogg');
     } catch (e) {
       enabled = false;
     }
@@ -293,12 +296,32 @@ const Audio = (() => {
     tone(660, 0.05, 'square', 0.15);
   }
 
+  // 굿판 mode trigger SFX — single procedural sting meant to feel like a
+  // 꽹과리 (small Korean brass gong) struck once on activation. Made of a
+  // bright metallic transient (high square + sawtooth) over a quick
+  // band-passed noise burst. Replaced by a real sample if assets land
+  // later — call sites use `Audio.gutpanTrigger && Audio.gutpanTrigger()`
+  // so a missing export is harmless.
+  function gutpanTrigger() {
+    if (playSample('gutpan', 0.7)) return;
+    if (!ctx) return;
+    // Metallic body
+    tone(880, 0.18, 'square', 0.22, 0.001, 0.20);
+    tone(1320, 0.22, 'sawtooth', 0.18, 0.001, 0.25);
+    tone(1760, 0.12, 'triangle', 0.14, 0.001, 0.15);
+    // Strike transient
+    noise(0.08, 0.35, 3200, 1.5);
+    // Tail — softer thud so the sting has weight under the bright top.
+    setTimeout(() => tone(220, 0.18, 'sawtooth', 0.18, 0.002, 0.20), 30);
+  }
+
   return {
     init, resume,
     shootPistol, shootShotgun, shootMachineGun, shootSniper,
     hit, hitFlesh, hitArmor, hitBoss,
     enemyDeath, bossDeath, bossEnrage, explosion,
     playerHit, reload, emptyClick, footstep,
-    waveStart, waveClear, gameOver, pickup, uiClick
+    waveStart, waveClear, gameOver, pickup, uiClick,
+    gutpanTrigger
   };
 })();

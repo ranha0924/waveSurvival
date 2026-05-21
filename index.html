@@ -4,6 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Wave Survival FPS</title>
+<!-- Korean brush + heavy display fonts for the 굿판 mode banner.
+     Nanum Brush Script: traditional brush calligraphy.
+     Black Han Sans: heavy headline weight for impact text.
+     Gowun Batang: Myeongjo serif fallback for body text. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&family=Black+Han+Sans&family=Gowun+Batang:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -28,7 +35,7 @@
         <div id="wave-info">WAVE <span id="wave-num">1</span> <span id="wave-best" class="best-tag"></span></div>
         <div id="enemy-count">남은 적: <span id="enemies-left">0</span></div>
         <div id="score-info">SCORE: <span id="score">0</span> <span id="score-best" class="best-tag"></span></div>
-        <div id="combo-info" class="hidden">COMBO ×<span id="combo-mult">1</span></div>
+        <div id="combo-info" class="hidden">COMBO <span id="combo-mult">1</span> <span id="combo-sub"></span></div>
       </div>
 
       <div id="crosshair"></div>
