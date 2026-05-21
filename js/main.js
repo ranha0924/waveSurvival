@@ -206,6 +206,13 @@
   function init() {
     Audio.init();
     UI.init();
+    // Trigger an early font fetch so the first 굿판 banner already has the
+    // brush face cached. The CSS @font-face directive only loads on first
+    // *use*, so without this the headline pops in mid-effect.
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load('100px "Nanum Brush Script"');
+      document.fonts.load('100px "Black Han Sans"');
+    }
 
     game.canvas = document.getElementById('game-canvas');
     game.ctx = game.canvas.getContext('2d');
@@ -641,7 +648,7 @@
     // Spawn falling talismans at the screen edges while active. Density
     // scales with intensity so the effect fades out alongside the tint.
     if (g.active) {
-      const spawnPerSec = 12;
+      const spawnPerSec = 22;
       // Stochastic spawn — expected spawns per frame = spawnPerSec * dt.
       const expected = spawnPerSec * dt;
       let toSpawn = Math.floor(expected);
@@ -668,20 +675,20 @@
       : W - Math.random() * edgeBand;
     game.talismanParticles.push({
       x,
-      y: -40 - Math.random() * 60,
+      y: -60 - Math.random() * 80,
       vx: (fromLeftEdge ? 1 : -1) * (10 + Math.random() * 40),
-      vy: 90 + Math.random() * 140,
-      rot: Math.random() * Math.PI * 2,
-      vrot: (Math.random() - 0.5) * 4,
-      scale: 0.5 + Math.random() * 0.6,
+      vy: 110 + Math.random() * 160,
+      rot: (Math.random() - 0.5) * 0.6,   // mostly upright with slight tilt
+      vrot: (Math.random() - 0.5) * 2.2,
+      scale: 1.4 + Math.random() * 0.9,    // ~1.4–2.3× base size — big and readable
       life: 1.0,
       // Decay so the particle fades before it leaves the screen even on
       // very tall canvases.
-      maxLife: 2.2 + Math.random() * 1.0,
+      maxLife: 2.8 + Math.random() * 1.2,
       imgIdx: Math.floor(Math.random() * TALISMAN_IMAGES.length)
     });
     // Hard cap so a very long 굿판 can't grow the pool unboundedly.
-    if (game.talismanParticles.length > 80) game.talismanParticles.shift();
+    if (game.talismanParticles.length > 120) game.talismanParticles.shift();
   }
 
   function updateTalismans(dt) {
@@ -867,27 +874,30 @@
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
       if (slot && slot.loaded) {
-        const w = 32 * p.scale;
-        const h = 48 * p.scale;
+        // Base 56×84 so even scale 1.0 reads as a clear tag; with the new
+        // scale range (1.4–2.3) talismans render at roughly 80–130px tall.
+        const w = 56 * p.scale;
+        const h = 84 * p.scale;
         ctx.drawImage(slot.img, -w / 2, -h / 2, w, h);
       } else {
         // Fallback — yellow rect with the hanja drawn so the effect still
-        // reads even before image assets are committed.
-        const w = 24 * p.scale;
-        const h = 36 * p.scale;
+        // reads even before image assets are committed. Same base size as
+        // the sprite path so the layout doesn't jump when images load in.
+        const w = 48 * p.scale;
+        const h = 72 * p.scale;
         ctx.fillStyle = '#f3d67b';
         ctx.fillRect(-w / 2, -h / 2, w, h);
         ctx.fillStyle = '#202020';
-        ctx.fillRect(-w / 2 - 1, -h / 2 - 6, 2, 8);
+        ctx.fillRect(-w / 2 - 2, -h / 2 - 10, 3, 12);
         ctx.fillStyle = '#b71c1c';
-        ctx.font = `bold ${Math.floor(14 * p.scale)}px 'Noto Sans CJK KR', sans-serif`;
+        ctx.font = `bold ${Math.floor(26 * p.scale)}px 'Nanum Brush Script', 'Gowun Batang', serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const label = slot ? slot.char : '符';
         // Hanja is two characters → draw vertically so it reads as a tag.
         if (label.length > 1) {
-          ctx.fillText(label[0], 0, -h * 0.18);
-          ctx.fillText(label[1], 0,  h * 0.18);
+          ctx.fillText(label[0], 0, -h * 0.20);
+          ctx.fillText(label[1], 0,  h * 0.20);
         } else {
           ctx.fillText(label, 0, 0);
         }
@@ -914,20 +924,26 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Glow halo behind the text.
-    ctx.shadowColor = 'rgba(255, 80, 30, 0.9)';
-    ctx.shadowBlur = 22;
-    ctx.fillStyle = `rgba(255, 220, 80, ${0.95 * intensity})`;
-    ctx.font = 'bold 56px "Noto Serif KR", "맑은 고딕", serif';
+    // Glow halo behind the text. Drop shadow doubled up by drawing the
+    // headline twice — once as a thick dark stroke (back layer), once as
+    // the warm fill — so the brush strokes stand out against bright walls.
+    ctx.shadowColor = 'rgba(255, 80, 30, 0.95)';
+    ctx.shadowBlur = 32;
+    ctx.font = '140px "Nanum Brush Script", "Gowun Batang", serif';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = `rgba(40, 0, 0, ${0.95 * intensity})`;
+    ctx.strokeText('굿판!', 0, 0);
+    ctx.fillStyle = `rgba(255, 230, 90, ${intensity})`;
     ctx.fillText('굿판!', 0, 0);
 
-    // Sub-text — multipliers + remaining time.
-    ctx.shadowBlur = 6;
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    // Sub-text — multipliers + remaining time. Heavy display font for
+    // legibility under the brush headline.
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
     ctx.fillStyle = `rgba(255, 240, 200, ${0.95 * intensity})`;
-    ctx.font = 'bold 18px "Noto Sans KR", sans-serif';
+    ctx.font = '900 22px "Black Han Sans", "Gowun Batang", sans-serif';
     const remain = Math.max(0, g.timer).toFixed(1);
-    ctx.fillText(`데미지 ×1.5 · 점수 ×2.0 · ${remain}s`, 0, 40);
+    ctx.fillText(`데미지 ×1.5 · 점수 ×2.0 · ${remain}s`, 0, 78);
 
     ctx.restore();
   }
