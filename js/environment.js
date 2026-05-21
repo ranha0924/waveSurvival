@@ -82,14 +82,30 @@ const Environment = (() => {
     return themes.storm;
   }
 
-  // ---------- Tree canvases ----------
-  // Three variants built once at init so the forest looks varied without
-  // each tree owning its own canvas. Variant 0 is a tall pine (conifer
-  // crown), variant 1 a denser pine, variant 2 a broadleaf with a
-  // rounded crown. All face the camera (billboard) so the variant
-  // mostly governs silhouette shape.
+  // ---------- Tree assets ----------
+  // Trees can be either an external WebP/PNG (preferred) loaded
+  // asynchronously, or — until the file lands or if it 404s — the
+  // procedural canvas built by buildPineTall / buildPineFull /
+  // buildBroadleaf below acting as a fallback.
+  //
+  // Variant lookup goes through treeAssets[variant] which is always
+  // either an HTMLImageElement (once ready) or the fallback canvas.
+  // The raycaster's drawTreeSprite blits either form via ctx.drawImage
+  // so the swap is invisible at the call site.
   const trees = [];           // { x, y, variant, scale } in world coords
-  const treeCanvases = [];    // one canvas per variant
+  const treeAssets = [];      // index → Image | canvas
+  const treeFallbackCanvases = []; // same index → procedural canvas
+  // External tree art, in variant order. Picked so the forest's silhouette
+  // mix reads as: lots of straight conifers + scattered red pines + a
+  // few broadleaf + occasional creepy dead tree.
+  const TREE_FILES = [
+    'assets/trees/pine_tall.webp',  // 0 — straight conifer, most common
+    'assets/trees/pine_red.webp',   // 1 — gnarled Korean red pine
+    'assets/trees/broadleaf.webp',  // 2 — rounded oak crown
+    'assets/trees/dead.webp'        // 3 — twisted dead tree with talismans
+  ];
+  // Weighted draw — sums to 1.0. Adjust here to rebalance the silhouette.
+  const TREE_WEIGHTS = [0.40, 0.30, 0.22, 0.08];
 
   function rng(seed) {
     let s = seed | 0;
@@ -100,6 +116,16 @@ const Environment = (() => {
       t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+  }
+
+  function pickVariant(rfn) {
+    const v = rfn();
+    let acc = 0;
+    for (let i = 0; i < TREE_WEIGHTS.length; i++) {
+      acc += TREE_WEIGHTS[i];
+      if (v < acc) return i;
+    }
+    return TREE_WEIGHTS.length - 1;
   }
 
   // Tall conifer: narrow brown trunk + 3 stacked dark green triangle
@@ -285,7 +311,7 @@ const Environment = (() => {
         trees.push({
           x: wx + jx,
           y: wy + jy,
-          variant: Math.floor(r() * 3),
+          variant: pickVariant(r),
           scale: 0.85 + r() * 0.45
         });
       }
@@ -369,10 +395,24 @@ const Environment = (() => {
   }
 
   function init() {
-    treeCanvases.length = 0;
-    treeCanvases.push(buildPineTall());
-    treeCanvases.push(buildPineFull());
-    treeCanvases.push(buildBroadleaf());
+    treeAssets.length = 0;
+    treeFallbackCanvases.length = 0;
+    // Fallback canvases keep the forest looking populated immediately
+    // even if the WebP assets take a moment to decode (or fail entirely).
+    const fallbacks = [buildPineTall(), buildPineFull(), buildBroadleaf(), buildPineTall()];
+    for (let i = 0; i < TREE_FILES.length; i++) {
+      treeFallbackCanvases[i] = fallbacks[i];
+      treeAssets[i] = fallbacks[i];           // start as fallback
+      const img = new Image();
+      img.onload = () => {
+        // Once decoded, point this variant at the real image. All future
+        // draws pick it up; trees already placed don't need updating
+        // since they reference by variant index.
+        treeAssets[i] = img;
+      };
+      img.onerror = () => { /* keep fallback */ };
+      img.src = TREE_FILES[i];
+    }
     flagCanvas = buildFlagPole();
     placeTrees();
     placeFlags();
@@ -380,7 +420,9 @@ const Environment = (() => {
   function update() {}
 
   function getTrees() { return trees; }
-  function getTreeCanvas(variant) { return treeCanvases[variant] || treeCanvases[0]; }
+  function getTreeCanvas(variant) {
+    return treeAssets[variant] || treeFallbackCanvases[variant] || treeFallbackCanvases[0];
+  }
   function getFlags() { return flags; }
   function getFlagCanvas() { return flagCanvas; }
 
