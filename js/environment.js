@@ -19,57 +19,59 @@ const Environment = (() => {
   // shift after wave 15, but the dominant palette stays blue-night.
   const themes = {
     // Waves 1–5 — 산속 어둑한 밤. Deep blue sky over damp forest earth.
+    // Tuned darker than a normal moonlit reference so colourful prop
+    // accents (오방기, lanterns) carry the contrast.
     sunset: {
       name: 'sunset',
-      skyTop:    '#02030a',
-      skyMid:    '#080f22',
-      skyBottom: '#101a30',
-      floorNear: '#1a1208',
-      floorFar:  '#060403',
-      ambient: 0.75,
-      fogDist: 22,
-      haze: '40,60,90',
-      concreteTint: '90,60,30'
+      skyTop:    '#01020a',
+      skyMid:    '#040814',
+      skyBottom: '#080f20',
+      floorNear: '#120c06',
+      floorFar:  '#030202',
+      ambient: 0.55,
+      fogDist: 18,
+      haze: '30,45,75',
+      concreteTint: '70,45,22'
     },
     // Waves 6–10 — 더 깊은 밤. Tighter fog, slightly cooler.
     dusk: {
       name: 'dusk',
-      skyTop:    '#01020a',
-      skyMid:    '#05091e',
-      skyBottom: '#0c142a',
-      floorNear: '#15100a',
-      floorFar:  '#040302',
-      ambient: 0.68,
-      fogDist: 20,
-      haze: '35,55,85',
-      concreteTint: '80,55,28'
+      skyTop:    '#00010a',
+      skyMid:    '#020614',
+      skyBottom: '#060c1e',
+      floorNear: '#0e0906',
+      floorFar:  '#020201',
+      ambient: 0.50,
+      fogDist: 16,
+      haze: '25,42,70',
+      concreteTint: '62,40,20'
     },
     // Waves 11–15 — 삼경. Cold moonlit night, ground steeped in blue mist.
     night: {
       name: 'night',
-      skyTop:    '#000005',
-      skyMid:    '#02061a',
-      skyBottom: '#080f22',
-      floorNear: '#100a06',
-      floorFar:  '#020203',
-      ambient: 0.60,
-      fogDist: 18,
-      haze: '28,48,80',
-      concreteTint: '70,48,25'
+      skyTop:    '#000004',
+      skyMid:    '#010412',
+      skyBottom: '#040a1a',
+      floorNear: '#0a0604',
+      floorFar:  '#010102',
+      ambient: 0.44,
+      fogDist: 14,
+      haze: '20,36,65',
+      concreteTint: '54,36,18'
     },
     // Waves 16+ — 검은 굿판. Near-pitch with the faintest blood bleed at
     // the horizon — atmosphere shifts, palette stays blue-night.
     storm: {
       name: 'storm',
-      skyTop:    '#000003',
-      skyMid:    '#010312',
-      skyBottom: '#06081c',
-      floorNear: '#0a0604',
-      floorFar:  '#010102',
-      ambient: 0.52,
-      fogDist: 15,
-      haze: '25,40,70',
-      concreteTint: '60,38,20'
+      skyTop:    '#000002',
+      skyMid:    '#01020a',
+      skyBottom: '#030516',
+      floorNear: '#070403',
+      floorFar:  '#010101',
+      ambient: 0.38,
+      fogDist: 12,
+      haze: '18,28,55',
+      concreteTint: '46,28,15'
     }
   };
 
@@ -290,17 +292,101 @@ const Environment = (() => {
     }
   }
 
+  // ---------- 오방기 (5-colour shaman flag pole) ----------
+  // The five 오방색 — 청 (east), 적 (south), 황 (centre), 백 (west),
+  // 흑 (north) — hung as triangular pennants from a tall wooden pole.
+  // Built once at init time as a single billboard sprite; placed in
+  // front of the main hall so the opening view frames the shrine the
+  // way the reference does.
+  const flags = [];          // { x, y, scale } in world coords
+  let flagCanvas = null;
+
+  function buildFlagPole() {
+    const W = 56, H = 160;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const c = cv.getContext('2d');
+    // Pole — tall dark wooden stake
+    const px = W / 2;
+    c.fillStyle = '#2a160a';
+    c.fillRect(px - 2, 4, 4, H - 8);
+    c.fillStyle = '#4a2814';
+    c.fillRect(px - 2, 4, 1, H - 8);
+    // Top finial — small ball + cap
+    c.fillStyle = '#5a2810';
+    c.beginPath(); c.arc(px, 5, 4, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#a85020';
+    c.fillRect(px - 1, 1, 2, 6);
+    // Horizontal crossbar near the top to hang the pennants from
+    c.fillStyle = '#1a0c06';
+    c.fillRect(px - 22, 12, 44, 2);
+    // 5 오방색 pennants — triangular, each tied to the crossbar by a
+    // thin tie. Colours intentionally muted (alpha 0.85) so they sit in
+    // the night atmosphere without blowing out.
+    const colours = [
+      { r: 30,  g: 90,  b: 200 },  // 청 — east, blue
+      { r: 200, g: 30,  b: 40  },  // 적 — south, red
+      { r: 230, g: 180, b: 50  },  // 황 — centre, yellow
+      { r: 235, g: 230, b: 220 },  // 백 — west, white
+      { r: 20,  g: 20,  b: 30  }   // 흑 — north, black
+    ];
+    const fW = 10;
+    for (let i = 0; i < 5; i++) {
+      const fx = px - 22 + i * 9 + 2;
+      const col = colours[i];
+      // Tie string
+      c.fillStyle = 'rgba(60,30,15,0.8)';
+      c.fillRect(fx + fW / 2 - 0.5, 14, 1, 4);
+      // Pennant body — long triangle hanging down
+      c.fillStyle = `rgba(${col.r},${col.g},${col.b},0.92)`;
+      c.beginPath();
+      c.moveTo(fx,           18);
+      c.lineTo(fx + fW,      18);
+      c.lineTo(fx + fW / 2,  80 + i * 6);  // staggered tip lengths
+      c.closePath();
+      c.fill();
+      // Subtle wind-shading down the lit edge
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.beginPath();
+      c.moveTo(fx + fW * 0.7, 18);
+      c.lineTo(fx + fW,       18);
+      c.lineTo(fx + fW / 2,   80 + i * 6);
+      c.closePath();
+      c.fill();
+    }
+    return cv;
+  }
+
+  function placeFlags() {
+    flags.length = 0;
+    if (typeof GameMap === 'undefined') return;
+    // Two flagpoles framing the south courtyard so the opening view
+    // shows them silhouetted against the hall's entrance. Coordinates
+    // are world-space; the raycaster anchors the trunk base on the
+    // floor at the projected distance.
+    flags.push({ x: 18.5, y: 21.5, scale: 1.0 });
+    flags.push({ x: 24.5, y: 21.5, scale: 1.0 });
+  }
+
   function init() {
     treeCanvases.length = 0;
     treeCanvases.push(buildPineTall());
     treeCanvases.push(buildPineFull());
     treeCanvases.push(buildBroadleaf());
+    flagCanvas = buildFlagPole();
     placeTrees();
+    placeFlags();
   }
   function update() {}
 
   function getTrees() { return trees; }
   function getTreeCanvas(variant) { return treeCanvases[variant] || treeCanvases[0]; }
+  function getFlags() { return flags; }
+  function getFlagCanvas() { return flagCanvas; }
 
-  return { init, update, themeForWave, getTrees, getTreeCanvas };
+  return {
+    init, update, themeForWave,
+    getTrees, getTreeCanvas,
+    getFlags, getFlagCanvas
+  };
 })();

@@ -111,13 +111,50 @@ const Raycaster = (() => {
     if (typeof Environment !== 'undefined' && Environment.getTrees) {
       for (const t of Environment.getTrees()) push(t.x, t.y, 'tree', t);
     }
+    if (typeof Environment !== 'undefined' && Environment.getFlags) {
+      for (const f of Environment.getFlags()) push(f.x, f.y, 'flag', f);
+    }
     sprites.sort((a, b) => b.dist - a.dist);
 
     for (const s of sprites) {
       if (s.type === 'enemy') drawEnemySprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'pickup') drawPickupSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'tree') drawTreeSprite(player, s.ref, horizonOffset, theme);
+      else if (s.type === 'flag') drawFlagSprite(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
+    }
+  }
+
+  // 오방기 sprite. Drawn taller than a tree (1.9× wall column) so the
+  // pole reaches the eaves of the main hall in the background. Same
+  // column-by-column blit with zBuffer clipping as the tree path; no
+  // distance fade because the player should always see the flags
+  // clearly when in the courtyard.
+  function drawFlagSprite(player, f, horizonOffset, theme) {
+    const proj = projectSprite(player, f.x, f.y);
+    if (!proj) return;
+    const canvas = Environment.getFlagCanvas();
+    if (!canvas) return;
+    const horizon = H / 2 + horizonOffset;
+    const lineH = H / proj.dist;
+    const aspect = canvas.width / canvas.height;
+    const flagH = Math.floor(lineH * 1.9 * (f.scale || 1));
+    const flagW = Math.floor(flagH * aspect);
+    const groundedBottom = horizon + lineH / 2;
+    const drawStartY = Math.floor(groundedBottom - flagH);
+    const drawStartX = Math.floor(proj.screenX - flagW / 2);
+    const xStart = Math.max(0, drawStartX);
+    const xEnd = Math.min(W, drawStartX + flagW);
+    for (let x = xStart; x < xEnd; x++) {
+      let dstY1 = drawStartY + flagH;
+      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
+      if (proj.dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
+      if (dstY1 <= drawStartY) continue;
+      const u = (x - drawStartX) / flagW;
+      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
+      const dstH = dstY1 - drawStartY;
+      const srcH = Math.max(1, Math.floor((dstH / flagH) * canvas.height));
+      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
     }
   }
 
@@ -336,6 +373,28 @@ const Raycaster = (() => {
     return a;
   }
 
+  // Distant mountain ridge — smoother, much taller silhouette drawn
+  // behind the forest tree-line. Two layered sines + per-x noise gives
+  // believable peaks without spiky alpine pretension; the second
+  // (smaller) sine adds secondary humps so it doesn't read as a single
+  // hill. Heights in the 60–120 px range so the ridge actually pokes
+  // well above the trees.
+  let mountainProfile = null;
+  function buildMountainProfile() {
+    const LEN = 2048;
+    const r = rng(57192);
+    const a = new Float32Array(LEN + 1);
+    for (let i = 0; i <= LEN; i++) {
+      const t = i / LEN;
+      const big   = 70 + Math.sin(t * Math.PI * 1.7 + 0.4) * 28;
+      const mid   = Math.sin(t * Math.PI * 3.9 + 2.1) * 16;
+      const small = Math.sin(t * Math.PI * 9.0 + 4.7) * 8;
+      const noise = (r() - 0.5) * 6;
+      a[i] = Math.max(0, big + mid + small + noise);
+    }
+    return a;
+  }
+
   function ensureBakedAssets() {
     if (!concreteTile) {
       concreteTile = buildConcreteTile();
@@ -346,6 +405,7 @@ const Raycaster = (() => {
     }
     if (!starField) starField = buildStarField();
     if (!forestProfile) forestProfile = buildForestProfile();
+    if (!mountainProfile) mountainProfile = buildMountainProfile();
   }
 
   // ---------- Sky pass ----------
@@ -386,46 +446,76 @@ const Raycaster = (() => {
     drawForestSilhouette(horizon, name, player);
   }
 
-  // Distant forest ridge — opaque tree-line drawn from the precomputed
-  // height profile, plus a softer pre-pass behind it so the ridge reads
-  // as deep multiple-row forest rather than a single picket fence. The
-  // player.angle shifts the sample window so when the player turns the
-  // canopy stays anchored to the world rather than scrolling with the
-  // view — gives the sense of being surrounded.
+  // Distant mountain + forest stack — three layers from back to front so
+  // the silhouette reads as deep landscape: faint misty mountains way
+  // back, then a shorter forest row, then the tall conifer ridge in
+  // front. Each layer scrolls at a different speed relative to player
+  // yaw (parallax) — far mountains barely move, near trees scroll fully.
   function drawForestSilhouette(horizon, themeName, player) {
-    if (!forestProfile) return;
-    const len = forestProfile.length - 1;
-    // World-space anchored: 1 radian of player yaw → samplePerRadian px
-    // of profile scroll. Picked so a full 2π yaw walks ~8 canvas widths
-    // of profile, giving every direction a different ridge shape.
+    if (!forestProfile || !mountainProfile) return;
+    const fLen = forestProfile.length - 1;
+    const mLen = mountainProfile.length - 1;
     const yaw = (player && typeof player.angle === 'number') ? player.angle : 0;
-    const samplePerRadian = (len / (Math.PI * 2)) * 8;
-    const scrollNear = yaw * samplePerRadian;
-    const scrollFar = yaw * samplePerRadian * 0.55;
-    function sample(scroll, x) {
-      let idx = ((x + scroll) % len + len) % len;
+    const samplePerRadian = (fLen / (Math.PI * 2)) * 8;
+    const scrollMountain = yaw * samplePerRadian * 0.18; // distant parallax
+    const scrollFar      = yaw * samplePerRadian * 0.55;
+    const scrollNear     = yaw * samplePerRadian;
+
+    function sampleF(scroll, x) {
+      let idx = ((x + scroll) % fLen + fLen) % fLen;
       return forestProfile[Math.floor(idx)];
     }
-    // Far row — shorter, lighter, behind. Pulls toward the horizon haze
-    // so it doesn't fight the sky gradient.
+    function sampleM(scroll, x) {
+      let idx = ((x + scroll) % mLen + mLen) % mLen;
+      return mountainProfile[Math.floor(idx)];
+    }
+
     ctx.save();
+    // Layer 1 — back mountains. Painted with a vertical gradient so
+    // peaks fade into the sky rather than cutting hard. Two slightly
+    // offset passes give a sense of distant + middle range.
+    function drawMountainPass(scroll, scale, topColor, baseColor) {
+      const peakAlphaY = Math.max(0, horizon - 130);
+      const grd = ctx.createLinearGradient(0, peakAlphaY, 0, horizon + 2);
+      grd.addColorStop(0, topColor);
+      grd.addColorStop(1, baseColor);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.moveTo(0, horizon + 1);
+      for (let x = 0; x <= W; x++) {
+        const h = sampleM(scroll, x) * scale;
+        ctx.lineTo(x, horizon - h);
+      }
+      ctx.lineTo(W, horizon + 1);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Far range — palest, biggest, draws first
+    drawMountainPass(scrollMountain, 1.0,
+      themeName === 'storm' ? 'rgba(10,12,20,0.45)' : 'rgba(20,30,55,0.55)',
+      themeName === 'storm' ? 'rgba(4,6,12,0.85)'   : 'rgba(8,14,30,0.85)');
+    // Mid range — slightly darker, shifted sample
+    drawMountainPass(scrollMountain + 540, 0.78,
+      themeName === 'storm' ? 'rgba(4,6,12,0.65)'  : 'rgba(10,18,38,0.70)',
+      themeName === 'storm' ? 'rgba(2,2,6,0.95)'   : 'rgba(4,8,18,0.95)');
+
+    // Layer 2 — distant forest row (shorter trees, behind near row).
     ctx.fillStyle = themeName === 'storm' ? '#040508' : '#060a14';
     ctx.beginPath();
     ctx.moveTo(0, horizon + 1);
     for (let x = 0; x <= W; x++) {
-      const h = sample(scrollFar, x) * 0.55;
+      const h = sampleF(scrollFar, x) * 0.55;
       ctx.lineTo(x, horizon - h);
     }
     ctx.lineTo(W, horizon + 1);
     ctx.closePath();
     ctx.fill();
-    // Near row — taller, deeper black, in front. Two offset samples
-    // give pointed conifer crowns more bite.
+    // Layer 3 — near tree row (tall conifers, deepest black, in front).
     ctx.fillStyle = themeName === 'storm' ? '#010103' : '#020306';
     ctx.beginPath();
     ctx.moveTo(0, horizon + 1);
     for (let x = 0; x <= W; x++) {
-      const h = sample(scrollNear, x);
+      const h = sampleF(scrollNear, x);
       ctx.lineTo(x, horizon - h);
     }
     ctx.lineTo(W, horizon + 1);
@@ -435,7 +525,7 @@ const Raycaster = (() => {
     // floor instead of cutting hard.
     const mist = ctx.createLinearGradient(0, horizon - 8, 0, horizon + 14);
     mist.addColorStop(0, 'rgba(20,30,55,0)');
-    mist.addColorStop(0.5, 'rgba(20,30,55,0.45)');
+    mist.addColorStop(0.5, 'rgba(20,30,55,0.55)');
     mist.addColorStop(1, 'rgba(20,30,55,0)');
     ctx.fillStyle = mist;
     ctx.fillRect(0, horizon - 8, W, 22);
