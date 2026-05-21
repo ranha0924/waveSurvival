@@ -26,12 +26,12 @@ const Environment = (() => {
       skyTop:    '#01020a',
       skyMid:    '#040814',
       skyBottom: '#080f20',
-      floorNear: '#120c06',
-      floorFar:  '#030202',
+      floorNear: '#15110c',
+      floorFar:  '#040303',
       ambient: 0.55,
       fogDist: 18,
       haze: '30,45,75',
-      concreteTint: '70,45,22'
+      concreteTint: '74,62,52'
     },
     // Waves 6–10 — 더 깊은 밤. Tighter fog, slightly cooler.
     dusk: {
@@ -39,12 +39,12 @@ const Environment = (() => {
       skyTop:    '#00010a',
       skyMid:    '#020614',
       skyBottom: '#060c1e',
-      floorNear: '#0e0906',
-      floorFar:  '#020201',
+      floorNear: '#100d0a',
+      floorFar:  '#020202',
       ambient: 0.50,
       fogDist: 16,
       haze: '25,42,70',
-      concreteTint: '62,40,20'
+      concreteTint: '66,56,48'
     },
     // Waves 11–15 — 삼경. Cold moonlit night, ground steeped in blue mist.
     night: {
@@ -52,12 +52,12 @@ const Environment = (() => {
       skyTop:    '#000004',
       skyMid:    '#010412',
       skyBottom: '#040a1a',
-      floorNear: '#0a0604',
-      floorFar:  '#010102',
+      floorNear: '#0c0a08',
+      floorFar:  '#020202',
       ambient: 0.44,
       fogDist: 14,
       haze: '20,36,65',
-      concreteTint: '54,36,18'
+      concreteTint: '58,50,42'
     },
     // Waves 16+ — 검은 굿판. Near-pitch with the faintest blood bleed at
     // the horizon — atmosphere shifts, palette stays blue-night.
@@ -66,12 +66,12 @@ const Environment = (() => {
       skyTop:    '#000002',
       skyMid:    '#01020a',
       skyBottom: '#030516',
-      floorNear: '#070403',
+      floorNear: '#070605',
       floorFar:  '#010101',
       ambient: 0.38,
       fogDist: 12,
       haze: '18,28,55',
-      concreteTint: '46,28,15'
+      concreteTint: '48,42,36'
     }
   };
 

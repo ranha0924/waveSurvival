@@ -272,13 +272,30 @@ const Raycaster = (() => {
     cv.width = 128; cv.height = 128;
     const c = cv.getContext('2d');
     const r = rng(9911);
-    // Base — dark damp earth
-    c.fillStyle = '#2a1a0c';
+    // Base — damp ash-brown earth (mixed warm brown + cool stone-grey
+    // so the floor reads as forest soil with mineral content rather
+    // than pure mud).
+    c.fillStyle = '#28221c';
     c.fillRect(0, 0, 128, 128);
-    // Fine grain (lighter)
-    for (let i = 0; i < 240; i++) {
+    // Cool stone-grey blotches — break up the brown
+    for (let i = 0; i < 14; i++) {
       const x = r() * 128, y = r() * 128;
-      c.fillStyle = `rgba(180,140,90,${(0.04 + r() * 0.10).toFixed(3)})`;
+      const w = 10 + r() * 24, h = 6 + r() * 18;
+      c.fillStyle = `rgba(140,140,135,${(0.06 + r() * 0.10).toFixed(3)})`;
+      c.beginPath();
+      c.ellipse(x, y, w / 2, h / 2, r() * Math.PI, 0, Math.PI * 2);
+      c.fill();
+    }
+    // Fine grain (lighter) — warm tone speckle
+    for (let i = 0; i < 220; i++) {
+      const x = r() * 128, y = r() * 128;
+      c.fillStyle = `rgba(170,140,100,${(0.04 + r() * 0.10).toFixed(3)})`;
+      c.fillRect(Math.floor(x), Math.floor(y), 1, 1);
+    }
+    // Fine grain (cool) — grey speckle so the ash tone keeps reading
+    for (let i = 0; i < 200; i++) {
+      const x = r() * 128, y = r() * 128;
+      c.fillStyle = `rgba(160,160,155,${(0.04 + r() * 0.10).toFixed(3)})`;
       c.fillRect(Math.floor(x), Math.floor(y), 1, 1);
     }
     // Coarse mineral grain (darker)
@@ -287,17 +304,17 @@ const Raycaster = (() => {
       c.fillStyle = `rgba(0,0,0,${(0.15 + r() * 0.25).toFixed(3)})`;
       c.fillRect(Math.floor(x), Math.floor(y), 1, 1);
     }
-    // Pebbles — small grey-brown dots
-    for (let i = 0; i < 22; i++) {
+    // Pebbles — small grey dots, leaning more neutral than before
+    for (let i = 0; i < 28; i++) {
       const x = r() * 128, y = r() * 128;
       const sz = 1 + Math.floor(r() * 2);
-      const shade = 80 + Math.floor(r() * 40);
-      c.fillStyle = `rgb(${shade},${shade - 10},${shade - 25})`;
+      const shade = 90 + Math.floor(r() * 50);
+      c.fillStyle = `rgb(${shade},${shade - 4},${shade - 12})`;
       c.beginPath();
       c.arc(x, y, sz, 0, Math.PI * 2);
       c.fill();
       // Tiny highlight
-      c.fillStyle = 'rgba(255,255,255,0.18)';
+      c.fillStyle = 'rgba(255,255,255,0.20)';
       c.fillRect(Math.floor(x - sz / 2), Math.floor(y - sz / 2), 1, 1);
     }
     // Straw / leaf litter — short bright streaks
