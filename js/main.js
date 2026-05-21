@@ -210,7 +210,7 @@
     // brush face cached. The CSS @font-face directive only loads on first
     // *use*, so without this the headline pops in mid-effect.
     if (document.fonts && document.fonts.load) {
-      document.fonts.load('100px "Nanum Brush Script"');
+      document.fonts.load('900 100px "Noto Serif KR"');
       document.fonts.load('100px "Black Han Sans"');
     }
 
@@ -680,7 +680,7 @@
       vy: 110 + Math.random() * 160,
       rot: (Math.random() - 0.5) * 0.6,   // mostly upright with slight tilt
       vrot: (Math.random() - 0.5) * 2.2,
-      scale: 1.4 + Math.random() * 0.9,    // ~1.4–2.3× base size — big and readable
+      scale: 0.7 + Math.random() * 0.5,    // ~0.7–1.2× — readable but not screen-eating
       life: 1.0,
       // Decay so the particle fades before it leaves the screen even on
       // very tall canvases.
@@ -890,7 +890,7 @@
         ctx.fillStyle = '#202020';
         ctx.fillRect(-w / 2 - 2, -h / 2 - 10, 3, 12);
         ctx.fillStyle = '#b71c1c';
-        ctx.font = `bold ${Math.floor(26 * p.scale)}px 'Nanum Brush Script', 'Gowun Batang', serif`;
+        ctx.font = `900 ${Math.floor(26 * p.scale)}px 'Noto Serif KR', 'Gowun Batang', serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const label = slot ? slot.char : '符';
@@ -926,11 +926,11 @@
 
     // Glow halo behind the text. Drop shadow doubled up by drawing the
     // headline twice — once as a thick dark stroke (back layer), once as
-    // the warm fill — so the brush strokes stand out against bright walls.
+    // the warm fill — so the strokes stand out against bright walls.
     ctx.shadowColor = 'rgba(255, 80, 30, 0.95)';
     ctx.shadowBlur = 32;
-    ctx.font = '140px "Nanum Brush Script", "Gowun Batang", serif';
-    ctx.lineWidth = 6;
+    ctx.font = '900 110px "Noto Serif KR", "Gowun Batang", serif';
+    ctx.lineWidth = 7;
     ctx.strokeStyle = `rgba(40, 0, 0, ${0.95 * intensity})`;
     ctx.strokeText('굿판!', 0, 0);
     ctx.fillStyle = `rgba(255, 230, 90, ${intensity})`;
@@ -943,7 +943,7 @@
     ctx.fillStyle = `rgba(255, 240, 200, ${0.95 * intensity})`;
     ctx.font = '900 22px "Black Han Sans", "Gowun Batang", sans-serif';
     const remain = Math.max(0, g.timer).toFixed(1);
-    ctx.fillText(`데미지 ×1.5 · 점수 ×2.0 · ${remain}s`, 0, 78);
+    ctx.fillText(`데미지 ×1.5 · 점수 ×2.0 · ${remain}s`, 0, 64);
 
     ctx.restore();
   }
