@@ -874,10 +874,12 @@
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
       if (slot && slot.loaded) {
-        // Base 56×84 so even scale 1.0 reads as a clear tag; with the new
-        // scale range (1.4–2.3) talismans render at roughly 80–130px tall.
-        const w = 56 * p.scale;
+        // Anchor height at 84px (× particle scale) and derive width from the
+        // sprite's native aspect ratio so the talismans don't get squashed
+        // when the source image isn't exactly 2:3. Asset cleanup already
+        // tight-cropped each sprite so the bbox is the visible body.
         const h = 84 * p.scale;
+        const w = h * (slot.img.width / slot.img.height);
         ctx.drawImage(slot.img, -w / 2, -h / 2, w, h);
       } else {
         // Fallback — yellow rect with the hanja drawn so the effect still
