@@ -178,6 +178,25 @@ html, body {
   text-shadow: 0 0 6px rgba(255, 220, 50, 0.8);
 }
 
+#combo-mult {
+  font-size: 20px;
+}
+
+#combo-sub {
+  display: inline-block;
+  font-size: 12px;
+  margin-left: 6px;
+  color: #ffd8b0;
+  font-weight: normal;
+  letter-spacing: 0.5px;
+}
+
+#combo-sub.gutpan {
+  color: #ff5533;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(255, 80, 30, 0.9);
+}
+
 #crosshair {
   position: absolute;
   top: 50%;

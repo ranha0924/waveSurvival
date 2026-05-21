@@ -279,17 +279,18 @@ const Enemies = (() => {
   function awardChainKill(player, victim, scoreCallback) {
     if (!scoreCallback) return;
     const t = performance.now() / 1000;
-    if (t - player.lastKillTime < 2.0) {
-      player.comboCount = Math.min(3, player.comboCount + 1);
+    if (t - player.lastKillTime < 3.0) {
+      player.comboCount = player.comboCount + 1;
     } else {
-      player.comboCount = 0;
+      player.comboCount = 1;
     }
     player.lastKillTime = t;
     if (player.comboCount > player.maxComboReached) {
       player.maxComboReached = player.comboCount;
     }
-    const comboMult = [1, 1.5, 2, 3][player.comboCount] || 1;
-    scoreCallback(Math.floor(victim.type.score * comboMult), victim);
+    const comboMult = Player.comboMultFor(player.comboCount);
+    const gutpanMult = player.gutpanActive ? Player.GUTPAN_SCORE_MULT : 1;
+    scoreCallback(Math.floor(victim.type.score * comboMult * gutpanMult), victim);
     player.kills++;
     if (victim.type.isBoss) player.bossKills++;
   }

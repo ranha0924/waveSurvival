@@ -43,15 +43,34 @@ const Player = (() => {
       muzzleFlash: 0,
       // Camera shake
       shake: 0,
-      // Combo
+      // Combo — count is now the raw streak length (1, 2, 3, ...), not a
+      // bucket index. The score multiplier still caps at ×3 but the count
+      // itself keeps climbing so 굿판 모드 can trigger at ≥5 and extend at
+      // every multiple of 5.
       lastKillTime: -10,
       comboCount: 0,
+      // 굿판 모드 — set by main.js each frame from game.gutpan.active.
+      // When true, damage / fire rate / score gain bonus multipliers.
+      gutpanActive: false,
       // Stats
       kills: 0,
       headshots: 0,
       bossKills: 0,
       maxComboReached: 0
     };
+  }
+
+  // ---------- 굿판 mode multipliers ----------
+  // Centralised so player.shoot / damageEnemy and enemy.awardChainKill all
+  // apply the same numbers. Tuned to the spec: damage ×1.5, fire interval
+  // ×0.8 (= rate ×1.25), score ×2.0.
+  const GUTPAN_DAMAGE_MULT = 1.5;
+  const GUTPAN_FIRE_MULT = 1.25;
+  const GUTPAN_SCORE_MULT = 2.0;
+
+  function comboMultFor(count) {
+    // Score multiplier caps at ×3 even as the raw streak keeps climbing.
+    return [1, 1, 1.5, 2, 3][Math.min(count, 4)] || 3;
   }
 
   function getWeapon(p) { return p.loadout[p.currentWeapon]; }
@@ -139,8 +158,9 @@ const Player = (() => {
       }
     }
 
-    // Combo timeout
-    if (performance.now() / 1000 - p.lastKillTime > 2.0) {
+    // Combo timeout — 3 seconds per spec (was 2). Streak resets to zero so
+    // the next kill starts a fresh count from 1.
+    if (performance.now() / 1000 - p.lastKillTime > 3.0) {
       p.comboCount = 0;
     }
   }
@@ -172,13 +192,15 @@ const Player = (() => {
     }
 
     w.currentAmmo -= 1;
-    p.shootCooldown = w.fireRate / p.fireRateMult;
+    const fireBonus = p.gutpanActive ? GUTPAN_FIRE_MULT : 1;
+    p.shootCooldown = w.fireRate / (p.fireRateMult * fireBonus);
     p.kickback = w.kickback;
     p.muzzleFlash = 1.0;
     p.shake = w.kickback * 0.4;
     Audio[w.sound]();
 
-    const damage = w.damage * p.damageMult;
+    const dmgBonus = p.gutpanActive ? GUTPAN_DAMAGE_MULT : 1;
+    const damage = w.damage * p.damageMult * dmgBonus;
     const pierceCount = (w.pierce || 0) + p.pierce;
 
     for (let i = 0; i < w.pellets; i++) {
@@ -311,18 +333,21 @@ const Player = (() => {
       e.alive = false;
       if (e.type.isBoss) Audio.bossDeath();
       else Audio.enemyDeath();
-      // Score
+      // Score — combo now counts raw streak length (1, 2, ...) and only
+      // resets after the 3s timeout. Score multiplier caps at ×3 via
+      // comboMultFor; the unclamped count is what 굿판 모드 watches for ≥5.
       const t = performance.now() / 1000;
-      if (t - p.lastKillTime < 2.0) {
-        p.comboCount = Math.min(3, p.comboCount + 1);
+      if (t - p.lastKillTime < 3.0) {
+        p.comboCount = p.comboCount + 1;
       } else {
-        p.comboCount = 0;
+        p.comboCount = 1;
       }
       p.lastKillTime = t;
       if (p.comboCount > p.maxComboReached) p.maxComboReached = p.comboCount;
-      const comboMult = [1, 1.5, 2, 3][p.comboCount] || 1;
+      const comboMult = comboMultFor(p.comboCount);
       const headMult = headshot ? 2 : 1;
-      const score = Math.floor(e.type.score * comboMult * headMult);
+      const gutpanMult = p.gutpanActive ? GUTPAN_SCORE_MULT : 1;
+      const score = Math.floor(e.type.score * comboMult * headMult * gutpanMult);
       scoreCallback(score, e);
       p.kills++;
       if (headshot) p.headshots++;
@@ -551,6 +576,9 @@ const Player = (() => {
 
   return {
     create, update, turn, shoot, startReload, switchWeapon, cycleWeapon, takeDamage, getWeapon,
-    spawnExplosion, spawnDeathBurst
+    spawnExplosion, spawnDeathBurst,
+    // Exposed so UI and enemy.awardChainKill use the same multiplier table.
+    comboMultFor,
+    GUTPAN_DAMAGE_MULT, GUTPAN_FIRE_MULT, GUTPAN_SCORE_MULT
   };
 })();
