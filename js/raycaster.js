@@ -93,6 +93,8 @@ const Raycaster = (() => {
 
   // Collect every billboarded thing in the world, sort far→near so closer
   // sprites overdraw farther ones, then dispatch to its type-specific draw.
+  // Trees are static decoration from Environment — added to the same pool
+  // so they z-sort against enemies/pickups/particles correctly.
   function drawSprites(player, enemies, particles, horizonOffset, theme) {
     const sprites = [];
     const push = (x, y, type, ref) => {
@@ -106,13 +108,66 @@ const Raycaster = (() => {
     if (typeof Pickups !== 'undefined') {
       for (const k of Pickups.getList()) push(k.x, k.y, 'pickup', k);
     }
+    if (typeof Environment !== 'undefined' && Environment.getTrees) {
+      for (const t of Environment.getTrees()) push(t.x, t.y, 'tree', t);
+    }
     sprites.sort((a, b) => b.dist - a.dist);
 
     for (const s of sprites) {
       if (s.type === 'enemy') drawEnemySprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'pickup') drawPickupSprite(player, s.ref, horizonOffset, theme);
+      else if (s.type === 'tree') drawTreeSprite(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
     }
+  }
+
+  // Tree billboards. Behave like pickups (column-by-column with zBuffer
+  // clipping) but anchored such that the trunk base sits on the floor at
+  // the projected distance — bottom of the sprite goes at horizon + lineH/2,
+  // top at horizon + lineH/2 - treeH. Per-tile scale variance keeps them
+  // from looking like a cloned forest.
+  function drawTreeSprite(player, t, horizonOffset, theme) {
+    const proj = projectSprite(player, t.x, t.y);
+    if (!proj) return;
+    const canvas = Environment.getTreeCanvas(t.variant);
+    if (!canvas) return;
+
+    const horizon = H / 2 + horizonOffset;
+    const lineH = H / proj.dist;
+    const aspect = canvas.width / canvas.height;
+    // Trees are tall: ~1.6× the wall column height feels right for a 64-px
+    // sprite that's meant to read as a 5–6m tree against a 2m wall.
+    const treeH = Math.floor(lineH * 1.6 * (t.scale || 1));
+    const treeW = Math.floor(treeH * aspect);
+    const groundedBottom = horizon + lineH / 2;
+    const drawStartY = Math.floor(groundedBottom - treeH);
+    const drawStartX = Math.floor(proj.screenX - treeW / 2);
+
+    const xStart = Math.max(0, drawStartX);
+    const xEnd = Math.min(W, drawStartX + treeW);
+
+    // Forest fog: alpha falls off with distance so far trees melt into
+    // the haze layer instead of stamping hard silhouettes.
+    const fogD = (theme && theme.fogDist) || 22;
+    const fade = Math.max(0, Math.min(1, 1 - (proj.dist - fogD * 0.3) / fogD));
+    if (fade <= 0.02) return;
+
+    ctx.save();
+    ctx.globalAlpha = fade;
+    for (let x = xStart; x < xEnd; x++) {
+      // Tree fully occludes anything behind it on this column, so respect
+      // the wall zBuffer the same way other sprites do.
+      let dstY1 = drawStartY + treeH;
+      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
+      if (proj.dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
+      if (dstY1 <= drawStartY) continue;
+      const u = (x - drawStartX) / treeW;
+      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
+      const dstH = dstY1 - drawStartY;
+      const srcH = Math.max(1, Math.floor((dstH / treeH) * canvas.height));
+      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
+    }
+    ctx.restore();
   }
 
   // ---------- Pickup sprites ----------
