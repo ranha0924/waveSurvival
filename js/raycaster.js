@@ -352,9 +352,11 @@ const Raycaster = (() => {
   function buildStarField() {
     const r = rng(7777);
     const stars = [];
+    // Distribute stars over the full 2π sky ring so the player's yaw
+    // controls which slice of the sky is visible (world-anchored).
     for (let i = 0; i < 70; i++) {
       stars.push({
-        u: r(),
+        yaw: r() * Math.PI * 2,
         v: r() * 0.55,
         size: 1 + Math.floor(r() * 2),
         twinkleRate: 1.0 + r() * 2.5,
@@ -451,11 +453,11 @@ const Raycaster = (() => {
     // All 굿판 themes are night-time, so every wave gets stars; the count /
     // intensity climbs with darkness. Storm still pulses with lightning on
     // top of its faint star field.
-    if (name === 'sunset') drawStars(horizon, 45, 0.6);
-    else if (name === 'dusk') drawStars(horizon, 55, 0.8);
-    else if (name === 'night') drawStars(horizon, 70, 1.0);
-    else if (name === 'storm') { drawStars(horizon, 30, 0.5); drawStormSky(horizon); }
-    drawMoon(horizon, name);
+    if (name === 'sunset') drawStars(horizon, 45, 0.6, player);
+    else if (name === 'dusk') drawStars(horizon, 55, 0.8, player);
+    else if (name === 'night') drawStars(horizon, 70, 1.0, player);
+    else if (name === 'storm') { drawStars(horizon, 30, 0.5, player); drawStormSky(horizon); }
+    drawMoon(horizon, name, player);
     // Forest silhouette sits in front of the celestial layer (so trees
     // occlude any star they overlap) but behind the walls + floor pass
     // (so any in-world wall taller than the horizon naturally hides the
@@ -463,36 +465,56 @@ const Raycaster = (() => {
     drawForestSilhouette(horizon, name, player);
   }
 
-  // Distant mountain + forest stack — three layers from back to front so
-  // the silhouette reads as deep landscape: faint misty mountains way
-  // back, then a shorter forest row, then the tall conifer ridge in
-  // front. Each layer scrolls at a different speed relative to player
-  // yaw (parallax) — far mountains barely move, near trees scroll fully.
+  // Distant mountain + forest stack — three world-anchored layers. Each
+  // pixel column on screen corresponds to a specific world-yaw direction
+  // (FOV-mapped), so the mountains stay locked to their direction in the
+  // world rather than scrolling at an arbitrary parallax rate. Turning
+  // the player by 1 radian rolls exactly 1 radian of the 360° ridge
+  // across the view, the way real distant landscape would.
+  //
+  // The profile array represents the full 0..2π world ring; sample
+  // index = (world_yaw / 2π) * LEN, wrapped.
   function drawForestSilhouette(horizon, themeName, player) {
     if (!forestProfile || !mountainProfile) return;
     const fLen = forestProfile.length - 1;
     const mLen = mountainProfile.length - 1;
     const yaw = (player && typeof player.angle === 'number') ? player.angle : 0;
-    const samplePerRadian = (fLen / (Math.PI * 2)) * 8;
-    const scrollMountain = yaw * samplePerRadian * 0.18; // distant parallax
-    const scrollFar      = yaw * samplePerRadian * 0.55;
-    const scrollNear     = yaw * samplePerRadian;
+    const halfFov = FOV / 2;
+    const tanHalf = Math.tan(halfFov);
+    const TWO_PI = Math.PI * 2;
 
-    function sampleF(scroll, x) {
-      let idx = ((x + scroll) % fLen + fLen) % fLen;
-      return forestProfile[Math.floor(idx)];
+    // For each screen-x compute its world yaw using the same perspective
+    // projection the wall pass uses (atan-based), then convert to a
+    // ridge sample index. Cached for the call so we don't recompute per
+    // layer.
+    const ridgeFx = new Float32Array(W + 1);
+    const ridgeMx = new Float32Array(W + 1);
+    for (let x = 0; x <= W; x++) {
+      const sn = (x / W) * 2 - 1;             // -1..+1
+      const screenYaw = Math.atan(sn * tanHalf);
+      const worldYaw = yaw + screenYaw;
+      // Sample index in the 0..LEN ring
+      let fi = (worldYaw / TWO_PI) * fLen;
+      let mi = (worldYaw / TWO_PI) * mLen;
+      fi = ((fi % fLen) + fLen) % fLen;
+      mi = ((mi % mLen) + mLen) % mLen;
+      ridgeFx[x] = fi;
+      ridgeMx[x] = mi;
     }
-    function sampleM(scroll, x) {
-      let idx = ((x + scroll) % mLen + mLen) % mLen;
+    function sampleF(x) { return forestProfile[Math.floor(ridgeFx[x])]; }
+    function sampleM(x, offset) {
+      let idx = ridgeMx[x] + (offset || 0);
+      idx = ((idx % mLen) + mLen) % mLen;
       return mountainProfile[Math.floor(idx)];
     }
 
     ctx.save();
     // Layer 1 — back mountains. Painted with a vertical gradient so
-    // peaks fade into the sky rather than cutting hard. Two slightly
-    // offset passes give a sense of distant + middle range.
-    function drawMountainPass(scroll, scale, topColor, baseColor) {
-      const peakAlphaY = Math.max(0, horizon - 130);
+    // peaks fade into the sky rather than cutting hard. Two passes give
+    // far + mid ranges with a fixed sample offset (not extra parallax —
+    // both rotate with yaw at the same 1:1 rate).
+    function drawMountainPass(sampleOffset, scale, topColor, baseColor) {
+      const peakAlphaY = Math.max(0, horizon - 220);
       const grd = ctx.createLinearGradient(0, peakAlphaY, 0, horizon + 2);
       grd.addColorStop(0, topColor);
       grd.addColorStop(1, baseColor);
@@ -500,28 +522,30 @@ const Raycaster = (() => {
       ctx.beginPath();
       ctx.moveTo(0, horizon + 1);
       for (let x = 0; x <= W; x++) {
-        const h = sampleM(scroll, x) * scale;
+        const h = sampleM(x, sampleOffset) * scale;
         ctx.lineTo(x, horizon - h);
       }
       ctx.lineTo(W, horizon + 1);
       ctx.closePath();
       ctx.fill();
     }
-    // Far range — palest, biggest, draws first
-    drawMountainPass(scrollMountain, 1.0,
-      themeName === 'storm' ? 'rgba(10,12,20,0.45)' : 'rgba(20,30,55,0.55)',
-      themeName === 'storm' ? 'rgba(4,6,12,0.85)'   : 'rgba(8,14,30,0.85)');
-    // Mid range — slightly darker, shifted sample
-    drawMountainPass(scrollMountain + 540, 0.78,
-      themeName === 'storm' ? 'rgba(4,6,12,0.65)'  : 'rgba(10,18,38,0.70)',
-      themeName === 'storm' ? 'rgba(2,2,6,0.95)'   : 'rgba(4,8,18,0.95)');
+    // Far range — palest, tallest, draws first. Scale bumped to 1.6 so
+    // the peaks actually read as 'high mountains surrounding the shrine'
+    // rather than gentle hills.
+    drawMountainPass(0, 1.6,
+      themeName === 'storm' ? 'rgba(10,12,20,0.55)' : 'rgba(20,32,58,0.65)',
+      themeName === 'storm' ? 'rgba(4,6,12,0.90)'   : 'rgba(8,14,30,0.92)');
+    // Mid range — slightly darker, sample-offset for a different ridge shape
+    drawMountainPass(420, 1.15,
+      themeName === 'storm' ? 'rgba(4,6,12,0.75)'  : 'rgba(10,18,38,0.80)',
+      themeName === 'storm' ? 'rgba(2,2,6,0.97)'   : 'rgba(4,8,18,0.97)');
 
     // Layer 2 — distant forest row (shorter trees, behind near row).
     ctx.fillStyle = themeName === 'storm' ? '#040508' : '#060a14';
     ctx.beginPath();
     ctx.moveTo(0, horizon + 1);
     for (let x = 0; x <= W; x++) {
-      const h = sampleF(scrollFar, x) * 0.55;
+      const h = sampleF(x) * 0.55;
       ctx.lineTo(x, horizon - h);
     }
     ctx.lineTo(W, horizon + 1);
@@ -532,7 +556,7 @@ const Raycaster = (() => {
     ctx.beginPath();
     ctx.moveTo(0, horizon + 1);
     for (let x = 0; x <= W; x++) {
-      const h = sampleF(scrollNear, x);
+      const h = sampleF(x);
       ctx.lineTo(x, horizon - h);
     }
     ctx.lineTo(W, horizon + 1);
@@ -549,15 +573,26 @@ const Raycaster = (() => {
     ctx.restore();
   }
 
-  // Full moon — same position every frame so the player can use it as a
-  // landmark while sprinting. Pulled up high enough that the player's
-  // pitch range can't bring it under the horizon at any reasonable
-  // playing angle. The 'storm' band suppresses it (the sky is supposed
-  // to be pitch black with red bleed) — a faint disc through cloud is
-  // drawn instead.
-  function drawMoon(horizon, themeName) {
-    const cx = Math.floor(W * 0.72);
-    const cy = Math.floor(horizon * 0.32);
+  // Full moon — world-anchored at a fixed yaw + pitch in the sky dome,
+  // so the player can use it as a directional landmark while sprinting.
+  // Yaw rotation moves the moon across the screen at exactly the FOV
+  // 1:1 ratio (like a real distant body); pitch rotation moves it
+  // vertically. The 'storm' band suppresses the disc to a faint
+  // through-cloud halo so the darker palette still progresses.
+  const MOON_WORLD_YAW = -Math.PI * 0.30;   // roughly NW relative to map north
+  const MOON_SKY_ALT   = 0.30;              // higher = lower in sky (multiplied with horizon)
+  function drawMoon(horizon, themeName, player) {
+    const yaw = (player && typeof player.angle === 'number') ? player.angle : 0;
+    let dyaw = MOON_WORLD_YAW - yaw;
+    // Wrap to [-π, π]
+    while (dyaw > Math.PI) dyaw -= 2 * Math.PI;
+    while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
+    const halfFov = FOV / 2;
+    const tanHalf = Math.tan(halfFov);
+    // Off-screen guard (give a small margin so the disc enters smoothly)
+    if (Math.abs(dyaw) > halfFov + 0.25) return;
+    const cx = Math.floor(W * 0.5 + (Math.tan(dyaw) / tanHalf) * (W * 0.5));
+    const cy = Math.floor(horizon * MOON_SKY_ALT);
     const r = 22;
     if (themeName === 'storm') {
       ctx.fillStyle = 'rgba(180,180,200,0.18)';
@@ -594,11 +629,18 @@ const Raycaster = (() => {
     }
   }
 
-  function drawStars(horizon, count, intensity) {
+  function drawStars(horizon, count, intensity, player) {
     const t = performance.now() / 1000;
+    const yaw = (player && typeof player.angle === 'number') ? player.angle : 0;
+    const halfFov = FOV / 2;
+    const tanHalf = Math.tan(halfFov);
     for (let i = 0; i < Math.min(count, starField.length); i++) {
       const s = starField[i];
-      const x = Math.floor(s.u * W);
+      let dyaw = s.yaw - yaw;
+      while (dyaw > Math.PI) dyaw -= 2 * Math.PI;
+      while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
+      if (Math.abs(dyaw) > halfFov) continue;
+      const x = Math.floor(W * 0.5 + (Math.tan(dyaw) / tanHalf) * (W * 0.5));
       const y = Math.floor(s.v * horizon);
       const twinkle = 0.5 + 0.5 * Math.sin(t * s.twinkleRate + s.twinklePhase);
       const a = (s.baseAlpha * (0.6 + 0.4 * twinkle) * intensity).toFixed(3);

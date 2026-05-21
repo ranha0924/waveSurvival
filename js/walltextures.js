@@ -13,7 +13,12 @@
 // motif is a one-builder change.
 const WallTextures = (() => {
   // ---------- Constants + helpers ----------
-  const TEX_W = 64, TEX_H = 64;
+  // 128×128 base resolution — double what we had before so the painterly
+  // shrine textures (hanok roof tiles, talisman calligraphy, jangdok
+  // belly highlights) read with detail instead of blurring to flat
+  // colour at close range. The raycaster pulls 1-px vertical slices so
+  // the larger source mostly costs memory, not draw cost.
+  const TEX_W = 128, TEX_H = 128;
   const cache = {};
 
   // Numeric tile types this module renders. Mirrors the legend at the top
@@ -52,210 +57,378 @@ const WallTextures = (() => {
   }
 
   // ---------- Texture builders (one per tile material) ----------
-  // Hwangto (yellow-earth) wall — Korea's traditional mud-and-straw
-  // construction. Warm ochre base, embedded straw fibres, horizontal
-  // strata where successive layers were trowelled on, and weathering
-  // cracks.
+  // Hwangto (yellow-earth) wall — Korean traditional mud-and-straw wall
+  // at 128 px so the strata + straw + weathering can carry visible
+  // detail rather than mash together into a single warm tone.
   function buildConcrete() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(1101);
-    c.fillStyle = '#8a6a3a';
+    // Base — vary the underlying mud colour with a soft horizontal
+    // gradient (lighter where light hits, darker in shadow).
+    c.fillStyle = '#7a5a2e';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    // Vertical lighting wash so the wall reads as 3D
-    const wash = c.createLinearGradient(0, 0, 0, TEX_H);
-    wash.addColorStop(0,   'rgba(255,220,160,0.10)');
-    wash.addColorStop(0.5, 'rgba(0,0,0,0)');
-    wash.addColorStop(1,   'rgba(0,0,0,0.22)');
-    c.fillStyle = wash;
+    const baseWash = c.createLinearGradient(0, 0, 0, TEX_H);
+    baseWash.addColorStop(0,    '#9a7038');
+    baseWash.addColorStop(0.45, '#7a5828');
+    baseWash.addColorStop(1,    '#3a2a14');
+    c.fillStyle = baseWash;
+    c.globalAlpha = 0.55;
     c.fillRect(0, 0, TEX_W, TEX_H);
-    // Horizontal trowel strata (faint earthen layer joins)
-    c.fillStyle = 'rgba(50,30,15,0.35)';
-    c.fillRect(0, 18, TEX_W, 1);
-    c.fillRect(0, 39, TEX_W, 1);
-    c.fillStyle = 'rgba(255,220,160,0.10)';
-    c.fillRect(0, 19, TEX_W, 1);
-    c.fillRect(0, 40, TEX_W, 1);
-    // Straw fibres — short bright streaks scattered horizontally
-    for (let i = 0; i < 32; i++) {
+    c.globalAlpha = 1;
+    // Rough trowel strata — 6 layer joins with paired highlight/shadow
+    for (let i = 0; i < 6; i++) {
+      const y = 12 + i * 19 + Math.floor((r() - 0.5) * 4);
+      c.fillStyle = 'rgba(30,18,8,0.55)';
+      c.fillRect(0, y, TEX_W, 2);
+      c.fillStyle = 'rgba(255,220,160,0.18)';
+      c.fillRect(0, y + 2, TEX_W, 1);
+      // Wavy bumps where the strata meet
+      for (let bx = 0; bx < TEX_W; bx += 4 + Math.floor(r() * 5)) {
+        if (r() < 0.4) {
+          c.fillStyle = `rgba(40,25,12,${(0.3 + r() * 0.3).toFixed(3)})`;
+          c.fillRect(bx, y - 1, 2, 1);
+        }
+      }
+    }
+    // Embedded straw fibres — longer, more visible at 128
+    for (let i = 0; i < 110; i++) {
       const x = Math.floor(r() * TEX_W);
       const y = Math.floor(r() * TEX_H);
-      const len = 3 + Math.floor(r() * 5);
-      c.fillStyle = `rgba(220,180,90,${(0.35 + r() * 0.30).toFixed(3)})`;
+      const len = 5 + Math.floor(r() * 10);
+      const tone = 180 + Math.floor(r() * 60);
+      c.fillStyle = `rgba(${tone},${tone - 40},${tone - 110},${(0.40 + r() * 0.30).toFixed(3)})`;
       c.fillRect(x, y, len, 1);
+      if (r() < 0.4) {
+        c.fillStyle = 'rgba(0,0,0,0.45)';
+        c.fillRect(x, y + 1, len, 1);
+      }
     }
-    // Coarse mud grain (dark)
-    for (let i = 0; i < 260; i++) {
+    // Mud aggregate — coarse darker grain
+    for (let i = 0; i < 900; i++) {
       const x = Math.floor(r() * TEX_W);
       const y = Math.floor(r() * TEX_H);
-      c.fillStyle = `rgba(40,20,10,${(0.10 + r() * 0.20).toFixed(3)})`;
+      c.fillStyle = `rgba(30,15,5,${(0.10 + r() * 0.25).toFixed(3)})`;
       c.fillRect(x, y, 1, 1);
     }
-    // Highlight speckles
-    for (let i = 0; i < 70; i++) {
+    // Brighter ochre flecks
+    for (let i = 0; i < 220; i++) {
       const x = Math.floor(r() * TEX_W);
       const y = Math.floor(r() * TEX_H);
-      c.fillStyle = `rgba(255,230,170,${(0.05 + r() * 0.08).toFixed(3)})`;
+      c.fillStyle = `rgba(255,210,140,${(0.06 + r() * 0.10).toFixed(3)})`;
       c.fillRect(x, y, 1, 1);
     }
-    // Weathering cracks
-    c.strokeStyle = 'rgba(30,15,8,0.55)';
-    c.lineWidth = 1;
-    for (let i = 0; i < 5; i++) {
+    // Chunky pebble inclusions
+    for (let i = 0; i < 18; i++) {
+      const x = r() * TEX_W, y = r() * TEX_H;
+      const shade = 80 + Math.floor(r() * 50);
+      c.fillStyle = `rgb(${shade},${shade - 12},${shade - 28})`;
+      c.beginPath();
+      c.arc(x, y, 1.5 + r() * 1.8, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.18)';
+      c.fillRect(Math.floor(x - 1), Math.floor(y - 1), 1, 1);
+    }
+    // Weathering cracks — branched and contrast-stronger
+    c.strokeStyle = 'rgba(20,8,3,0.70)';
+    c.lineWidth = 1.2;
+    for (let i = 0; i < 9; i++) {
       let cx = r() * TEX_W, cy = r() * TEX_H;
       c.beginPath();
       c.moveTo(cx, cy);
-      for (let j = 0; j < 5; j++) {
-        cx += (r() - 0.5) * 16;
-        cy += (r() - 0.5) * 16;
+      for (let j = 0; j < 7; j++) {
+        cx += (r() - 0.5) * 22;
+        cy += (r() - 0.5) * 22;
         c.lineTo(cx, cy);
       }
       c.stroke();
     }
+    // Top moonlight rim — thin highlight along the top edge so the
+    // wall has a clear top in dark scenes
+    c.fillStyle = 'rgba(180,200,220,0.18)';
+    c.fillRect(0, 0, TEX_W, 2);
     return cv;
   }
 
-  // Hanok roof + plaster wall: white lime-plaster band on top, then
-  // stacked ceramic roof tiles below with the characteristic semi-cylinder
-  // shading. Reads like the side of a Korean traditional building.
+  // Hanok wall — 128×128 elevation of a traditional Korean building:
+  // plastered wall on top, dark wooden eave header, three rows of
+  // semi-cylindrical ceramic roof tiles below, with paint-style
+  // shading + speckle so the surface doesn't look flat.
   function buildHangar() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(2202);
-    // Upper third: white plaster wall
-    c.fillStyle = '#d8cdb5';
-    c.fillRect(0, 0, TEX_W, 22);
-    for (let i = 0; i < 180; i++) {
+    // ---- Upper third: lime-plaster wall ----
+    const plasterH = 46;
+    const plasterGrd = c.createLinearGradient(0, 0, 0, plasterH);
+    plasterGrd.addColorStop(0,    '#dcd0b6');
+    plasterGrd.addColorStop(0.55, '#b8a888');
+    plasterGrd.addColorStop(1,    '#7e6b4c');
+    c.fillStyle = plasterGrd;
+    c.fillRect(0, 0, TEX_W, plasterH);
+    // Plaster grain
+    for (let i = 0; i < 520; i++) {
       const x = Math.floor(r() * TEX_W);
-      const y = Math.floor(r() * 22);
-      c.fillStyle = `rgba(80,60,40,${(0.06 + r() * 0.10).toFixed(3)})`;
+      const y = Math.floor(r() * plasterH);
+      c.fillStyle = `rgba(60,40,20,${(0.05 + r() * 0.12).toFixed(3)})`;
       c.fillRect(x, y, 1, 1);
     }
-    // Plaster-to-tile band (dark wooden header line)
-    c.fillStyle = '#3a2515';
-    c.fillRect(0, 22, TEX_W, 3);
-    c.fillStyle = 'rgba(0,0,0,0.4)';
-    c.fillRect(0, 24, TEX_W, 1);
-    // Lower two thirds: dark grey ceramic roof tiles in 3 horizontal rows
-    c.fillStyle = '#2a2a2e';
-    c.fillRect(0, 25, TEX_W, TEX_H - 25);
+    // Vertical wood lattice on the plaster (한옥 격자 hint) — three
+    // dark thin posts breaking the white surface
+    for (let i = 0; i < 3; i++) {
+      const px = 22 + i * 40;
+      c.fillStyle = 'rgba(30,18,8,0.45)';
+      c.fillRect(px, 4, 3, plasterH - 8);
+      c.fillStyle = 'rgba(0,0,0,0.30)';
+      c.fillRect(px + 3, 4, 1, plasterH - 8);
+    }
+    // Horizontal cross-beam mid-plaster
+    c.fillStyle = 'rgba(30,18,8,0.40)';
+    c.fillRect(0, plasterH * 0.55, TEX_W, 2);
+    // ---- Wooden eave / header band ----
+    const eaveY = plasterH;
+    c.fillStyle = '#1a0c06';
+    c.fillRect(0, eaveY, TEX_W, 8);
+    // Lighter underside of the beam (sunlit edge)
+    c.fillStyle = '#4a2c14';
+    c.fillRect(0, eaveY + 1, TEX_W, 2);
+    // Decorative dentils — small alternating darker/lighter squares
+    for (let bx = 4; bx < TEX_W; bx += 12) {
+      c.fillStyle = 'rgba(0,0,0,0.55)';
+      c.fillRect(bx, eaveY + 3, 6, 4);
+      c.fillStyle = 'rgba(120,80,40,0.4)';
+      c.fillRect(bx + 1, eaveY + 4, 4, 1);
+    }
+    // ---- Ceramic roof tiles — 3 rows of semi-cylinders ----
+    const tilesStart = eaveY + 8;
     const rows = 3;
-    const tileH = (TEX_H - 25) / rows;
+    const tileH = (TEX_H - tilesStart) / rows;
     for (let row = 0; row < rows; row++) {
-      const y0 = 25 + row * tileH;
-      // Each "tile" is a half-cylinder — column-of-shading look using sine
-      const tileW = 12;
+      const y0 = tilesStart + row * tileH;
+      const tileW = 14;
       const offset = (row % 2) * (tileW / 2);
       for (let col = -1; col <= TEX_W / tileW + 1; col++) {
         const bx = col * tileW + offset;
+        // Cylindrical shading via sine
         for (let x = 0; x < tileW; x++) {
           const t = Math.sin((x / tileW) * Math.PI);
-          const shade = 36 + Math.floor(t * 42);
-          c.fillStyle = `rgb(${shade},${shade},${shade + 4})`;
+          const shade = 30 + Math.floor(t * 56);
+          c.fillStyle = `rgb(${shade},${shade + 2},${shade + 8})`;
           c.fillRect(bx + x, y0, 1, tileH - 1);
         }
-        // Dark groove between tiles
-        c.fillStyle = 'rgba(0,0,0,0.55)';
-        c.fillRect(bx, y0, 1, tileH);
+        // Highlight rim along top of each tile
+        c.fillStyle = 'rgba(180,200,220,0.30)';
+        c.fillRect(bx + tileW * 0.30, y0, tileW * 0.45, 1);
+        // Deep dark groove between tiles
+        c.fillStyle = 'rgba(0,0,0,0.75)';
+        c.fillRect(bx, y0, 2, tileH);
+        // Drip stain
+        if (r() < 0.35) {
+          c.fillStyle = `rgba(20,30,40,${(0.20 + r() * 0.30).toFixed(3)})`;
+          c.fillRect(bx + 4 + Math.floor(r() * 6), y0 + 2, 1, tileH - 4);
+        }
       }
-      // Shadow under each row
-      c.fillStyle = 'rgba(0,0,0,0.45)';
-      c.fillRect(0, y0 + tileH - 1, TEX_W, 1);
+      // Heavy shadow under each row
+      c.fillStyle = 'rgba(0,0,0,0.55)';
+      c.fillRect(0, y0 + tileH - 2, TEX_W, 2);
     }
+    // Mossy patches creeping along the lowest tile row
+    for (let i = 0; i < 30; i++) {
+      const x = Math.floor(r() * TEX_W);
+      const y = TEX_H - Math.floor(r() * 20);
+      c.fillStyle = `rgba(60,90,50,${(0.30 + r() * 0.30).toFixed(3)})`;
+      c.fillRect(x, y, 1 + Math.floor(r() * 2), 1);
+    }
+    // Top moonlight rim across the very top of the wall
+    c.fillStyle = 'rgba(180,200,220,0.25)';
+    c.fillRect(0, 0, TEX_W, 1);
     return cv;
   }
 
-  // Moss-stained mountain stones: irregular dark grey stones bound by
-  // mortar with patches of green-grey moss in the joints.
+  // Mossy mountain stones — irregular fieldstones bound by dark mortar
+  // with mossy joints. 128×128 lets each stone carry shape variation +
+  // a separate highlight + crack instead of flat blocks.
   function buildStone() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(3303);
-    c.fillStyle = '#1f1f1c';  // mortar / shadow base
+    // Dark mortar base
+    c.fillStyle = '#15140f';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    const bw = 18, bh = 10;
-    for (let row = 0; row * bh < TEX_H; row++) {
-      const y = row * bh;
-      const offset = Math.floor(r() * bw);
-      for (let x = -bw; x < TEX_W; x += bw) {
+    // Stones laid in 5 rough rows with brick offset, each stone slightly
+    // wobbled in size + position so the grid doesn't read as machined.
+    const rows = 5;
+    const baseRowH = TEX_H / rows;
+    for (let row = 0; row < rows; row++) {
+      const y = row * baseRowH;
+      const offset = Math.floor(r() * 22);
+      let x = -10;
+      while (x < TEX_W) {
+        const sw = 14 + Math.floor(r() * 14);
+        const sh = baseRowH - 2 + Math.floor((r() - 0.5) * 4);
         const bx = x + offset;
-        // Cool stone shade tinted slightly toward green/grey for moss
-        const grey = 55 + Math.floor(r() * 35);
         const moss = r() < 0.30;
+        const grey = 65 + Math.floor(r() * 45);
+        // Body — slightly rounded with corners cut
         c.fillStyle = moss
-          ? `rgb(${grey - 10},${grey + 8},${grey - 4})`
-          : `rgb(${grey},${grey - 4},${grey - 8})`;
-        c.fillRect(bx + 1, y + 1, bw - 1, bh - 1);
-        // Top highlight (mossy or stone)
-        c.fillStyle = moss ? 'rgba(140,180,120,0.25)' : 'rgba(255,255,255,0.10)';
-        c.fillRect(bx + 1, y + 1, bw - 1, 1);
-        c.fillStyle = 'rgba(0,0,0,0.30)';
-        c.fillRect(bx + 1, y + bh - 1, bw - 1, 1);
+          ? `rgb(${grey - 18},${grey + 10},${grey - 8})`
+          : `rgb(${grey},${grey - 6},${grey - 12})`;
+        c.beginPath();
+        c.moveTo(bx + 2, y + 1);
+        c.lineTo(bx + sw - 2, y + 1);
+        c.lineTo(bx + sw, y + 3);
+        c.lineTo(bx + sw, y + sh - 3);
+        c.lineTo(bx + sw - 2, y + sh - 1);
+        c.lineTo(bx + 2, y + sh - 1);
+        c.lineTo(bx, y + sh - 3);
+        c.lineTo(bx, y + 3);
+        c.closePath();
+        c.fill();
+        // Top moonlight highlight
+        c.fillStyle = moss ? 'rgba(140,180,120,0.35)' : 'rgba(200,210,220,0.18)';
+        c.fillRect(bx + 2, y + 1, sw - 4, 1);
+        // Bottom shadow
+        c.fillStyle = 'rgba(0,0,0,0.45)';
+        c.fillRect(bx + 2, y + sh - 2, sw - 4, 1);
+        // Per-stone surface speckle
+        for (let i = 0; i < 18; i++) {
+          const sx = bx + 2 + Math.floor(r() * (sw - 4));
+          const sy = y + 2 + Math.floor(r() * (sh - 4));
+          c.fillStyle = `rgba(0,0,0,${(0.18 + r() * 0.20).toFixed(3)})`;
+          c.fillRect(sx, sy, 1, 1);
+        }
+        // Subtle crack through some stones
+        if (r() < 0.30) {
+          c.strokeStyle = 'rgba(0,0,0,0.65)';
+          c.lineWidth = 1;
+          c.beginPath();
+          c.moveTo(bx + 2 + r() * (sw - 4), y + 2);
+          c.lineTo(bx + 2 + r() * (sw - 4), y + sh - 2);
+          c.stroke();
+        }
+        x += sw + 1;
       }
     }
-    // Moss tufts
-    for (let i = 0; i < 14; i++) {
+    // Moss tufts overlapping the mortar joints
+    for (let i = 0; i < 28; i++) {
       const x = Math.floor(r() * TEX_W);
       const y = Math.floor(r() * TEX_H);
-      c.fillStyle = `rgba(90,130,70,${(0.40 + r() * 0.30).toFixed(3)})`;
+      c.fillStyle = `rgba(90,140,70,${(0.40 + r() * 0.30).toFixed(3)})`;
       c.beginPath();
-      c.arc(x, y, 1 + r() * 2, 0, Math.PI * 2);
+      c.arc(x, y, 1 + r() * 2.5, 0, Math.PI * 2);
       c.fill();
+      // Darker centre
+      c.fillStyle = `rgba(40,70,30,${(0.40 + r() * 0.30).toFixed(3)})`;
+      c.fillRect(x, y, 1, 1);
     }
+    // Top moonlight rim
+    c.fillStyle = 'rgba(180,200,220,0.18)';
+    c.fillRect(0, 0, TEX_W, 1);
     return cv;
   }
 
-  // Earthen wall papered over with yellow shamanic talismans. Hwangto
-  // base like CONCRETE but more saturated, with a few large 부적
-  // rectangles glued on at irregular positions — red brushstroke hint
-  // inside each one to suggest a 한자 without committing to a specific
-  // glyph at 64-px resolution.
+  // Talisman-papered mud wall — same hwangto base as CONCRETE but with
+  // several yellow 부적 papers glued at irregular positions, each one
+  // carrying a red calligraphy mark. 128 px gives enough room for the
+  // talismans to actually look like papers + script instead of yellow
+  // rectangles.
   function buildContainer() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(4404);
-    // Mud base
-    c.fillStyle = '#6e5230';
+    // Mud base — slightly darker than CONCRETE so the yellow talismans pop
+    c.fillStyle = '#5e4628';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    for (let i = 0; i < 250; i++) {
+    const wash = c.createLinearGradient(0, 0, 0, TEX_H);
+    wash.addColorStop(0,    'rgba(140,100,55,0.4)');
+    wash.addColorStop(0.5,  'rgba(0,0,0,0)');
+    wash.addColorStop(1,    'rgba(0,0,0,0.45)');
+    c.fillStyle = wash;
+    c.fillRect(0, 0, TEX_W, TEX_H);
+    // Mud grain
+    for (let i = 0; i < 700; i++) {
       const x = Math.floor(r() * TEX_W);
       const y = Math.floor(r() * TEX_H);
-      c.fillStyle = `rgba(30,18,10,${(0.10 + r() * 0.18).toFixed(3)})`;
+      c.fillStyle = `rgba(20,12,5,${(0.10 + r() * 0.22).toFixed(3)})`;
       c.fillRect(x, y, 1, 1);
     }
     // Straw fibres
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 70; i++) {
       const x = Math.floor(r() * TEX_W);
       const y = Math.floor(r() * TEX_H);
-      const len = 3 + Math.floor(r() * 4);
-      c.fillStyle = `rgba(220,180,90,${(0.30 + r() * 0.25).toFixed(3)})`;
+      const len = 4 + Math.floor(r() * 6);
+      c.fillStyle = `rgba(210,170,80,${(0.35 + r() * 0.25).toFixed(3)})`;
       c.fillRect(x, y, len, 1);
     }
-    // Talisman papers — 2 to 3, rectangular, slightly tilted via diagonal
-    // shading rather than rotation (cheap and reads fine at 1-px slice).
+    // Talisman papers — 5 at 128 px so the wall feels actively warded.
+    // Each one slightly tilted via 4-corner outline + body fill.
     const tals = [
-      { x:  8, y:  6, w: 16, h: 22 },
-      { x: 40, y: 18, w: 14, h: 24 },
-      { x: 22, y: 36, w: 14, h: 22 }
+      { x: 12,  y:  8,  w: 22, h: 38, tilt: -0.06 },
+      { x: 70,  y: 16,  w: 22, h: 40, tilt:  0.05 },
+      { x: 38,  y: 62,  w: 24, h: 42, tilt: -0.04 },
+      { x: 92,  y: 64,  w: 22, h: 40, tilt:  0.07 },
+      { x: 10,  y: 78,  w: 20, h: 36, tilt:  0.03 }
     ];
     for (const t of tals) {
-      // Paper body — warm yellow
-      c.fillStyle = '#e8c25a';
+      // Paper body
+      c.save();
+      const cx = t.x + t.w / 2, cy = t.y + t.h / 2;
+      c.translate(cx, cy);
+      c.rotate(t.tilt);
+      c.translate(-cx, -cy);
+      // Drop shadow
+      c.fillStyle = 'rgba(0,0,0,0.50)';
+      c.fillRect(t.x + 2, t.y + 2, t.w, t.h);
+      // Paper body — warm yellow with slight gradient
+      const paperGrd = c.createLinearGradient(t.x, t.y, t.x, t.y + t.h);
+      paperGrd.addColorStop(0,    '#f0c860');
+      paperGrd.addColorStop(0.5,  '#d8a838');
+      paperGrd.addColorStop(1,    '#a07820');
+      c.fillStyle = paperGrd;
       c.fillRect(t.x, t.y, t.w, t.h);
-      // Slight inner shadow (paper sag)
-      c.fillStyle = 'rgba(0,0,0,0.15)';
-      c.fillRect(t.x, t.y + t.h - 2, t.w, 2);
-      c.fillRect(t.x, t.y, 1, t.h);
-      // Top-edge highlight
-      c.fillStyle = 'rgba(255,240,180,0.6)';
+      // Paper top edge highlight
+      c.fillStyle = 'rgba(255,240,180,0.75)';
       c.fillRect(t.x, t.y, t.w, 1);
-      // Red calligraphy hint — two short vertical brush strokes
-      c.fillStyle = '#9a1818';
-      const cx = t.x + t.w / 2;
-      c.fillRect(cx - 1, t.y + 4, 2, t.h - 8);
-      c.fillRect(cx - 3, t.y + 7, 6, 2);
-      c.fillRect(cx - 4, t.y + t.h - 9, 8, 2);
+      c.fillStyle = 'rgba(0,0,0,0.30)';
+      c.fillRect(t.x, t.y + t.h - 1, t.w, 1);
+      c.fillRect(t.x, t.y, 1, t.h);
+      // Red calligraphy — vertical column of strokes resembling Hanja.
+      // We draw 2–3 character-shaped clusters.
+      const ccx = t.x + t.w / 2;
+      const ccol = '#8a1010';
+      const charH = Math.floor((t.h - 6) / 3);
+      for (let ch = 0; ch < 3; ch++) {
+        const top = t.y + 3 + ch * charH;
+        c.fillStyle = ccol;
+        // Vertical main stroke
+        c.fillRect(ccx - 1, top + 1, 2, charH - 2);
+        // Cross stroke
+        c.fillRect(ccx - 5, top + 2 + Math.floor(r() * 2), 10, 2);
+        // Lower hook
+        c.fillRect(ccx - 4, top + charH - 4, 8, 2);
+        // Stray ink dot
+        if (r() < 0.5) c.fillRect(ccx + 2, top + 5 + Math.floor(r() * 4), 1, 1);
+      }
+      // Paper crinkle lines
+      for (let k = 0; k < 4; k++) {
+        const ky = t.y + 6 + Math.floor(r() * (t.h - 12));
+        c.fillStyle = 'rgba(0,0,0,0.18)';
+        c.fillRect(t.x + 2, ky, t.w - 4, 1);
+      }
+      // Frayed edge tatters at the bottom
+      for (let f = 0; f < 4; f++) {
+        const fx = t.x + 2 + Math.floor(r() * (t.w - 4));
+        const fh = 2 + Math.floor(r() * 4);
+        c.fillStyle = 'rgba(0,0,0,0.4)';
+        c.fillRect(fx, t.y + t.h, 1, fh);
+        c.fillStyle = `rgba(${200 + Math.floor(r() * 40)},${140 + Math.floor(r() * 40)},${50 + Math.floor(r() * 30)},0.75)`;
+        c.fillRect(fx, t.y + t.h, 1, fh - 1);
+      }
+      c.restore();
     }
+    // Top moonlight rim
+    c.fillStyle = 'rgba(180,200,220,0.18)';
+    c.fillRect(0, 0, TEX_W, 2);
     return cv;
   }
 
