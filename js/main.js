@@ -938,14 +938,15 @@
     ctx.fillStyle = `rgba(255, 230, 90, ${intensity})`;
     ctx.fillText('굿판!', 0, 0);
 
-    // Sub-text — multipliers + remaining time. Heavy display font for
-    // legibility under the brush headline.
-    ctx.shadowBlur = 8;
+    // Sub-text — multipliers + remaining time. Same Myeongjo face as the
+    // headline so the two lines feel like one unit; sized small so it reads
+    // as supporting info, not a second banner.
+    ctx.shadowBlur = 6;
     ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
     ctx.fillStyle = `rgba(255, 240, 200, ${0.95 * intensity})`;
-    ctx.font = '900 22px "Black Han Sans", "Gowun Batang", sans-serif';
+    ctx.font = '900 16px "Noto Serif KR", "Gowun Batang", serif';
     const remain = Math.max(0, g.timer).toFixed(1);
-    ctx.fillText(`데미지 ×1.5 · 점수 ×2.0 · ${remain}s`, 0, 64);
+    ctx.fillText(`데미지 ×1.5 · 점수 ×2.0 · ${remain}s`, 0, 58);
 
     ctx.restore();
   }
