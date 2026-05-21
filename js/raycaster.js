@@ -256,6 +256,31 @@ const Raycaster = (() => {
     return stars;
   }
 
+  // Pre-sampled tree-line height profile. Each entry is "how many pixels
+  // does the canopy rise above the horizon at this U coord". Built once
+  // from layered sine waves + per-x noise so the silhouette stays stable
+  // across frames (no twitching) but reads as a chaotic ridge of trees.
+  // Long enough that any reasonable canvas width can sample it without
+  // wrapping noticeably.
+  let forestProfile = null;
+  function buildForestProfile() {
+    const LEN = 2048;
+    const r = rng(31415);
+    const a = new Float32Array(LEN + 1);
+    for (let i = 0; i <= LEN; i++) {
+      const t = i / LEN;
+      // Three layered sines for a believable canopy ridge; a few sharper
+      // spikes (Math.pow on a sine) drop in pointed conifer crowns.
+      const base   = 22 + Math.sin(t * Math.PI * 4.3 + 1.1) * 6;
+      const mid    = Math.sin(t * Math.PI * 11.0 + 2.7) * 4;
+      const detail = Math.sin(t * Math.PI * 29.0 + 4.3) * 3;
+      const conifer = Math.pow(Math.max(0, Math.sin(t * Math.PI * 47 + 0.7)), 6) * 14;
+      const noise = (r() - 0.5) * 5;
+      a[i] = Math.max(0, base + mid + detail + conifer + noise);
+    }
+    return a;
+  }
+
   function ensureBakedAssets() {
     if (!concreteTile) {
       concreteTile = buildConcreteTile();
@@ -265,6 +290,7 @@ const Raycaster = (() => {
         .getImageData(0, 0, concreteTile.width, concreteTile.height).data;
     }
     if (!starField) starField = buildStarField();
+    if (!forestProfile) forestProfile = buildForestProfile();
   }
 
   // ---------- Sky pass ----------
@@ -298,6 +324,67 @@ const Raycaster = (() => {
     else if (name === 'night') drawStars(horizon, 70, 1.0);
     else if (name === 'storm') { drawStars(horizon, 30, 0.5); drawStormSky(horizon); }
     drawMoon(horizon, name);
+    // Forest silhouette sits in front of the celestial layer (so trees
+    // occlude any star they overlap) but behind the walls + floor pass
+    // (so any in-world wall taller than the horizon naturally hides the
+    // corresponding chunk of forest).
+    drawForestSilhouette(horizon, name, player);
+  }
+
+  // Distant forest ridge — opaque tree-line drawn from the precomputed
+  // height profile, plus a softer pre-pass behind it so the ridge reads
+  // as deep multiple-row forest rather than a single picket fence. The
+  // player.angle shifts the sample window so when the player turns the
+  // canopy stays anchored to the world rather than scrolling with the
+  // view — gives the sense of being surrounded.
+  function drawForestSilhouette(horizon, themeName, player) {
+    if (!forestProfile) return;
+    const len = forestProfile.length - 1;
+    // World-space anchored: 1 radian of player yaw → samplePerRadian px
+    // of profile scroll. Picked so a full 2π yaw walks ~8 canvas widths
+    // of profile, giving every direction a different ridge shape.
+    const yaw = (player && typeof player.angle === 'number') ? player.angle : 0;
+    const samplePerRadian = (len / (Math.PI * 2)) * 8;
+    const scrollNear = yaw * samplePerRadian;
+    const scrollFar = yaw * samplePerRadian * 0.55;
+    function sample(scroll, x) {
+      let idx = ((x + scroll) % len + len) % len;
+      return forestProfile[Math.floor(idx)];
+    }
+    // Far row — shorter, lighter, behind. Pulls toward the horizon haze
+    // so it doesn't fight the sky gradient.
+    ctx.save();
+    ctx.fillStyle = themeName === 'storm' ? '#040508' : '#060a14';
+    ctx.beginPath();
+    ctx.moveTo(0, horizon + 1);
+    for (let x = 0; x <= W; x++) {
+      const h = sample(scrollFar, x) * 0.55;
+      ctx.lineTo(x, horizon - h);
+    }
+    ctx.lineTo(W, horizon + 1);
+    ctx.closePath();
+    ctx.fill();
+    // Near row — taller, deeper black, in front. Two offset samples
+    // give pointed conifer crowns more bite.
+    ctx.fillStyle = themeName === 'storm' ? '#010103' : '#020306';
+    ctx.beginPath();
+    ctx.moveTo(0, horizon + 1);
+    for (let x = 0; x <= W; x++) {
+      const h = sample(scrollNear, x);
+      ctx.lineTo(x, horizon - h);
+    }
+    ctx.lineTo(W, horizon + 1);
+    ctx.closePath();
+    ctx.fill();
+    // Ground mist right at the tree feet so the ridge melts into the
+    // floor instead of cutting hard.
+    const mist = ctx.createLinearGradient(0, horizon - 8, 0, horizon + 14);
+    mist.addColorStop(0, 'rgba(20,30,55,0)');
+    mist.addColorStop(0.5, 'rgba(20,30,55,0.45)');
+    mist.addColorStop(1, 'rgba(20,30,55,0)');
+    ctx.fillStyle = mist;
+    ctx.fillRect(0, horizon - 8, W, 22);
+    ctx.restore();
   }
 
   // Full moon — same position every frame so the player can use it as a
