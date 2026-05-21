@@ -239,34 +239,47 @@ const Environment = (() => {
   }
 
   // Decide which tiles get a tree. Skips perimeter walls, spawn gates,
-  // the player spawn pocket, and any tile too close to the player start
-  // so the opening view isn't a wall of trunks pressed against the
-  // crosshair. Density was tuned to feel 'surrounded' without spamming
-  // hundreds of sprites — the raycaster sorts every sprite each frame
-  // so a tighter forest gets expensive fast.
+  // the player spawn pocket, and any tile adjacent to a structure so the
+  // shrine's walls / jars / poles don't visually fuse with tree trunks.
+  // Density was tuned to feel 'surrounded' without spamming hundreds of
+  // sprites — the raycaster sorts every sprite each frame so a tighter
+  // forest gets expensive fast.
   function placeTrees() {
     if (typeof GameMap === 'undefined') return;
     trees.length = 0;
     const r = rng(424242);
     const start = GameMap.PLAYER_START || { x: 5.5, y: 20.5 };
-    // Iterate every empty floor tile. We tile-by-tile decide whether
-    // to drop a tree at a jittered position inside the cell.
+    // Chebyshev-radius check: skip any cell that has a wall (1–8) or a
+    // spawn gate (9) within the 3×3 neighborhood. Keeps trees off the
+    // shrine's grounds and out of gate funnels.
+    function blockedByStructure(cx, cy) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const t = GameMap.getTile(cx + dx, cy + dy);
+          // Perimeter earth wall (1) is fine to brush against — trees
+          // pressing into the boundary actually sells the 'edge of the
+          // clearing' feel. Only the shrine furniture (2–8) and spawn
+          // gates (9) get a clear 1-tile buffer.
+          if (t >= 2 && t <= 9) return true;
+        }
+      }
+      return false;
+    }
     for (let y = 1; y < GameMap.H - 1; y++) {
       for (let x = 1; x < GameMap.W - 1; x++) {
         const t = GameMap.getTile(x, y);
         if (t !== 0) continue;
         const wx = x + 0.5;
         const wy = y + 0.5;
-        // Clear pocket around player spawn (radius ~3 tiles)
+        // Clear pocket around player spawn (radius ~4 tiles) — the
+        // opening view should look down the courtyard at the hall, not
+        // into a thicket.
         const dxs = wx - start.x, dys = wy - start.y;
-        if (dxs * dxs + dys * dys < 9) continue;
-        // Avoid landing on spawn gates (tile 9). placeTrees scans floor
-        // (tile 0) so this is only here in case future maps mix the two.
-        // Density: 45% of eligible tiles get a tree. Keeps it dense but
-        // not totally walled-in.
-        if (r() > 0.45) continue;
-        const jx = (r() - 0.5) * 0.7;
-        const jy = (r() - 0.5) * 0.7;
+        if (dxs * dxs + dys * dys < 16) continue;
+        if (blockedByStructure(x, y)) continue;
+        if (r() > 0.55) continue;
+        const jx = (r() - 0.5) * 0.6;
+        const jy = (r() - 0.5) * 0.6;
         trees.push({
           x: wx + jx,
           y: wy + jy,
