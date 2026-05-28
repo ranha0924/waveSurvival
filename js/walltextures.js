@@ -2,10 +2,12 @@
 // wall surface reads as its actual material (한옥 mud wall, woven straw
 // bundles, jangdok pottery, etc.) instead of a flat color column.
 //
-// Each texture is a 64×64 canvas; the raycaster picks a 1-pixel-wide
+// Each texture is a 128×128 canvas; the raycaster picks a 1-pixel-wide
 // vertical slice based on the hit's U coordinate and stretches it to fit
-// the column's screen height. Side darkening + fog are still applied as
-// an overlay in the raycaster, so this module only owns the base look.
+// the column's screen height (nearest-neighbour — imageSmoothing is off —
+// so fine carving stays crisp at any range). Side darkening + fog ride on
+// top as an overlay in the raycaster, so this module only owns the base
+// look.
 //
 // The 굿판 rebuild maps the original 8 military materials onto their
 // shamanic counterparts (same tile IDs, same gameplay walls — only the
@@ -13,22 +15,18 @@
 // motif is a one-builder change.
 const WallTextures = (() => {
   // ---------- Constants + helpers ----------
-  const TEX_W = 64, TEX_H = 64;
+  const TEX_W = 128, TEX_H = 128;
   const cache = {};
 
-  // Numeric tile types this module renders. Mirrors the legend at the top
-  // of map.js; kept named here so buildAll's wiring reads as material →
-  // builder instead of a column of magic numbers. The trailing comment is
-  // the 굿판 motif each ID now represents.
   const TILE = {
-    CONCRETE:  1,   // 황토 흙담
-    HANGAR:    2,   // 한옥 기와벽
-    STONE:     3,   // 이끼 낀 돌담
-    CONTAINER: 4,   // 부적 붙은 토담
-    SANDBAG:   5,   // 짚단 묶음
-    VEHICLE:   6,   // 폐 한옥 자재
-    COMMS:     7,   // 솟대 (sotdae)
-    HAZARD:    8    // 장독대 항아리
+    CONCRETE:  1,   // 흙담 (hwangto rammed-earth perimeter wall)
+    HANGAR:    2,   // 한옥 기와벽 (tiled-roof main hall facade)
+    STONE:     3,   // 이끼 낀 돌담 (mossy field-stone wall)
+    CONTAINER: 4,   // 부적 토담 (talisman-papered mud wall)
+    SANDBAG:   5,   // 짚단 묶음 (bound straw sheaves)
+    VEHICLE:   6,   // 폐 한옥 자재 (collapsed timber + tile rubble)
+    COMMS:     7,   // 솟대 (spirit pole)
+    HAZARD:    8    // 장독대 항아리 (glazed onggi jar)
   };
 
   function newTex() {
@@ -51,481 +49,589 @@ const WallTextures = (() => {
     };
   }
 
+  // Rounded-rect path (canvas roundRect isn't universal on older engines).
+  function roundRect(c, x, y, w, h, rad) {
+    rad = Math.min(rad, w / 2, h / 2);
+    c.beginPath();
+    c.moveTo(x + rad, y);
+    c.arcTo(x + w, y, x + w, y + h, rad);
+    c.arcTo(x + w, y + h, x, y + h, rad);
+    c.arcTo(x, y + h, x, y, rad);
+    c.arcTo(x, y, x + w, y, rad);
+    c.closePath();
+  }
+
+  // A rounded course of foundation stones (죽담 / 기단) along a band.
+  function footing(c, r, y0, h) {
+    c.fillStyle = '#27211b';
+    c.fillRect(0, y0, TEX_W, h);
+    let x = -Math.floor(r() * 12);
+    while (x < TEX_W) {
+      const w = 15 + Math.floor(r() * 16);
+      const g = 64 + Math.floor(r() * 28);
+      c.fillStyle = `rgb(${g},${g - 4},${g - 10})`;
+      roundRect(c, x + 1, y0 + 2, w - 2, h - 4, Math.min(6, (h - 4) / 2));
+      c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.10)';
+      roundRect(c, x + 1, y0 + 2, w - 2, 3, 2);
+      c.fill();
+      c.fillStyle = 'rgba(0,0,0,0.40)';
+      c.fillRect(x, y0 + 2, 1, h - 4);
+      x += w;
+    }
+    c.fillStyle = 'rgba(0,0,0,0.45)';
+    c.fillRect(0, y0 - 1, TEX_W, 2);
+  }
+
   // ---------- Texture builders (one per tile material) ----------
-  // Hwangto (yellow-earth) wall — Korea's traditional mud-and-straw
-  // construction. Warm ochre base, embedded straw fibres, horizontal
-  // strata where successive layers were trowelled on, and weathering
-  // cracks.
+
+  // 흙담 — Korea's rammed-earth / mud-and-straw perimeter wall. Warm ochre
+  // body with horizontal compaction strata, embedded straw, weathering
+  // cracks, a damp-darkened base and a dressed-stone footing course.
   function buildConcrete() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(1101);
-    c.fillStyle = '#8a6a3a';
+    c.fillStyle = '#9a7038';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    // Vertical lighting wash so the wall reads as 3D
+    // Vertical lighting wash — sun-bleached crown, damp shaded base.
     const wash = c.createLinearGradient(0, 0, 0, TEX_H);
-    wash.addColorStop(0,   'rgba(255,220,160,0.10)');
-    wash.addColorStop(0.5, 'rgba(0,0,0,0)');
-    wash.addColorStop(1,   'rgba(0,0,0,0.22)');
+    wash.addColorStop(0,    'rgba(255,225,165,0.12)');
+    wash.addColorStop(0.45, 'rgba(0,0,0,0)');
+    wash.addColorStop(0.78, 'rgba(0,0,0,0.10)');
+    wash.addColorStop(1,    'rgba(0,0,0,0.34)');
     c.fillStyle = wash;
     c.fillRect(0, 0, TEX_W, TEX_H);
-    // Horizontal trowel strata (faint earthen layer joins)
-    c.fillStyle = 'rgba(50,30,15,0.35)';
-    c.fillRect(0, 18, TEX_W, 1);
-    c.fillRect(0, 39, TEX_W, 1);
-    c.fillStyle = 'rgba(255,220,160,0.10)';
-    c.fillRect(0, 19, TEX_W, 1);
-    c.fillRect(0, 40, TEX_W, 1);
-    // Straw fibres — short bright streaks scattered horizontally
-    for (let i = 0; i < 32; i++) {
-      const x = Math.floor(r() * TEX_W);
-      const y = Math.floor(r() * TEX_H);
-      const len = 3 + Math.floor(r() * 5);
-      c.fillStyle = `rgba(220,180,90,${(0.35 + r() * 0.30).toFixed(3)})`;
-      c.fillRect(x, y, len, 1);
+    // Rammed-earth strata — compaction joins every ~15px.
+    for (let y = 14; y < 104; y += 15) {
+      c.fillStyle = 'rgba(45,28,12,0.40)';
+      c.fillRect(0, y, TEX_W, 1);
+      c.fillStyle = 'rgba(255,225,160,0.10)';
+      c.fillRect(0, y + 1, TEX_W, 1);
+      for (let i = 0; i < 10; i++) {
+        const x = Math.floor(r() * TEX_W);
+        c.fillStyle = 'rgba(40,24,10,0.25)';
+        c.fillRect(x, y, 2, 1);
+      }
     }
-    // Coarse mud grain (dark)
-    for (let i = 0; i < 260; i++) {
+    // Embedded straw fibres.
+    for (let i = 0; i < 90; i++) {
       const x = Math.floor(r() * TEX_W);
-      const y = Math.floor(r() * TEX_H);
-      c.fillStyle = `rgba(40,20,10,${(0.10 + r() * 0.20).toFixed(3)})`;
-      c.fillRect(x, y, 1, 1);
+      const y = Math.floor(r() * 104);
+      const len = 3 + Math.floor(r() * 7);
+      const horiz = r() < 0.6;
+      c.fillStyle = `rgba(222,184,96,${(0.30 + r() * 0.30).toFixed(3)})`;
+      c.fillRect(x, y, horiz ? len : 1, horiz ? 1 : len);
     }
-    // Highlight speckles
-    for (let i = 0; i < 70; i++) {
-      const x = Math.floor(r() * TEX_W);
-      const y = Math.floor(r() * TEX_H);
-      c.fillStyle = `rgba(255,230,170,${(0.05 + r() * 0.08).toFixed(3)})`;
-      c.fillRect(x, y, 1, 1);
+    // Coarse mud grain + bright mineral specks.
+    for (let i = 0; i < 900; i++) {
+      c.fillStyle = `rgba(40,22,10,${(0.06 + r() * 0.18).toFixed(3)})`;
+      c.fillRect(Math.floor(r() * TEX_W), Math.floor(r() * 104), 1, 1);
     }
-    // Weathering cracks
-    c.strokeStyle = 'rgba(30,15,8,0.55)';
+    for (let i = 0; i < 240; i++) {
+      c.fillStyle = `rgba(255,232,176,${(0.04 + r() * 0.08).toFixed(3)})`;
+      c.fillRect(Math.floor(r() * TEX_W), Math.floor(r() * 104), 1, 1);
+    }
+    // Weathering cracks.
+    c.strokeStyle = 'rgba(28,14,6,0.55)';
     c.lineWidth = 1;
-    for (let i = 0; i < 5; i++) {
-      let cx = r() * TEX_W, cy = r() * TEX_H;
+    for (let i = 0; i < 8; i++) {
+      let cx = r() * TEX_W, cy = r() * 100;
       c.beginPath();
       c.moveTo(cx, cy);
-      for (let j = 0; j < 5; j++) {
-        cx += (r() - 0.5) * 16;
-        cy += (r() - 0.5) * 16;
+      for (let j = 0; j < 6; j++) {
+        cx += (r() - 0.5) * 26;
+        cy += (r() - 0.3) * 22;
         c.lineTo(cx, cy);
       }
       c.stroke();
     }
+    footing(c, r, 104, 24);
     return cv;
   }
 
-  // Hanok roof + plaster wall: white lime-plaster band on top, then
-  // stacked ceramic roof tiles below with the characteristic semi-cylinder
-  // shading. Reads like the side of a Korean traditional building.
+  // 한옥 기와벽 — the central hall facade. Top to bottom: a stacked ceramic
+  // roof with 막새 eave-end discs, a 단청 painted beam, a white-plaster wall
+  // framed by dark timber posts around a hanji-lit 창호 lattice window, and a
+  // dressed-stone 기단 base course.
   function buildHangar() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(2202);
-    // Upper third: white plaster wall
-    c.fillStyle = '#d8cdb5';
-    c.fillRect(0, 0, TEX_W, 22);
-    for (let i = 0; i < 180; i++) {
-      const x = Math.floor(r() * TEX_W);
-      const y = Math.floor(r() * 22);
-      c.fillStyle = `rgba(80,60,40,${(0.06 + r() * 0.10).toFixed(3)})`;
-      c.fillRect(x, y, 1, 1);
-    }
-    // Plaster-to-tile band (dark wooden header line)
-    c.fillStyle = '#3a2515';
-    c.fillRect(0, 22, TEX_W, 3);
-    c.fillStyle = 'rgba(0,0,0,0.4)';
-    c.fillRect(0, 24, TEX_W, 1);
-    // Lower two thirds: dark grey ceramic roof tiles in 3 horizontal rows
-    c.fillStyle = '#2a2a2e';
-    c.fillRect(0, 25, TEX_W, TEX_H - 25);
-    const rows = 3;
-    const tileH = (TEX_H - 25) / rows;
-    for (let row = 0; row < rows; row++) {
-      const y0 = 25 + row * tileH;
-      // Each "tile" is a half-cylinder — column-of-shading look using sine
-      const tileW = 12;
+    // ── Roof: ceramic tiles in three rows ──
+    c.fillStyle = '#23232a';
+    c.fillRect(0, 0, TEX_W, 46);
+    const tileH = 14, tileW = 16;
+    for (let row = 0; row < 3; row++) {
+      const y0 = row * tileH;
       const offset = (row % 2) * (tileW / 2);
       for (let col = -1; col <= TEX_W / tileW + 1; col++) {
         const bx = col * tileW + offset;
         for (let x = 0; x < tileW; x++) {
           const t = Math.sin((x / tileW) * Math.PI);
-          const shade = 36 + Math.floor(t * 42);
-          c.fillStyle = `rgb(${shade},${shade},${shade + 4})`;
+          const sh = 30 + Math.floor(t * 40);
+          c.fillStyle = `rgb(${sh},${sh},${sh + 6})`;
           c.fillRect(bx + x, y0, 1, tileH - 1);
         }
-        // Dark groove between tiles
         c.fillStyle = 'rgba(0,0,0,0.55)';
         c.fillRect(bx, y0, 1, tileH);
+        c.fillStyle = 'rgba(210,214,224,0.12)';
+        c.fillRect(bx + Math.floor(tileW / 2), y0, 1, 2);
       }
-      // Shadow under each row
-      c.fillStyle = 'rgba(0,0,0,0.45)';
+      c.fillStyle = 'rgba(0,0,0,0.40)';
       c.fillRect(0, y0 + tileH - 1, TEX_W, 1);
     }
+    // 막새 — round eave-end tiles along the roof bottom.
+    for (let x = 8; x < TEX_W; x += tileW) {
+      c.fillStyle = '#3a3a42';
+      c.beginPath(); c.arc(x, 46, 5, Math.PI, 2 * Math.PI); c.fill();
+      c.fillStyle = '#1a1a20';
+      c.beginPath(); c.arc(x, 46, 2.4, Math.PI, 2 * Math.PI); c.fill();
+      c.fillStyle = 'rgba(210,214,224,0.18)';
+      c.beginPath(); c.arc(x, 45, 5, Math.PI * 1.08, Math.PI * 1.5); c.fill();
+    }
+    c.fillStyle = 'rgba(0,0,0,0.5)';
+    c.fillRect(0, 46, TEX_W, 2);
+    // ── 단청 painted beam ──
+    c.fillStyle = '#23402f';
+    c.fillRect(0, 48, TEX_W, 14);
+    for (let x = 0; x < TEX_W; x += 16) {
+      c.fillStyle = '#9e2f1d'; c.fillRect(x + 2, 50, 12, 4);
+      c.fillStyle = '#d8cdb0'; c.fillRect(x + 4, 51, 8, 1);
+      c.fillStyle = '#2b4f8a'; c.fillRect(x + 1, 56, 5, 4);
+      c.fillStyle = '#c9a23a'; c.fillRect(x + 9, 56, 5, 4);
+      c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x, 48, 1, 14);
+    }
+    c.fillStyle = '#140d06';
+    c.fillRect(0, 61, TEX_W, 2);
+    // ── Wall body: plaster + timber posts + 창호 window ──
+    c.fillStyle = '#cfc4a8';
+    c.fillRect(0, 63, TEX_W, 49);
+    for (let i = 0; i < 260; i++) {
+      c.fillStyle = `rgba(90,70,46,${(0.05 + r() * 0.10).toFixed(3)})`;
+      c.fillRect(Math.floor(r() * TEX_W), 63 + Math.floor(r() * 49), 1, 1);
+    }
+    const post = (px) => {
+      const grd = c.createLinearGradient(px, 0, px + 12, 0);
+      grd.addColorStop(0, '#1e120a');
+      grd.addColorStop(0.5, '#4a2c16');
+      grd.addColorStop(1, '#1e120a');
+      c.fillStyle = grd;
+      c.fillRect(px, 63, 12, 49);
+      for (let i = 0; i < 10; i++) {
+        c.fillStyle = `rgba(0,0,0,${(0.15 + r() * 0.20).toFixed(3)})`;
+        c.fillRect(px + Math.floor(r() * 12), 63, 1, 49);
+      }
+    };
+    post(0);
+    post(TEX_W - 12);
+    // 창호 lattice window with warm hanji glow.
+    const wx = 40, wy = 68, ww = 48, wh = 40;
+    c.fillStyle = '#2a1a0e';
+    c.fillRect(wx - 2, wy - 2, ww + 4, wh + 4);
+    c.fillStyle = '#e6c47a';
+    c.fillRect(wx, wy, ww, wh);
+    const gg = c.createRadialGradient(wx + ww / 2, wy + wh / 2, 2, wx + ww / 2, wy + wh / 2, ww / 1.4);
+    gg.addColorStop(0, 'rgba(255,228,150,0.5)');
+    gg.addColorStop(1, 'rgba(180,120,40,0)');
+    c.fillStyle = gg;
+    c.fillRect(wx, wy, ww, wh);
+    c.fillStyle = '#2a1a0e';
+    for (let gx = wx; gx <= wx + ww; gx += 8) c.fillRect(gx, wy, 2, wh);
+    for (let gy = wy; gy <= wy + wh; gy += 8) c.fillRect(wx, gy, ww, 2);
+    // ── 기단 stone base ──
+    footing(c, r, 112, 16);
     return cv;
   }
 
-  // Moss-stained mountain stones: irregular dark grey stones bound by
-  // mortar with patches of green-grey moss in the joints.
+  // 이끼 낀 돌담 — chest-high wall of irregular stacked field stones bound by
+  // dark mortar, with moss in the joints, lichen speckle, and rim-light on
+  // each stone's upper edge.
   function buildStone() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(3303);
-    c.fillStyle = '#1f1f1c';  // mortar / shadow base
+    c.fillStyle = '#16160f';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    const bw = 18, bh = 10;
-    for (let row = 0; row * bh < TEX_H; row++) {
-      const y = row * bh;
-      const offset = Math.floor(r() * bw);
-      for (let x = -bw; x < TEX_W; x += bw) {
-        const bx = x + offset;
-        // Cool stone shade tinted slightly toward green/grey for moss
-        const grey = 55 + Math.floor(r() * 35);
+    let y = 2;
+    while (y < TEX_H) {
+      const rh = 14 + Math.floor(r() * 10);
+      let x = -Math.floor(r() * 20);
+      while (x < TEX_W) {
+        const w = 18 + Math.floor(r() * 22);
+        const g = 58 + Math.floor(r() * 34);
         const moss = r() < 0.30;
         c.fillStyle = moss
-          ? `rgb(${grey - 10},${grey + 8},${grey - 4})`
-          : `rgb(${grey},${grey - 4},${grey - 8})`;
-        c.fillRect(bx + 1, y + 1, bw - 1, bh - 1);
-        // Top highlight (mossy or stone)
-        c.fillStyle = moss ? 'rgba(140,180,120,0.25)' : 'rgba(255,255,255,0.10)';
-        c.fillRect(bx + 1, y + 1, bw - 1, 1);
-        c.fillStyle = 'rgba(0,0,0,0.30)';
-        c.fillRect(bx + 1, y + bh - 1, bw - 1, 1);
+          ? `rgb(${g - 14},${g + 10},${g - 6})`
+          : `rgb(${g},${g - 5},${g - 10})`;
+        roundRect(c, x + 1, y + 1, w - 2, rh - 2, Math.min(7, rh / 2));
+        c.fill();
+        c.fillStyle = moss ? 'rgba(150,185,120,0.30)' : 'rgba(255,255,255,0.12)';
+        roundRect(c, x + 2, y + 2, w - 4, 3, 2);
+        c.fill();
+        c.fillStyle = 'rgba(0,0,0,0.35)';
+        c.fillRect(x + 2, y + rh - 3, w - 4, 2);
+        for (let i = 0; i < 6; i++) {
+          c.fillStyle = `rgba(0,0,0,${(0.10 + r() * 0.20).toFixed(3)})`;
+          c.fillRect(x + 2 + Math.floor(r() * (w - 4)), y + 2 + Math.floor(r() * (rh - 4)), 1, 1);
+        }
+        x += w;
       }
+      y += rh;
     }
-    // Moss tufts
-    for (let i = 0; i < 14; i++) {
-      const x = Math.floor(r() * TEX_W);
-      const y = Math.floor(r() * TEX_H);
-      c.fillStyle = `rgba(90,130,70,${(0.40 + r() * 0.30).toFixed(3)})`;
+    for (let i = 0; i < 26; i++) {
+      c.fillStyle = `rgba(95,135,72,${(0.35 + r() * 0.30).toFixed(3)})`;
       c.beginPath();
-      c.arc(x, y, 1 + r() * 2, 0, Math.PI * 2);
+      c.arc(Math.floor(r() * TEX_W), Math.floor(r() * TEX_H), 1 + r() * 2.5, 0, Math.PI * 2);
       c.fill();
+    }
+    for (let i = 0; i < 40; i++) {
+      c.fillStyle = `rgba(180,190,150,${(0.10 + r() * 0.15).toFixed(3)})`;
+      c.fillRect(Math.floor(r() * TEX_W), Math.floor(r() * TEX_H), 1, 1);
     }
     return cv;
   }
 
-  // Earthen wall papered over with yellow shamanic talismans. Hwangto
-  // base like CONCRETE but more saturated, with a few large 부적
-  // rectangles glued on at irregular positions — red brushstroke hint
-  // inside each one to suggest a 한자 without committing to a specific
-  // glyph at 64-px resolution.
+  // 부적 토담 — mud wall papered with yellow shamanic talismans. Hwangto base
+  // (grain + straw + strata + cracks) overlaid with several 부적 sheets, each
+  // with red brush calligraphy, an aged border and a paste strip at the top.
   function buildContainer() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(4404);
-    // Mud base
     c.fillStyle = '#6e5230';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    for (let i = 0; i < 250; i++) {
-      const x = Math.floor(r() * TEX_W);
-      const y = Math.floor(r() * TEX_H);
-      c.fillStyle = `rgba(30,18,10,${(0.10 + r() * 0.18).toFixed(3)})`;
-      c.fillRect(x, y, 1, 1);
+    const wash = c.createLinearGradient(0, 0, 0, TEX_H);
+    wash.addColorStop(0, 'rgba(255,220,160,0.10)');
+    wash.addColorStop(0.5, 'rgba(0,0,0,0)');
+    wash.addColorStop(1, 'rgba(0,0,0,0.30)');
+    c.fillStyle = wash;
+    c.fillRect(0, 0, TEX_W, TEX_H);
+    for (let i = 0; i < 800; i++) {
+      c.fillStyle = `rgba(28,16,8,${(0.08 + r() * 0.16).toFixed(3)})`;
+      c.fillRect(Math.floor(r() * TEX_W), Math.floor(r() * 108), 1, 1);
     }
-    // Straw fibres
-    for (let i = 0; i < 28; i++) {
-      const x = Math.floor(r() * TEX_W);
-      const y = Math.floor(r() * TEX_H);
-      const len = 3 + Math.floor(r() * 4);
-      c.fillStyle = `rgba(220,180,90,${(0.30 + r() * 0.25).toFixed(3)})`;
-      c.fillRect(x, y, len, 1);
+    for (let i = 0; i < 70; i++) {
+      const len = 3 + Math.floor(r() * 6);
+      c.fillStyle = `rgba(220,180,90,${(0.28 + r() * 0.25).toFixed(3)})`;
+      c.fillRect(Math.floor(r() * TEX_W), Math.floor(r() * 108), len, 1);
     }
-    // Talisman papers — 2 to 3, rectangular, slightly tilted via diagonal
-    // shading rather than rotation (cheap and reads fine at 1-px slice).
+    for (let y = 16; y < 104; y += 18) {
+      c.fillStyle = 'rgba(40,24,10,0.30)';
+      c.fillRect(0, y, TEX_W, 1);
+    }
+    c.strokeStyle = 'rgba(26,14,6,0.5)';
+    c.lineWidth = 1;
+    for (let i = 0; i < 6; i++) {
+      let cx = r() * TEX_W, cy = r() * 104;
+      c.beginPath();
+      c.moveTo(cx, cy);
+      for (let j = 0; j < 5; j++) {
+        cx += (r() - 0.5) * 24;
+        cy += (r() - 0.3) * 22;
+        c.lineTo(cx, cy);
+      }
+      c.stroke();
+    }
     const tals = [
-      { x:  8, y:  6, w: 16, h: 22 },
-      { x: 40, y: 18, w: 14, h: 24 },
-      { x: 22, y: 36, w: 14, h: 22 }
+      { x: 14, y: 12, w: 26, h: 40 },
+      { x: 78, y: 30, w: 24, h: 44 },
+      { x: 46, y: 60, w: 24, h: 40 },
+      { x: 98, y: 74, w: 22, h: 30 }
     ];
-    for (const t of tals) {
-      // Paper body — warm yellow
-      c.fillStyle = '#e8c25a';
-      c.fillRect(t.x, t.y, t.w, t.h);
-      // Slight inner shadow (paper sag)
-      c.fillStyle = 'rgba(0,0,0,0.15)';
-      c.fillRect(t.x, t.y + t.h - 2, t.w, 2);
-      c.fillRect(t.x, t.y, 1, t.h);
-      // Top-edge highlight
-      c.fillStyle = 'rgba(255,240,180,0.6)';
-      c.fillRect(t.x, t.y, t.w, 1);
-      // Red calligraphy hint — two short vertical brush strokes
-      c.fillStyle = '#9a1818';
-      const cx = t.x + t.w / 2;
-      c.fillRect(cx - 1, t.y + 4, 2, t.h - 8);
-      c.fillRect(cx - 3, t.y + 7, 6, 2);
-      c.fillRect(cx - 4, t.y + t.h - 9, 8, 2);
-    }
+    for (const t of tals) drawTalisman(c, r, t.x, t.y, t.w, t.h);
+    footing(c, r, 108, 20);
     return cv;
   }
 
-  // Woven straw bundles (짚단) stacked in 4 rows. Bright golden straw
-  // with darker fibre grooves, twine wraps across each bundle.
+  function drawTalisman(c, r, x, y, w, h) {
+    c.fillStyle = '#e3bd54';
+    c.fillRect(x, y, w, h);
+    c.fillStyle = 'rgba(120,80,20,0.25)';
+    c.fillRect(x, y, w, 2); c.fillRect(x, y + h - 2, w, 2);
+    c.fillRect(x, y, 2, h); c.fillRect(x + w - 2, y, 2, h);
+    c.fillStyle = 'rgba(255,242,190,0.6)';
+    c.fillRect(x, y, w, 1);
+    const cx = x + w / 2;
+    c.fillStyle = '#8e1414';
+    c.fillRect(cx - 4, y + 3, 8, 5);                 // header block
+    c.fillStyle = '#9a1818';
+    c.fillRect(cx - 1, y + 10, 2, h - 16);           // vertical column
+    for (let i = 0; i < 4; i++) {                    // glyph crossbars
+      const gy = y + 12 + i * ((h - 18) / 4);
+      const gw = 4 + Math.floor(r() * 6);
+      c.fillRect(cx - gw / 2, gy, gw, 2);
+    }
+    c.fillRect(cx - 3, y + h - 10, 7, 2);            // bottom flick
+    c.fillStyle = 'rgba(220,210,180,0.5)';
+    c.fillRect(cx - 3, y - 1, 6, 2);                 // paste strip
+  }
+
+  // 짚단 묶음 — bound straw sheaves stacked as chest-high cover. Each bundle
+  // gets a lit-to-shadow straw gradient, individual fibre streaks, an X twine
+  // binding, a mid twine band, and frayed straw tips poking above.
   function buildSandbag() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(5505);
-    c.fillStyle = '#2a1c0a';
+    c.fillStyle = '#241708';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    const ROWS = 4;
-    const bagH = TEX_H / ROWS;       // 16
-    const bagW = 16;
+    const ROWS = 4, bagH = TEX_H / ROWS, bagW = 26;
     for (let row = 0; row < ROWS; row++) {
       const y = row * bagH;
       const offset = (row % 2) * (bagW / 2);
-      for (let col = -1; col <= TEX_W / bagW; col++) {
+      for (let col = -1; col <= TEX_W / bagW + 1; col++) {
         const bx = col * bagW + offset;
-        // Bundle body — straw colour gradient (lit top → shadow bottom)
         const grd = c.createLinearGradient(bx, y, bx, y + bagH);
-        grd.addColorStop(0,    '#e6c560');
-        grd.addColorStop(0.45, '#b89438');
-        grd.addColorStop(0.85, '#765820');
+        grd.addColorStop(0,    '#ecc964');
+        grd.addColorStop(0.5,  '#bd9838');
+        grd.addColorStop(0.86, '#7a5c22');
         grd.addColorStop(1,    '#3a2810');
         c.fillStyle = grd;
-        c.beginPath();
-        c.moveTo(bx + 2, y);
-        c.lineTo(bx + bagW - 2, y);
-        c.quadraticCurveTo(bx + bagW, y, bx + bagW, y + 3);
-        c.lineTo(bx + bagW, y + bagH - 3);
-        c.quadraticCurveTo(bx + bagW, y + bagH, bx + bagW - 2, y + bagH);
-        c.lineTo(bx + 2, y + bagH);
-        c.quadraticCurveTo(bx, y + bagH, bx, y + bagH - 3);
-        c.lineTo(bx, y + 3);
-        c.quadraticCurveTo(bx, y, bx + 2, y);
-        c.closePath();
+        roundRect(c, bx + 1, y + 1, bagW - 2, bagH - 2, 6);
         c.fill();
-        // Side rounding shadow
-        const sideGrd = c.createLinearGradient(bx, 0, bx + bagW, 0);
-        sideGrd.addColorStop(0,    'rgba(0,0,0,0.30)');
-        sideGrd.addColorStop(0.18, 'rgba(0,0,0,0)');
-        sideGrd.addColorStop(0.82, 'rgba(0,0,0,0)');
-        sideGrd.addColorStop(1,    'rgba(0,0,0,0.30)');
-        c.fillStyle = sideGrd;
+        const sg = c.createLinearGradient(bx, 0, bx + bagW, 0);
+        sg.addColorStop(0,    'rgba(0,0,0,0.32)');
+        sg.addColorStop(0.2,  'rgba(0,0,0,0)');
+        sg.addColorStop(0.8,  'rgba(0,0,0,0)');
+        sg.addColorStop(1,    'rgba(0,0,0,0.32)');
+        c.fillStyle = sg;
         c.fillRect(bx, y, bagW, bagH);
-        // Twine wrap — dark band across the middle
-        c.fillStyle = 'rgba(40,25,10,0.85)';
-        c.fillRect(bx + 1, y + bagH / 2 - 1, bagW - 2, 2);
-        c.fillStyle = 'rgba(255,230,150,0.30)';
-        c.fillRect(bx + 1, y + bagH / 2 - 1, bagW - 2, 1);
-        // Vertical fibre grooves
-        for (let g = 0; g < 5; g++) {
-          const gx = bx + 2 + Math.floor(r() * (bagW - 4));
-          c.fillStyle = `rgba(0,0,0,${(0.10 + r() * 0.15).toFixed(3)})`;
-          c.fillRect(gx, y + 1, 1, bagH - 2);
+        for (let g = 0; g < bagW; g++) {
+          if (r() < 0.5) {
+            c.fillStyle = `rgba(0,0,0,${(0.05 + r() * 0.12).toFixed(3)})`;
+            c.fillRect(bx + g, y + 2, 1, bagH - 4);
+          }
         }
-        // Shadow groove between rows
-        c.strokeStyle = 'rgba(0,0,0,0.55)';
-        c.lineWidth = 1;
+        for (let g = 0; g < 10; g++) {
+          c.fillStyle = `rgba(255,232,150,${(0.20 + r() * 0.30).toFixed(3)})`;
+          c.fillRect(bx + 2 + Math.floor(r() * (bagW - 4)), y + 2, 1, bagH - 4);
+        }
+        c.strokeStyle = 'rgba(60,38,14,0.9)';
+        c.lineWidth = 2;
         c.beginPath();
-        c.moveTo(bx + 1, y + bagH - 0.5);
-        c.lineTo(bx + bagW - 1, y + bagH - 0.5);
+        c.moveTo(bx + 3, y + 8); c.lineTo(bx + bagW - 3, y + bagH - 8);
+        c.moveTo(bx + bagW - 3, y + 8); c.lineTo(bx + 3, y + bagH - 8);
         c.stroke();
+        c.fillStyle = 'rgba(40,25,10,0.85)';
+        c.fillRect(bx + 2, y + bagH / 2 - 1, bagW - 4, 2);
+        c.fillStyle = 'rgba(255,230,150,0.25)';
+        c.fillRect(bx + 2, y + bagH / 2 - 1, bagW - 4, 1);
+        for (let s = 0; s < 5; s++) {
+          const sx = bx + 3 + Math.floor(r() * (bagW - 6));
+          c.strokeStyle = `rgba(230,200,120,${(0.40 + r() * 0.30).toFixed(3)})`;
+          c.lineWidth = 1;
+          c.beginPath();
+          c.moveTo(sx, y + 2);
+          c.lineTo(sx + (r() - 0.5) * 5, y - 2 - Math.floor(r() * 3));
+          c.stroke();
+        }
       }
-    }
-    // Stray straw wisps
-    for (let i = 0; i < 16; i++) {
-      const x = Math.floor(r() * TEX_W);
-      const y = Math.floor(r() * TEX_H);
-      c.fillStyle = `rgba(255,220,130,${(0.40 + r() * 0.35).toFixed(3)})`;
-      c.fillRect(x, y, 2 + Math.floor(r() * 3), 1);
+      c.fillStyle = 'rgba(0,0,0,0.5)';
+      c.fillRect(0, y + bagH - 1, TEX_W, 1);
     }
     return cv;
   }
 
-  // Collapsed hanok timber + broken roof tiles. Dark blood-brown wooden
-  // beams stacked irregularly, with grey tile shards lodged in the gaps
-  // and rusty iron nails visible. Reads as a ruined building's debris.
+  // 폐 한옥 자재 — debris from a collapsed hanok: stacked broken timber planks
+  // with grain and splintered ends, grey roof-tile shards wedged in the gaps,
+  // rusty nails, and a fallen diagonal post.
   function buildVehicle() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(6606);
-    c.fillStyle = '#2a160c';
+    c.fillStyle = '#1c0f08';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    // Horizontal wooden beam planks
     let y = 0;
     while (y < TEX_H) {
-      const h = 7 + Math.floor(r() * 6);
-      const baseR = 60 + Math.floor(r() * 30);
-      const baseG = 30 + Math.floor(r() * 18);
-      const baseB = 18 + Math.floor(r() * 10);
-      c.fillStyle = `rgb(${baseR},${baseG},${baseB})`;
+      const h = 12 + Math.floor(r() * 12);
+      const bR = 58 + Math.floor(r() * 34);
+      const bG = 30 + Math.floor(r() * 18);
+      const bB = 16 + Math.floor(r() * 10);
+      c.fillStyle = `rgb(${bR},${bG},${bB})`;
       c.fillRect(0, y, TEX_W, h);
-      // Wood grain (darker streaks)
-      for (let g = 0; g < 7; g++) {
-        const gy = y + Math.floor(r() * h);
-        c.fillStyle = `rgba(0,0,0,${(0.20 + r() * 0.25).toFixed(3)})`;
-        c.fillRect(0, gy, TEX_W, 1);
+      for (let g = 0; g < 10; g++) {
+        c.fillStyle = `rgba(0,0,0,${(0.15 + r() * 0.25).toFixed(3)})`;
+        c.fillRect(0, y + Math.floor(r() * h), TEX_W, 1);
       }
-      // Plank shadow at bottom
-      c.fillStyle = 'rgba(0,0,0,0.55)';
-      c.fillRect(0, y + h - 1, TEX_W, 1);
+      const ex = Math.floor(r() * 100);
+      c.fillStyle = 'rgba(0,0,0,0.6)';
+      c.fillRect(ex, y, 3, h);
+      for (let s = 0; s < 4; s++) {
+        c.fillStyle = `rgba(${bR + 20},${bG + 15},${bB + 8},0.8)`;
+        c.fillRect(ex + 3, y + Math.floor(r() * h), 2 + Math.floor(r() * 4), 1);
+      }
       c.fillStyle = 'rgba(255,200,150,0.10)';
       c.fillRect(0, y, TEX_W, 1);
+      c.fillStyle = 'rgba(0,0,0,0.55)';
+      c.fillRect(0, y + h - 1, TEX_W, 1);
       y += h;
     }
-    // Broken roof-tile shards — small dark grey curved fragments
-    for (let i = 0; i < 6; i++) {
-      const cx = Math.floor(r() * TEX_W);
-      const cy = Math.floor(r() * TEX_H);
-      c.fillStyle = '#3a3a3e';
-      c.beginPath();
-      c.arc(cx, cy, 2 + r() * 2, 0, Math.PI);
-      c.fill();
-      c.fillStyle = 'rgba(255,255,255,0.18)';
-      c.beginPath();
-      c.arc(cx, cy - 1, 1.5 + r(), 0, Math.PI);
-      c.fill();
-    }
-    // Rusty iron nails — small dark dots with rust halo
     for (let i = 0; i < 10; i++) {
-      const x = Math.floor(r() * TEX_W);
-      const y2 = Math.floor(r() * TEX_H);
+      const cx = Math.floor(r() * TEX_W), cy = Math.floor(r() * TEX_H);
+      c.fillStyle = '#34343a';
+      c.beginPath(); c.arc(cx, cy, 3 + r() * 3, 0, Math.PI); c.fill();
+      c.fillStyle = 'rgba(220,224,230,0.18)';
+      c.beginPath(); c.arc(cx, cy - 1, 2 + r() * 1.5, Math.PI, 2 * Math.PI); c.fill();
+      c.fillStyle = 'rgba(0,0,0,0.4)';
+      c.fillRect(cx - 3, cy, 6, 1);
+    }
+    for (let i = 0; i < 14; i++) {
+      const x = Math.floor(r() * TEX_W), y2 = Math.floor(r() * TEX_H);
+      c.fillStyle = 'rgba(120,55,20,0.4)';
+      c.fillRect(x - 1, y2 - 1, 4, 4);
       c.fillStyle = '#0a0604';
       c.fillRect(x, y2, 2, 2);
-      c.fillStyle = 'rgba(120,55,20,0.35)';
-      c.fillRect(x - 1, y2 - 1, 4, 4);
     }
+    c.save();
+    c.translate(18, 92);
+    c.rotate(-0.5);
+    const pg = c.createLinearGradient(0, -7, 0, 7);
+    pg.addColorStop(0, '#5a3318');
+    pg.addColorStop(0.5, '#3a2010');
+    pg.addColorStop(1, '#1c0e06');
+    c.fillStyle = pg;
+    c.fillRect(0, -7, 92, 14);
+    c.fillStyle = 'rgba(0,0,0,0.4)';
+    for (let i = 0; i < 6; i++) c.fillRect(0, -6 + i * 2, 92, 1);
+    c.restore();
     return cv;
   }
 
-  // Sotdae — Korean shamanic spirit pole. Dark weathered wood column up
-  // the middle with a perched wooden duck/bird silhouette at the top
-  // and a red ritual cord tied around the upper third. The whole
-  // texture reads vertically since the raycaster pulls 1-px columns from
-  // it.
+  // 솟대 — a shamanic spirit pole. Weathered wood column with grain + knots,
+  // five 오방색 cloth strips tied near the top, and a small stone base cairn.
+  // The carved duck that crowns it is drawn by the raycaster's top-deco pass
+  // so it can poke above the wall body against the sky.
   function buildComms() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(7707);
-    // Dark sky / background (this tile usually sits against open ground)
-    c.fillStyle = '#0a0808';
+    c.fillStyle = '#0a0a0c';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    // Wood pole down the middle
-    const cx = TEX_W / 2;
-    const poleW = 10;
-    const grd = c.createLinearGradient(cx - poleW, 0, cx + poleW, 0);
-    grd.addColorStop(0,    '#1c1208');
-    grd.addColorStop(0.5,  '#4a2c14');
-    grd.addColorStop(1,    '#1c1208');
-    c.fillStyle = grd;
-    c.fillRect(cx - poleW, 0, poleW * 2, TEX_H);
-    // Wood grain — long vertical streaks
-    for (let i = 0; i < 14; i++) {
-      const x = cx - poleW + Math.floor(r() * (poleW * 2));
-      c.fillStyle = `rgba(0,0,0,${(0.20 + r() * 0.20).toFixed(3)})`;
-      c.fillRect(x, 0, 1, TEX_H);
-    }
-    // Knots along the pole — small dark ovals
-    for (let i = 0; i < 4; i++) {
-      const x = cx - 3 + Math.floor(r() * 6);
-      const y = 8 + i * 14 + Math.floor(r() * 4);
-      c.fillStyle = '#0a0604';
+    const cx = TEX_W / 2, poleW = 18;
+    // Base cairn.
+    c.fillStyle = '#1a1a1e';
+    c.fillRect(0, 108, TEX_W, 20);
+    for (let i = 0; i < 10; i++) {
+      const sx = 8 + i * 12 + Math.floor(r() * 4);
+      const g = 50 + Math.floor(r() * 26);
+      c.fillStyle = `rgb(${g},${g},${g + 3})`;
       c.beginPath();
-      c.ellipse(x, y, 2, 1.5, 0, 0, Math.PI * 2);
+      c.arc(sx, 118 + Math.floor(r() * 6), 5 + r() * 3, 0, Math.PI * 2);
       c.fill();
     }
-    // Red ritual cord wrapped near the top — three diagonal stripes
-    c.fillStyle = '#a51818';
-    for (let i = 0; i < 3; i++) {
-      c.fillRect(cx - poleW - 1, 14 + i * 4, poleW * 2 + 2, 2);
+    // Wood pole.
+    const grd = c.createLinearGradient(cx - poleW / 2, 0, cx + poleW / 2, 0);
+    grd.addColorStop(0, '#170d05');
+    grd.addColorStop(0.5, '#523016');
+    grd.addColorStop(1, '#170d05');
+    c.fillStyle = grd;
+    c.fillRect(cx - poleW / 2, 0, poleW, 116);
+    for (let i = 0; i < 22; i++) {
+      c.fillStyle = `rgba(0,0,0,${(0.15 + r() * 0.20).toFixed(3)})`;
+      c.fillRect(cx - poleW / 2 + Math.floor(r() * poleW), 0, 1, 116);
     }
-    c.fillStyle = 'rgba(255,180,120,0.30)';
-    c.fillRect(cx - poleW - 1, 14, poleW * 2 + 2, 1);
-    // Carved bird silhouette perched on top — a simple duck profile
-    c.fillStyle = '#1c1208';
-    // Body
-    c.beginPath();
-    c.ellipse(cx, 6, 7, 3, 0, 0, Math.PI * 2);
-    c.fill();
-    // Head
-    c.beginPath();
-    c.arc(cx + 5, 4, 2.5, 0, Math.PI * 2);
-    c.fill();
-    // Beak
-    c.fillRect(cx + 6, 4, 4, 1);
-    // Tail flare
-    c.beginPath();
-    c.moveTo(cx - 6, 5);
-    c.lineTo(cx - 10, 3);
-    c.lineTo(cx - 6, 7);
-    c.closePath();
-    c.fill();
-    // Eye dot
-    c.fillStyle = '#a51818';
-    c.fillRect(cx + 5, 4, 1, 1);
+    for (let i = 0; i < 6; i++) {
+      const x = cx - 4 + Math.floor(r() * 8);
+      const y = 12 + i * 18 + Math.floor(r() * 6);
+      c.fillStyle = 'rgba(90,55,25,0.5)';
+      c.beginPath(); c.ellipse(x, y, 4, 2.6, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#0a0604';
+      c.beginPath(); c.ellipse(x, y, 2.5, 1.8, 0, 0, Math.PI * 2); c.fill();
+    }
+    // 오방색 cloth strips.
+    const colors = ['#b32018', '#1f6fae', '#e8d24a', '#d8d0bc', '#2f7a44'];
+    for (let i = 0; i < colors.length; i++) {
+      const yy = 30 + i * 5;
+      c.fillStyle = colors[i];
+      c.fillRect(cx - poleW / 2 - 1, yy, poleW + 2, 3);
+      const dir = i % 2 === 0 ? 1 : -1;
+      c.fillRect(cx + dir * (poleW / 2), yy, dir * (8 + Math.floor(r() * 8)), 3);
+    }
+    c.fillStyle = 'rgba(255,200,150,0.12)';
+    c.fillRect(cx - 2, 0, 2, 116);
     return cv;
   }
 
-  // Jangdok — Korean earthenware fermentation jar. Round-bellied dark
-  // brown pottery shape filling the texture vertically, with a glazed
-  // sheen highlight down one side and a black mouth opening at the top.
-  // Reads as the side of a giant 항아리 when slice-sampled.
+  // 장독대 항아리 — glazed onggi fermentation jars. A fat-bellied main jar
+  // with a domed lid, glossy glaze sheen, finger-drawn wavy shoulder lines and
+  // kiln speckle, plus a smaller jar set beside it on the platform.
   function buildHazard() {
     const cv = newTex();
     const c = cv.getContext('2d');
     const r = rng(8808);
-    // Dark ground behind the jar
     c.fillStyle = '#0c0806';
     c.fillRect(0, 0, TEX_W, TEX_H);
-    // Jar silhouette — fat in the middle, narrows at top & base
-    const cx = TEX_W / 2;
-    function jarHalfWidth(y) {
-      // 0 at very top/bottom, peaks in the middle
-      const t = y / TEX_H;
-      const bulge = Math.sin(t * Math.PI);
-      const neckTaper = t < 0.10 ? (t / 0.10) * 0.7 + 0.3 : 1;
-      const baseTaper = t > 0.92 ? Math.max(0, (1 - (t - 0.92) / 0.08)) * 0.85 + 0.15 : 1;
-      return bulge * 30 * neckTaper * baseTaper;
-    }
-    // Body fill row by row so the silhouette is exact
-    for (let y = 0; y < TEX_H; y++) {
-      const hw = jarHalfWidth(y);
-      if (hw < 1) continue;
-      // Horizontal shading gradient across the jar's width: dark left,
-      // light highlight just right of centre, dark right
-      for (let dx = -hw; dx <= hw; dx++) {
-        const u = (dx + hw) / (2 * hw); // 0..1 across body
-        // Highlight at u ≈ 0.35
-        const highlight = Math.max(0, 1 - Math.abs(u - 0.35) * 3.5);
-        const baseR = 70 + Math.floor(highlight * 80);
-        const baseG = 36 + Math.floor(highlight * 50);
-        const baseB = 18 + Math.floor(highlight * 30);
-        c.fillStyle = `rgb(${baseR},${baseG},${baseB})`;
-        c.fillRect(cx + dx, y, 1, 1);
+    drawJar(c, r, 52, 6, 124, 52);   // main jar
+    drawJar(c, r, 98, 52, 126, 22);  // smaller front jar
+    return cv;
+  }
+
+  function drawJar(c, r, cx, top, bot, maxHW) {
+    const H2 = bot - top;
+    const hw = (y) => {
+      const t = (y - top) / H2;
+      if (t < 0 || t > 1) return 0;
+      const bulge = Math.sin(t * Math.PI * 0.92 + 0.08);
+      const neck = t < 0.12 ? (0.45 + (t / 0.12) * 0.55) : 1;
+      const base = t > 0.9 ? Math.max(0.25, 1 - ((t - 0.9) / 0.1) * 0.5) : 1;
+      return bulge * maxHW * neck * base;
+    };
+    for (let y = top; y <= bot; y++) {
+      const w = hw(y);
+      if (w < 1) continue;
+      for (let dx = -w; dx <= w; dx++) {
+        const u = (dx + w) / (2 * w);
+        const hl = Math.max(0, 1 - Math.abs(u - 0.34) * 3.2);
+        const rr = 58 + Math.floor(hl * 70);
+        const gg = 30 + Math.floor(hl * 42);
+        const bb = 14 + Math.floor(hl * 22);
+        c.fillStyle = `rgb(${rr},${gg},${bb})`;
+        c.fillRect(Math.round(cx + dx), y, 1, 1);
       }
     }
-    // Glaze sheen — a brighter narrow vertical band where the highlight peaks
-    for (let y = 4; y < TEX_H - 4; y++) {
-      const hw = jarHalfWidth(y);
-      if (hw < 4) continue;
-      const xh = cx - hw + (2 * hw) * 0.32;
-      c.fillStyle = 'rgba(255,220,180,0.18)';
+    // Glaze sheen band.
+    for (let y = top + 3; y < bot - 3; y++) {
+      const w = hw(y);
+      if (w < 4) continue;
+      const xh = cx - w + 2 * w * 0.30;
+      c.fillStyle = 'rgba(255,225,180,0.18)';
       c.fillRect(Math.round(xh), y, 1, 1);
-      c.fillStyle = 'rgba(255,220,180,0.10)';
+      c.fillStyle = 'rgba(255,225,180,0.10)';
       c.fillRect(Math.round(xh) + 1, y, 1, 1);
     }
-    // Rim — dark band at the top of the jar mouth
-    c.fillStyle = '#0a0604';
-    c.fillRect(cx - 8, 2, 16, 3);
-    c.fillStyle = '#1a0e08';
-    c.fillRect(cx - 7, 4, 14, 2);
-    // Speckle the pottery body with kiln blemishes
-    for (let i = 0; i < 70; i++) {
-      const y = 4 + Math.floor(r() * (TEX_H - 8));
-      const hw = jarHalfWidth(y);
-      if (hw < 2) continue;
-      const x = cx - hw + Math.floor(r() * (2 * hw));
-      c.fillStyle = `rgba(0,0,0,${(0.15 + r() * 0.25).toFixed(3)})`;
-      c.fillRect(x, y, 1, 1);
+    // Finger-drawn wavy shoulder lines.
+    c.strokeStyle = 'rgba(20,10,5,0.4)';
+    c.lineWidth = 1;
+    for (let k = 0; k < 2; k++) {
+      const yy = top + H2 * (0.30 + k * 0.10);
+      c.beginPath();
+      let started = false;
+      for (let dx = -maxHW; dx <= maxHW; dx += 2) {
+        if (Math.abs(dx) > hw(yy)) { started = false; continue; }
+        const yyy = yy + Math.sin(dx * 0.5 + k) * 2;
+        if (!started) { c.moveTo(cx + dx, yyy); started = true; }
+        else c.lineTo(cx + dx, yyy);
+      }
+      c.stroke();
     }
-    // Cord tied below the mouth — yellow rope wrap
-    c.fillStyle = '#caa044';
-    c.fillRect(cx - 9, 8, 18, 1);
-    c.fillStyle = 'rgba(255,230,150,0.5)';
-    c.fillRect(cx - 9, 8, 18, 1);
-    c.fillStyle = '#a8801f';
-    c.fillRect(cx - 9, 9, 18, 1);
-    return cv;
+    // Mouth + domed lid.
+    const topHW = hw(top + H2 * 0.05);
+    c.fillStyle = '#0a0604';
+    c.fillRect(Math.round(cx - topHW * 0.7), top + 1, Math.round(topHW * 1.4), 3);
+    c.fillStyle = '#3a2414';
+    c.beginPath(); c.ellipse(cx, top + 1, topHW * 0.8, 4, 0, Math.PI, 2 * Math.PI); c.fill();
+    c.fillStyle = 'rgba(255,210,160,0.2)';
+    c.beginPath(); c.ellipse(cx, top, topHW * 0.5, 2, 0, Math.PI, 2 * Math.PI); c.fill();
+    // Kiln speckle.
+    for (let i = 0; i < 60; i++) {
+      const y = top + Math.floor(r() * H2);
+      const w = hw(y);
+      if (w < 2) continue;
+      const x = cx - w + Math.floor(r() * 2 * w);
+      c.fillStyle = `rgba(0,0,0,${(0.12 + r() * 0.22).toFixed(3)})`;
+      c.fillRect(Math.round(x), y, 1, 1);
+    }
   }
 
   // ---------- Public API ----------

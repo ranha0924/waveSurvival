@@ -913,40 +913,59 @@ const Raycaster = (() => {
         break;
       }
       case 'jagged': {
-        // Broken concrete crown: deterministic per-slot height + a thin
-        // barbed-wire dotted line a bit above.
-        const slot = Math.floor(wallU * 18);
-        const n = Math.sin(slot * 12.9898) * 43758.5453;
-        const noise = n - Math.floor(n);
-        const h = Math.max(1, lineH * (0.03 + noise * 0.06));
-        ctx.fillStyle = dark;
-        ctx.fillRect(x, topY - h, 1, h);
-        if (Math.floor(wallU * 48) % 4 === 0) {
-          ctx.fillStyle = '#181614';
-          ctx.fillRect(x, Math.floor(topY - lineH * 0.13), 1, 1);
+        // Earthen wall (흙담 / 부적 토담) crowned with a small clay-tile coping
+        // (담장 기와). Roughly one section in six has lost its cap and shows a
+        // ragged mud crest instead, matching the half-collapsed setting.
+        const seg = Math.floor(wallU * 3);
+        const bn = Math.sin(seg * 91.17) * 43758.5453;
+        const broken = (bn - Math.floor(bn)) < 0.18;
+        if (broken) {
+          const slot = Math.floor(wallU * 22);
+          const n = Math.sin(slot * 12.9898) * 43758.5453;
+          const noise = n - Math.floor(n);
+          const h = Math.max(1, lineH * (0.02 + noise * 0.05));
+          ctx.fillStyle = dark;
+          ctx.fillRect(x, topY - h, 1, h);
+        } else {
+          const u = wallU * 6;                 // 6 coping tiles per map tile
+          const tf = u - Math.floor(u);
+          const bump = Math.sin(tf * Math.PI);  // convex tile crown
+          const capH = Math.max(2, lineH * (0.045 + bump * 0.045));
+          ctx.fillStyle = shadeColor('#3b3b42', lightFactor);
+          ctx.fillRect(x, topY - capH, 1, capH);
+          if (bump > 0.55) {
+            ctx.fillStyle = shadeColor('#5c5c66', Math.min(1.5, lightFactor * 1.2));
+            ctx.fillRect(x, topY - capH, 1, 1);
+          }
+          if (tf < 0.08 || tf > 0.92) {
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(x, topY - capH, 1, capH);
+          }
+          ctx.fillStyle = 'rgba(0,0,0,0.4)';   // eave shadow under the cap
+          ctx.fillRect(x, topY, 1, 1);
         }
         break;
       }
       case 'antenna': {
-        // Tall central spire with a few cross-bars; thin "guy wires" tapering
-        // outward make the silhouette read as a comms tower from any angle.
-        const dx = Math.abs(fract - 0.5);
-        if (dx < 0.025) {
-          const h = lineH * 0.75;
-          ctx.fillStyle = '#0e1014';
+        // 솟대 — a spirit pole crowned with a carved wooden duck. The pole tip
+        // continues above the wall body and the bird sits at the very top,
+        // facing along +U so it reads as a clean silhouette against the sky.
+        const adx = Math.abs(fract - 0.5);
+        if (adx < 0.07) {
+          const h = lineH * 0.34;
+          ctx.fillStyle = shadeColor('#2a1a0c', lightFactor);
           ctx.fillRect(x, topY - h, 1, h);
-        } else if (dx < 0.18) {
-          // Cross-bars
-          const bars = [0.30, 0.45, 0.58, 0.68];
-          for (const hf of bars) {
-            ctx.fillStyle = shadeColor('#3a3d44', lightFactor);
-            ctx.fillRect(x, Math.floor(topY - lineH * hf), 1, 1);
-          }
         }
-        // Spire tip beacon pulse
-        if (dx < 0.04 && Math.floor((performance.now() / 400)) % 2 === 0) {
-          ctx.fillStyle = '#ff5544';
-          ctx.fillRect(x, Math.floor(topY - lineH * 0.78), 1, 2);
+        const prof = duckProfile(fract);
+        if (prof) {
+          const yc = topY - lineH * 0.40 + prof.c * lineH;
+          const half = Math.max(1, prof.h * lineH);
+          ctx.fillStyle = shadeColor('#171008', lightFactor);
+          ctx.fillRect(x, Math.round(yc - half), 1, Math.round(half * 2));
+          if (fract > 0.70 && fract < 0.735) {   // eye dot on the head
+            ctx.fillStyle = '#8a1414';
+            ctx.fillRect(x, Math.round(yc - half * 0.3), 1, 1);
+          }
         }
         break;
       }
@@ -980,16 +999,31 @@ const Raycaster = (() => {
         break;
       }
       case 'roof': {
-        // Subtle roofline shadow + a peak in the center of each tile so the
-        // hangar reads as having a slightly pitched roof.
-        ctx.fillStyle = dark;
-        ctx.fillRect(x, topY, 1, 2);
-        const dx = Math.abs(fract - 0.5);
-        if (dx < 0.04) {
-          const h = lineH * 0.06;
-          ctx.fillStyle = dark;
-          ctx.fillRect(x, topY - h, 1, h);
+        // Hanok roof poking above the hall wall: a band of rounded ceramic
+        // tiles topped by a heavy 용마루 ridge beam, with an eave shadow under
+        // the body's top edge.
+        const u = wallU * 5;                   // 5 ridge tiles per map tile
+        const tf = u - Math.floor(u);
+        const bump = Math.sin(tf * Math.PI);
+        const tileH = Math.max(3, lineH * (0.06 + bump * 0.05));
+        const sh = 28 + Math.floor(bump * 26);
+        ctx.fillStyle = `rgb(${sh},${sh},${sh + 6})`;
+        ctx.fillRect(x, topY - tileH, 1, tileH);
+        if (tf < 0.07 || tf > 0.93) {
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(x, topY - tileH, 1, tileH);
         }
+        if (bump > 0.6) {
+          ctx.fillStyle = 'rgba(205,210,220,0.22)';
+          ctx.fillRect(x, topY - tileH, 1, 1);
+        }
+        const ridgeH = Math.max(2, lineH * 0.028);
+        ctx.fillStyle = shadeColor('#1b1b22', lightFactor);
+        ctx.fillRect(x, topY - tileH - ridgeH, 1, ridgeH);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(x, topY - tileH - ridgeH, 1, 1);
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';     // eave shadow
+        ctx.fillRect(x, topY, 1, 2);
         break;
       }
       case 'corners': {
@@ -1005,6 +1039,28 @@ const Raycaster = (() => {
         break;
       }
     }
+  }
+
+  // Carved-duck silhouette for the 솟대 top deco. Given the per-column U
+  // fraction within the tile it returns the bird's vertical centre offset `c`
+  // (lineH units, negative = higher) and half-thickness `h`, or null when the
+  // column falls outside the bird. Runs tail → body → neck/head → beak.
+  function duckProfile(f) {
+    if (f < 0.28 || f > 0.84) return null;
+    if (f < 0.40) {                  // tail, flaring up toward the left
+      const t = (0.40 - f) / 0.12;
+      return { c: -0.02 * t, h: 0.010 + 0.022 * (1 - t) };
+    }
+    if (f <= 0.62) {                 // body oval
+      const t = (f - 0.40) / 0.22;
+      return { c: 0, h: 0.012 + 0.05 * Math.sin(t * Math.PI) };
+    }
+    if (f <= 0.74) {                 // neck + head rising
+      const t = (f - 0.62) / 0.12;
+      return { c: -0.055 * t, h: Math.max(0.02, 0.045 - 0.012 * t) };
+    }
+    const t = (f - 0.74) / 0.10;     // beak
+    return { c: -0.055, h: 0.012 * (1 - t) + 0.003 };
   }
 
   // ---------- Sprites + helpers ----------
