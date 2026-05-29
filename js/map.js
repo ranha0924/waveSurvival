@@ -157,7 +157,7 @@ const GameMap = (() => {
     4: { heightFactor: 1.00, seeOver: false, topDeco: 'jagged'  }, // 부적 토담 — half-broken mud
     5: { heightFactor: 0.50, seeOver: true,  topDeco: null      }, // 짚단 — low cover
     6: { heightFactor: 0.55, seeOver: true,  topDeco: null      }, // 폐 자재 — debris pile, see over
-    7: { heightFactor: 1.60, seeOver: false, topDeco: 'antenna' }, // 솟대 — tall pole + bird
+    7: { heightFactor: 1.60, seeOver: false, topDeco: null     }, // 솟대 — billboard prop; shape blocks bullets via seeOver:false
     8: { heightFactor: 0.65, seeOver: true,  topDeco: null      }  // 장독 — jar height, see over
   };
 
@@ -171,6 +171,13 @@ const GameMap = (() => {
     const t = getTile(x, y);
     return t >= 1 && t <= 8;
   }
+
+  // Tiles the raycaster renders as solid wall columns. The freestanding shrine
+  // objects — 3 돌무더기, 5 짚단, 6 폐자재, 7 솟대, 8 장독 — are drawn as shaped
+  // billboard sprites (Environment props) instead of square tiles, so they're
+  // excluded here even though they still block movement / sight (isWall). Only
+  // the perimeter (1), main hall (2) and 부적 토담 (4) read as actual walls.
+  function isRenderWall(t) { return t === 1 || t === 2 || t === 4; }
 
   function getWallColor(type) { return wallColors[type] || wallColors[1]; }
   function getPattern(type) { return (wallColors[type] && wallColors[type].pattern) || 'concrete'; }
@@ -227,7 +234,7 @@ const GameMap = (() => {
 
   return {
     W, H, data,
-    getTile, isWall, getWallColor, getPattern, getShape,
+    getTile, isWall, isRenderWall, getWallColor, getPattern, getShape,
     getSpawnPoints, canMove, tryMove, hasLineOfSight,
     PLAYER_START
   };

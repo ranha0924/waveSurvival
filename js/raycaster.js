@@ -114,6 +114,9 @@ const Raycaster = (() => {
     if (typeof Environment !== 'undefined' && Environment.getFlags) {
       for (const f of Environment.getFlags()) push(f.x, f.y, 'flag', f);
     }
+    if (typeof Environment !== 'undefined' && Environment.getProps) {
+      for (const p of Environment.getProps()) push(p.x, p.y, 'prop', p);
+    }
     sprites.sort((a, b) => b.dist - a.dist);
 
     for (const s of sprites) {
@@ -121,8 +124,55 @@ const Raycaster = (() => {
       else if (s.type === 'pickup') drawPickupSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'tree') drawTreeSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'flag') drawFlagSprite(player, s.ref, horizonOffset, theme);
+      else if (s.type === 'prop') drawPropSprite(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
     }
+  }
+
+  // Shrine prop billboards — jars, spirit poles, straw bundles, rubble and
+  // stone cairns. Each is a shaped sprite (transparent background) anchored
+  // with its base on the floor at the projected distance, so it reads as a
+  // real object instead of a square tile. Per-type height factor mirrors the
+  // old wallShapes heights; width follows the canvas aspect. Wall zBuffer
+  // clipping still applies so a prop behind the hall is hidden correctly,
+  // while prop-vs-sprite overlap is resolved by the far→near paint order
+  // (giving free "see over the jar at its head" behaviour).
+  const PROP_HEIGHT = { 3: 0.72, 5: 0.62, 6: 0.50, 7: 2.20, 8: 0.80 };
+  function drawPropSprite(player, p, horizonOffset, theme) {
+    const proj = projectSprite(player, p.x, p.y);
+    if (!proj) return;
+    const canvas = Environment.getPropCanvas(p.type);
+    if (!canvas) return;
+    const horizon = H / 2 + horizonOffset;
+    const lineH = H / proj.dist;
+    const aspect = canvas.width / canvas.height;
+    const hf = PROP_HEIGHT[p.type] || 0.7;
+    const propH = Math.max(2, Math.floor(lineH * hf * (p.scale || 1)));
+    const propW = Math.max(2, Math.floor(propH * aspect));
+    const groundedBottom = horizon + lineH / 2;
+    const drawStartY = Math.floor(groundedBottom - propH);
+    const drawStartX = Math.floor(proj.screenX - propW / 2);
+    const xStart = Math.max(0, drawStartX);
+    const xEnd = Math.min(W, drawStartX + propW);
+    // Gentle distance fade so far props melt into the haze; near cover stays
+    // solid (fade is 1 until half the fog distance).
+    const fogD = (theme && theme.fogDist) || 16;
+    const fade = Math.max(0, Math.min(1, 1 - (proj.dist - fogD * 0.5) / fogD));
+    if (fade <= 0.02) return;
+    ctx.save();
+    ctx.globalAlpha = fade;
+    for (let x = xStart; x < xEnd; x++) {
+      let dstY1 = drawStartY + propH;
+      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
+      if (dstY1 <= drawStartY) continue;
+      let u = (x - drawStartX) / propW;
+      if (p.flip) u = 1 - u;
+      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
+      const dstH = dstY1 - drawStartY;
+      const srcH = Math.max(1, Math.floor((dstH / propH) * canvas.height));
+      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
+    }
+    ctx.restore();
   }
 
   // 오방기 sprite. Drawn taller than a tree (1.9× wall column) so the
@@ -804,7 +854,10 @@ const Raycaster = (() => {
           side = 1;
         }
         const t = GameMap.getTile(mapX, mapY);
-        if (t < 1 || t > 8) continue;
+        // Floor, spawn gates AND the shaped shrine objects (drawn as billboard
+        // props) all let the ray pass through — only buildings/perimeter walls
+        // terminate it. Collision still uses the full grid via GameMap.isWall.
+        if (!GameMap.isRenderWall(t)) continue;
         const shape = GameMap.getShape(t);
         let perpDist;
         if (side === 0) perpDist = (mapX - player.x + (1 - stepX) / 2) / (rayDirX || 1e-9);
@@ -946,29 +999,6 @@ const Raycaster = (() => {
         }
         break;
       }
-      case 'antenna': {
-        // 솟대 — a spirit pole crowned with a carved wooden duck. The pole tip
-        // continues above the wall body and the bird sits at the very top,
-        // facing along +U so it reads as a clean silhouette against the sky.
-        const adx = Math.abs(fract - 0.5);
-        if (adx < 0.07) {
-          const h = lineH * 0.34;
-          ctx.fillStyle = shadeColor('#2a1a0c', lightFactor);
-          ctx.fillRect(x, topY - h, 1, h);
-        }
-        const prof = duckProfile(fract);
-        if (prof) {
-          const yc = topY - lineH * 0.40 + prof.c * lineH;
-          const half = Math.max(1, prof.h * lineH);
-          ctx.fillStyle = shadeColor('#171008', lightFactor);
-          ctx.fillRect(x, Math.round(yc - half), 1, Math.round(half * 2));
-          if (fract > 0.70 && fract < 0.735) {   // eye dot on the head
-            ctx.fillStyle = '#8a1414';
-            ctx.fillRect(x, Math.round(yc - half * 0.3), 1, 1);
-          }
-        }
-        break;
-      }
       case 'turret': {
         // Center-of-tile raised cab/turret box with a top edge highlight.
         if (fract > 0.28 && fract < 0.72) {
@@ -1039,28 +1069,6 @@ const Raycaster = (() => {
         break;
       }
     }
-  }
-
-  // Carved-duck silhouette for the 솟대 top deco. Given the per-column U
-  // fraction within the tile it returns the bird's vertical centre offset `c`
-  // (lineH units, negative = higher) and half-thickness `h`, or null when the
-  // column falls outside the bird. Runs tail → body → neck/head → beak.
-  function duckProfile(f) {
-    if (f < 0.28 || f > 0.84) return null;
-    if (f < 0.40) {                  // tail, flaring up toward the left
-      const t = (0.40 - f) / 0.12;
-      return { c: -0.02 * t, h: 0.010 + 0.022 * (1 - t) };
-    }
-    if (f <= 0.62) {                 // body oval
-      const t = (f - 0.40) / 0.22;
-      return { c: 0, h: 0.012 + 0.05 * Math.sin(t * Math.PI) };
-    }
-    if (f <= 0.74) {                 // neck + head rising
-      const t = (f - 0.62) / 0.12;
-      return { c: -0.055 * t, h: Math.max(0.02, 0.045 - 0.012 * t) };
-    }
-    const t = (f - 0.74) / 0.10;     // beak
-    return { c: -0.055, h: 0.012 * (1 - t) + 0.003 };
   }
 
   // ---------- Sprites + helpers ----------
