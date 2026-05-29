@@ -114,6 +114,9 @@ const Raycaster = (() => {
     if (typeof Environment !== 'undefined' && Environment.getFlags) {
       for (const f of Environment.getFlags()) push(f.x, f.y, 'flag', f);
     }
+    if (typeof Environment !== 'undefined' && Environment.getProps) {
+      for (const p of Environment.getProps()) push(p.x, p.y, 'prop', p);
+    }
     sprites.sort((a, b) => b.dist - a.dist);
 
     for (const s of sprites) {
@@ -121,8 +124,55 @@ const Raycaster = (() => {
       else if (s.type === 'pickup') drawPickupSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'tree') drawTreeSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'flag') drawFlagSprite(player, s.ref, horizonOffset, theme);
+      else if (s.type === 'prop') drawPropSprite(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
     }
+  }
+
+  // Shrine prop billboards — jars, spirit poles, straw bundles, rubble and
+  // stone cairns. Each is a shaped sprite (transparent background) anchored
+  // with its base on the floor at the projected distance, so it reads as a
+  // real object instead of a square tile. Per-type height factor mirrors the
+  // old wallShapes heights; width follows the canvas aspect. Wall zBuffer
+  // clipping still applies so a prop behind the hall is hidden correctly,
+  // while prop-vs-sprite overlap is resolved by the far→near paint order
+  // (giving free "see over the jar at its head" behaviour).
+  const PROP_HEIGHT = { 3: 0.72, 5: 0.62, 6: 0.50, 7: 2.20, 8: 0.80 };
+  function drawPropSprite(player, p, horizonOffset, theme) {
+    const proj = projectSprite(player, p.x, p.y);
+    if (!proj) return;
+    const canvas = Environment.getPropCanvas(p.type);
+    if (!canvas) return;
+    const horizon = H / 2 + horizonOffset;
+    const lineH = H / proj.dist;
+    const aspect = canvas.width / canvas.height;
+    const hf = PROP_HEIGHT[p.type] || 0.7;
+    const propH = Math.max(2, Math.floor(lineH * hf * (p.scale || 1)));
+    const propW = Math.max(2, Math.floor(propH * aspect));
+    const groundedBottom = horizon + lineH / 2;
+    const drawStartY = Math.floor(groundedBottom - propH);
+    const drawStartX = Math.floor(proj.screenX - propW / 2);
+    const xStart = Math.max(0, drawStartX);
+    const xEnd = Math.min(W, drawStartX + propW);
+    // Gentle distance fade so far props melt into the haze; near cover stays
+    // solid (fade is 1 until half the fog distance).
+    const fogD = (theme && theme.fogDist) || 16;
+    const fade = Math.max(0, Math.min(1, 1 - (proj.dist - fogD * 0.5) / fogD));
+    if (fade <= 0.02) return;
+    ctx.save();
+    ctx.globalAlpha = fade;
+    for (let x = xStart; x < xEnd; x++) {
+      let dstY1 = drawStartY + propH;
+      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
+      if (dstY1 <= drawStartY) continue;
+      let u = (x - drawStartX) / propW;
+      if (p.flip) u = 1 - u;
+      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
+      const dstH = dstY1 - drawStartY;
+      const srcH = Math.max(1, Math.floor((dstH / propH) * canvas.height));
+      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
+    }
+    ctx.restore();
   }
 
   // 오방기 sprite. Drawn taller than a tree (1.9× wall column) so the
@@ -804,7 +854,10 @@ const Raycaster = (() => {
           side = 1;
         }
         const t = GameMap.getTile(mapX, mapY);
-        if (t < 1 || t > 8) continue;
+        // Floor, spawn gates AND the shaped shrine objects (drawn as billboard
+        // props) all let the ray pass through — only buildings/perimeter walls
+        // terminate it. Collision still uses the full grid via GameMap.isWall.
+        if (!GameMap.isRenderWall(t)) continue;
         const shape = GameMap.getShape(t);
         let perpDist;
         if (side === 0) perpDist = (mapX - player.x + (1 - stepX) / 2) / (rayDirX || 1e-9);
@@ -913,40 +966,36 @@ const Raycaster = (() => {
         break;
       }
       case 'jagged': {
-        // Broken concrete crown: deterministic per-slot height + a thin
-        // barbed-wire dotted line a bit above.
-        const slot = Math.floor(wallU * 18);
-        const n = Math.sin(slot * 12.9898) * 43758.5453;
-        const noise = n - Math.floor(n);
-        const h = Math.max(1, lineH * (0.03 + noise * 0.06));
-        ctx.fillStyle = dark;
-        ctx.fillRect(x, topY - h, 1, h);
-        if (Math.floor(wallU * 48) % 4 === 0) {
-          ctx.fillStyle = '#181614';
-          ctx.fillRect(x, Math.floor(topY - lineH * 0.13), 1, 1);
-        }
-        break;
-      }
-      case 'antenna': {
-        // Tall central spire with a few cross-bars; thin "guy wires" tapering
-        // outward make the silhouette read as a comms tower from any angle.
-        const dx = Math.abs(fract - 0.5);
-        if (dx < 0.025) {
-          const h = lineH * 0.75;
-          ctx.fillStyle = '#0e1014';
+        // Earthen wall (흙담 / 부적 토담) crowned with a small clay-tile coping
+        // (담장 기와). Roughly one section in six has lost its cap and shows a
+        // ragged mud crest instead, matching the half-collapsed setting.
+        const seg = Math.floor(wallU * 3);
+        const bn = Math.sin(seg * 91.17) * 43758.5453;
+        const broken = (bn - Math.floor(bn)) < 0.18;
+        if (broken) {
+          const slot = Math.floor(wallU * 22);
+          const n = Math.sin(slot * 12.9898) * 43758.5453;
+          const noise = n - Math.floor(n);
+          const h = Math.max(1, lineH * (0.02 + noise * 0.05));
+          ctx.fillStyle = dark;
           ctx.fillRect(x, topY - h, 1, h);
-        } else if (dx < 0.18) {
-          // Cross-bars
-          const bars = [0.30, 0.45, 0.58, 0.68];
-          for (const hf of bars) {
-            ctx.fillStyle = shadeColor('#3a3d44', lightFactor);
-            ctx.fillRect(x, Math.floor(topY - lineH * hf), 1, 1);
+        } else {
+          const u = wallU * 6;                 // 6 coping tiles per map tile
+          const tf = u - Math.floor(u);
+          const bump = Math.sin(tf * Math.PI);  // convex tile crown
+          const capH = Math.max(2, lineH * (0.045 + bump * 0.045));
+          ctx.fillStyle = shadeColor('#3b3b42', lightFactor);
+          ctx.fillRect(x, topY - capH, 1, capH);
+          if (bump > 0.55) {
+            ctx.fillStyle = shadeColor('#5c5c66', Math.min(1.5, lightFactor * 1.2));
+            ctx.fillRect(x, topY - capH, 1, 1);
           }
-        }
-        // Spire tip beacon pulse
-        if (dx < 0.04 && Math.floor((performance.now() / 400)) % 2 === 0) {
-          ctx.fillStyle = '#ff5544';
-          ctx.fillRect(x, Math.floor(topY - lineH * 0.78), 1, 2);
+          if (tf < 0.08 || tf > 0.92) {
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(x, topY - capH, 1, capH);
+          }
+          ctx.fillStyle = 'rgba(0,0,0,0.4)';   // eave shadow under the cap
+          ctx.fillRect(x, topY, 1, 1);
         }
         break;
       }
@@ -980,16 +1029,31 @@ const Raycaster = (() => {
         break;
       }
       case 'roof': {
-        // Subtle roofline shadow + a peak in the center of each tile so the
-        // hangar reads as having a slightly pitched roof.
-        ctx.fillStyle = dark;
-        ctx.fillRect(x, topY, 1, 2);
-        const dx = Math.abs(fract - 0.5);
-        if (dx < 0.04) {
-          const h = lineH * 0.06;
-          ctx.fillStyle = dark;
-          ctx.fillRect(x, topY - h, 1, h);
+        // Hanok roof poking above the hall wall: a band of rounded ceramic
+        // tiles topped by a heavy 용마루 ridge beam, with an eave shadow under
+        // the body's top edge.
+        const u = wallU * 5;                   // 5 ridge tiles per map tile
+        const tf = u - Math.floor(u);
+        const bump = Math.sin(tf * Math.PI);
+        const tileH = Math.max(3, lineH * (0.06 + bump * 0.05));
+        const sh = 28 + Math.floor(bump * 26);
+        ctx.fillStyle = `rgb(${sh},${sh},${sh + 6})`;
+        ctx.fillRect(x, topY - tileH, 1, tileH);
+        if (tf < 0.07 || tf > 0.93) {
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(x, topY - tileH, 1, tileH);
         }
+        if (bump > 0.6) {
+          ctx.fillStyle = 'rgba(205,210,220,0.22)';
+          ctx.fillRect(x, topY - tileH, 1, 1);
+        }
+        const ridgeH = Math.max(2, lineH * 0.028);
+        ctx.fillStyle = shadeColor('#1b1b22', lightFactor);
+        ctx.fillRect(x, topY - tileH - ridgeH, 1, ridgeH);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(x, topY - tileH - ridgeH, 1, 1);
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';     // eave shadow
+        ctx.fillRect(x, topY, 1, 2);
         break;
       }
       case 'corners': {
