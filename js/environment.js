@@ -95,6 +95,16 @@ const Environment = (() => {
   const trees = [];           // { x, y, variant, scale } in world coords
   const treeAssets = [];      // index → Image | canvas
   const treeFallbackCanvases = []; // same index → procedural canvas
+  // Fraction of each variant's art that is transparent padding below the
+  // trunk. The WebP assets aren't bottom-tight, so without this the trunk
+  // floats above the floor; drawTreeSprite drops the sprite by this much so
+  // the opaque trunk base lands on the ground. Procedural fallbacks are
+  // already bottom-tight (0).
+  const treeBottomPad = [];
+  // Trunk collision footprint (world units). Point test like the props, so you
+  // bump the trunk but can weave between trees without an invisible ring.
+  const TREE_RADIUS = 0.20;
+  let treeGrid = null;        // "tileX,tileY" → tree, for O(1) nearby lookup
   // External tree art, in variant order. Picked so the forest's silhouette
   // mix reads as: lots of straight conifers + scattered red pines + a
   // few broadleaf + occasional creepy dead tree.
@@ -116,6 +126,45 @@ const Environment = (() => {
       t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+  }
+
+  // Measure the transparent bottom padding of a decoded tree image as a
+  // fraction of its height. CORS-safe: if getImageData throws (file://), fall
+  // back to 0 so the tree just keeps its old anchoring.
+  function measureBottomPad(img) {
+    const w = img.width, h = img.height;
+    if (!w || !h) return 0;
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    const tc = tmp.getContext('2d');
+    tc.drawImage(img, 0, 0);
+    let data;
+    try { data = tc.getImageData(0, 0, w, h).data; } catch (e) { return 0; }
+    let bot = 0;
+    for (let y = h - 1; y >= 0; y--) {
+      let opaque = false;
+      const base = y * w * 4;
+      for (let x = 0; x < w; x++) { if (data[base + x * 4 + 3] > 16) { opaque = true; break; } }
+      if (opaque) break;
+      bot++;
+    }
+    return bot / h;
+  }
+
+  // True if (x,y) lies inside a nearby tree's trunk footprint. Scans the 3×3
+  // tile neighbourhood (one tree per tile).
+  function treeBlocks(x, y) {
+    if (!treeGrid) return false;
+    const gx = Math.floor(x), gy = Math.floor(y);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const t = treeGrid.get((gx + dx) + ',' + (gy + dy));
+        if (!t) continue;
+        const ex = x - t.x, ey = y - t.y;
+        if (ex * ex + ey * ey < TREE_RADIUS * TREE_RADIUS) return true;
+      }
+    }
+    return false;
   }
 
   function pickVariant(rfn) {
@@ -316,6 +365,9 @@ const Environment = (() => {
         });
       }
     }
+    // Spatial index for trunk collision (one tree per tile after jitter).
+    treeGrid = new Map();
+    for (const t of trees) treeGrid.set(Math.floor(t.x) + ',' + Math.floor(t.y), t);
   }
 
   // ---------- 오방기 (5-colour shaman flag pole) ----------
@@ -699,8 +751,10 @@ const Environment = (() => {
       img.onload = () => {
         // Once decoded, point this variant at the real image. All future
         // draws pick it up; trees already placed don't need updating
-        // since they reference by variant index.
+        // since they reference by variant index. Measure the trunk's bottom
+        // padding so the renderer can plant it flush on the floor.
         treeAssets[i] = img;
+        treeBottomPad[i] = measureBottomPad(img);
       };
       img.onerror = () => { /* keep fallback */ };
       img.src = TREE_FILES[i];
@@ -721,6 +775,7 @@ const Environment = (() => {
   function getTreeCanvas(variant) {
     return treeAssets[variant] || treeFallbackCanvases[variant] || treeFallbackCanvases[0];
   }
+  function getTreeBottomPad(variant) { return treeBottomPad[variant] || 0; }
   function getFlags() { return flags; }
   function getFlagCanvas() { return flagCanvas; }
   function getProps() { return props; }
@@ -728,7 +783,7 @@ const Environment = (() => {
 
   return {
     init, update, themeForWave,
-    getTrees, getTreeCanvas,
+    getTrees, getTreeCanvas, getTreeBottomPad, treeBlocks,
     getFlags, getFlagCanvas,
     getProps, getPropCanvas, propBlocks
   };

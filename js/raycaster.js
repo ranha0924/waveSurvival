@@ -227,7 +227,10 @@ const Raycaster = (() => {
     // by comparison rather than oversized.
     const treeH = Math.floor(lineH * 2.5 * (t.scale || 1));
     const treeW = Math.floor(treeH * aspect);
-    const groundedBottom = horizon + lineH / 2;
+    // Drop the sprite by the art's transparent bottom padding so the opaque
+    // trunk base sits on the floor instead of floating above it.
+    const pad = Environment.getTreeBottomPad ? Environment.getTreeBottomPad(t.variant) : 0;
+    const groundedBottom = horizon + lineH / 2 + pad * treeH;
     const drawStartY = Math.floor(groundedBottom - treeH);
     const drawStartX = Math.floor(proj.screenX - treeW / 2);
 
