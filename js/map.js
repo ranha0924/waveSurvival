@@ -211,10 +211,13 @@ const GameMap = (() => {
     if (isWall(x + radius, y - radius)) return false;
     if (isWall(x - radius, y + radius)) return false;
     if (isWall(x + radius, y + radius)) return false;
-    // Point-in-footprint collision for the shaped shrine props so they feel
-    // solid without the full-tile invisible wall the player used to bump into.
-    if (typeof Environment !== 'undefined' && Environment.propBlocks &&
-        Environment.propBlocks(x, y)) return false;
+    // Point-in-footprint collision for the shaped shrine props + tree trunks so
+    // they feel solid without the full-tile invisible wall the player used to
+    // bump into.
+    if (typeof Environment !== 'undefined') {
+      if (Environment.propBlocks && Environment.propBlocks(x, y)) return false;
+      if (Environment.treeBlocks && Environment.treeBlocks(x, y)) return false;
+    }
     return true;
   }
 
