@@ -128,9 +128,12 @@ const Environment = (() => {
     };
   }
 
-  // Measure the transparent bottom padding of a decoded tree image as a
-  // fraction of its height. CORS-safe: if getImageData throws (file://), fall
-  // back to 0 so the tree just keeps its old anchoring.
+  // Measure how far above its art's bottom a tree's real trunk base sits, as a
+  // fraction of height. We look for the lowest row holding a SUBSTANTIAL slice
+  // of trunk rather than the lowest opaque pixel — the dead tree dangles thin
+  // roots/branches below its actual base, and grounding those faint tips left
+  // the visible trunk hovering. CORS-safe: returns 0 if getImageData throws
+  // (file://) so the tree just keeps its old anchoring.
   function measureBottomPad(img) {
     const w = img.width, h = img.height;
     if (!w || !h) return 0;
@@ -140,12 +143,13 @@ const Environment = (() => {
     tc.drawImage(img, 0, 0);
     let data;
     try { data = tc.getImageData(0, 0, w, h).data; } catch (e) { return 0; }
+    const minN = Math.max(6, Math.floor(w * 0.03));
     let bot = 0;
     for (let y = h - 1; y >= 0; y--) {
-      let opaque = false;
+      let n = 0;
       const base = y * w * 4;
-      for (let x = 0; x < w; x++) { if (data[base + x * 4 + 3] > 16) { opaque = true; break; } }
-      if (opaque) break;
+      for (let x = 0; x < w; x++) { if (data[base + x * 4 + 3] > 60) n++; }
+      if (n >= minN) break;
       bot++;
     }
     return bot / h;
