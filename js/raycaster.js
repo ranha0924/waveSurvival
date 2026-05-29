@@ -222,9 +222,10 @@ const Raycaster = (() => {
     const horizon = H / 2 + horizonOffset;
     const lineH = H / proj.dist;
     const aspect = canvas.width / canvas.height;
-    // Trees are tall: ~1.6× the wall column height feels right for a 64-px
-    // sprite that's meant to read as a 5–6m tree against a 2m wall.
-    const treeH = Math.floor(lineH * 1.6 * (t.scale || 1));
+    // Trees tower over the ~2m (1× lineH) enemies: ~2.5× the wall column so a
+    // 5–6m tree reads correctly against the shrine and the zombies feel small
+    // by comparison rather than oversized.
+    const treeH = Math.floor(lineH * 2.5 * (t.scale || 1));
     const treeW = Math.floor(treeH * aspect);
     const groundedBottom = horizon + lineH / 2;
     const drawStartY = Math.floor(groundedBottom - treeH);

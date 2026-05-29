@@ -431,13 +431,11 @@ const Player = (() => {
       }
       if (dist > maxDist) return { dist: maxDist, h: 0 };
       const t = GameMap.getTile(mapX, mapY);
-      // Stop the bullet at any wall that isn't explicitly chest-high cover.
-      // Previously this only checked types 1..4, which silently let bullets
-      // (and sight) pass through comms towers / hazard panels / wrecks even
-      // though they're full-height structures.
-      if (t >= 1 && t <= 8) {
-        const shape = GameMap.getShape(t);
-        if (!shape.seeOver) return { dist, h: shape.heightFactor };
+      // Stop the bullet at solid walls only (perimeter / hall / 부적 토담). The
+      // shaped shrine objects are small free-standing props now, so shots pass
+      // them by — consistent with being able to walk right up to them.
+      if (GameMap.isRenderWall(t)) {
+        return { dist, h: GameMap.getShape(t).heightFactor };
       }
     }
     return { dist: maxDist, h: 0 };

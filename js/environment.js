@@ -403,6 +403,29 @@ const Environment = (() => {
   // background and a baked contact shadow so it grounds on the floor.
   const props = [];               // { x, y, type, scale, flip } in world coords
   const propCanvases = {};        // tile type → canvas
+  // Collision radius per prop type (world units) — deliberately well under a
+  // half-tile so the object feels solid but the player can walk right up to it
+  // and slip between neighbours, instead of hitting a full-tile invisible wall.
+  const PROP_RADIUS = { 3: 0.34, 5: 0.32, 6: 0.30, 7: 0.16, 8: 0.30 };
+  let propGrid = null;            // "tileX,tileY" → prop, for O(1) nearby lookup
+
+  // True if a circle of radius entityR at (x,y) overlaps any nearby prop's
+  // collision circle. Called from GameMap.canMove for player + enemy movement,
+  // so it only scans the 3×3 tile neighbourhood (props are one-per-tile).
+  function propBlocks(x, y, entityR) {
+    if (!propGrid) return false;
+    const gx = Math.floor(x), gy = Math.floor(y);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const p = propGrid.get((gx + dx) + ',' + (gy + dy));
+        if (!p) continue;
+        const rr = (PROP_RADIUS[p.type] || 0.30) + entityR;
+        const ex = x - p.x, ey = y - p.y;
+        if (ex * ex + ey * ey < rr * rr) return true;
+      }
+    }
+    return false;
+  }
 
   function newPropCanvas(w, h) {
     const cv = document.createElement('canvas');
@@ -655,6 +678,9 @@ const Environment = (() => {
         }
       }
     }
+    // Spatial index keyed by tile so movement collision is O(1) per query.
+    propGrid = new Map();
+    for (const p of props) propGrid.set(Math.floor(p.x) + ',' + Math.floor(p.y), p);
   }
 
   function init() {
@@ -701,6 +727,6 @@ const Environment = (() => {
     init, update, themeForWave,
     getTrees, getTreeCanvas,
     getFlags, getFlagCanvas,
-    getProps, getPropCanvas
+    getProps, getPropCanvas, propBlocks
   };
 })();
