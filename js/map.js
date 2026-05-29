@@ -167,9 +167,14 @@ const GameMap = (() => {
     return data[iy][ix];
   }
 
+  // A tile that physically blocks movement / sight as a full wall. Only the
+  // perimeter (1), main hall (2) and 부적 토담 (4) qualify. The freestanding
+  // shrine objects (3/5/6/7/8) are drawn as shaped billboards and use a small
+  // circular collision (Environment.propBlocks) instead of blocking their whole
+  // tile, so the player can walk right up to and between them.
   function isWall(x, y) {
     const t = getTile(x, y);
-    return t >= 1 && t <= 8;
+    return t === 1 || t === 2 || t === 4;
   }
 
   // Tiles the raycaster renders as solid wall columns. The freestanding shrine
@@ -206,6 +211,10 @@ const GameMap = (() => {
     if (isWall(x + radius, y - radius)) return false;
     if (isWall(x - radius, y + radius)) return false;
     if (isWall(x + radius, y + radius)) return false;
+    // Small circular collision for the shaped shrine props so they feel solid
+    // without the full-tile invisible wall the player used to bump into.
+    if (typeof Environment !== 'undefined' && Environment.propBlocks &&
+        Environment.propBlocks(x, y, radius)) return false;
     return true;
   }
 
