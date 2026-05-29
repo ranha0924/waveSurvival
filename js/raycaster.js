@@ -109,7 +109,15 @@ const Raycaster = (() => {
       for (const k of Pickups.getList()) push(k.x, k.y, 'pickup', k);
     }
     if (typeof Environment !== 'undefined' && Environment.getTrees) {
-      for (const t of Environment.getTrees()) push(t.x, t.y, 'tree', t);
+      // Cull trees past the fog: they fade to nothing anyway, so skip the
+      // projection + sort cost for the hundreds ringing the map.
+      const maxTreeD2 = Math.pow((theme.fogDist || 18) * 1.45, 2);
+      for (const t of Environment.getTrees()) {
+        const dx = t.x - player.x, dy = t.y - player.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > maxTreeD2) continue;
+        sprites.push({ dist: d2, type: 'tree', ref: t });
+      }
     }
     if (typeof Environment !== 'undefined' && Environment.getFlags) {
       for (const f of Environment.getFlags()) push(f.x, f.y, 'flag', f);
@@ -127,6 +135,55 @@ const Raycaster = (() => {
       else if (s.type === 'prop') drawPropSprite(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
     }
+  }
+
+  // Shared billboard blitter. The classic raycaster path blits one 1px column
+  // per drawImage so per-column wall clipping works — but with hundreds of
+  // trees that's tens of thousands of drawImage calls a frame and tanks the
+  // frame rate. When no wall in the sprite's column span is nearer than the
+  // sprite (the common open case), we draw the whole thing in ONE drawImage;
+  // only genuinely wall-clipped sprites fall back to the per-column path.
+  function blitBillboard(src, x0, y0, w, h, dist, alpha, flip) {
+    if (w <= 0 || h <= 0) return;
+    const sw = src.width, sh = src.height;
+    if (!sw || !sh) return;
+    const xStart = Math.max(0, x0);
+    const xEnd = Math.min(W, x0 + w);
+    if (xEnd <= xStart) return;
+
+    let clipped = false;
+    for (let x = xStart; x < xEnd; x++) {
+      if (zBuffer[x] < dist) { clipped = true; break; }
+    }
+
+    const prevAlpha = ctx.globalAlpha;
+    if (alpha !== 1) ctx.globalAlpha = alpha;
+
+    if (!clipped) {
+      if (flip) {
+        ctx.save();
+        ctx.translate(x0 + w, y0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(src, 0, 0, sw, sh, 0, 0, w, h);
+        ctx.restore();
+      } else {
+        ctx.drawImage(src, 0, 0, sw, sh, x0, y0, w, h);
+      }
+    } else {
+      for (let x = xStart; x < xEnd; x++) {
+        let dstY1 = y0 + h;
+        if (zBuffer[x] < dist) dstY1 = Math.min(dstY1, wallTopY[x]);
+        if (dstY1 <= y0) continue;
+        let u = (x - x0) / w;
+        if (flip) u = 1 - u;
+        const srcX = Math.min(sw - 1, Math.max(0, Math.floor(u * sw)));
+        const dstH = dstY1 - y0;
+        const srcH = Math.max(1, Math.floor((dstH / h) * sh));
+        ctx.drawImage(src, srcX, 0, 1, srcH, x, y0, 1, dstH);
+      }
+    }
+
+    if (alpha !== 1) ctx.globalAlpha = prevAlpha;
   }
 
   // Shrine prop billboards — jars, spirit poles, straw bundles, rubble and
@@ -152,27 +209,12 @@ const Raycaster = (() => {
     const groundedBottom = horizon + lineH / 2;
     const drawStartY = Math.floor(groundedBottom - propH);
     const drawStartX = Math.floor(proj.screenX - propW / 2);
-    const xStart = Math.max(0, drawStartX);
-    const xEnd = Math.min(W, drawStartX + propW);
     // Gentle distance fade so far props melt into the haze; near cover stays
     // solid (fade is 1 until half the fog distance).
     const fogD = (theme && theme.fogDist) || 16;
     const fade = Math.max(0, Math.min(1, 1 - (proj.dist - fogD * 0.5) / fogD));
     if (fade <= 0.02) return;
-    ctx.save();
-    ctx.globalAlpha = fade;
-    for (let x = xStart; x < xEnd; x++) {
-      let dstY1 = drawStartY + propH;
-      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
-      if (dstY1 <= drawStartY) continue;
-      let u = (x - drawStartX) / propW;
-      if (p.flip) u = 1 - u;
-      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
-      const dstH = dstY1 - drawStartY;
-      const srcH = Math.max(1, Math.floor((dstH / propH) * canvas.height));
-      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
-    }
-    ctx.restore();
+    blitBillboard(canvas, drawStartX, drawStartY, propW, propH, proj.dist, fade, p.flip);
   }
 
   // 오방기 sprite. Drawn taller than a tree (1.9× wall column) so the
@@ -193,19 +235,7 @@ const Raycaster = (() => {
     const groundedBottom = horizon + lineH / 2;
     const drawStartY = Math.floor(groundedBottom - flagH);
     const drawStartX = Math.floor(proj.screenX - flagW / 2);
-    const xStart = Math.max(0, drawStartX);
-    const xEnd = Math.min(W, drawStartX + flagW);
-    for (let x = xStart; x < xEnd; x++) {
-      let dstY1 = drawStartY + flagH;
-      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
-      if (proj.dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
-      if (dstY1 <= drawStartY) continue;
-      const u = (x - drawStartX) / flagW;
-      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
-      const dstH = dstY1 - drawStartY;
-      const srcH = Math.max(1, Math.floor((dstH / flagH) * canvas.height));
-      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
-    }
+    blitBillboard(canvas, drawStartX, drawStartY, flagW, flagH, proj.dist, 1, false);
   }
 
   // Tree billboards. Behave like pickups (column-by-column with zBuffer
@@ -234,31 +264,12 @@ const Raycaster = (() => {
     const drawStartY = Math.floor(groundedBottom - treeH);
     const drawStartX = Math.floor(proj.screenX - treeW / 2);
 
-    const xStart = Math.max(0, drawStartX);
-    const xEnd = Math.min(W, drawStartX + treeW);
-
     // Forest fog: alpha falls off with distance so far trees melt into
     // the haze layer instead of stamping hard silhouettes.
     const fogD = (theme && theme.fogDist) || 22;
     const fade = Math.max(0, Math.min(1, 1 - (proj.dist - fogD * 0.3) / fogD));
     if (fade <= 0.02) return;
-
-    ctx.save();
-    ctx.globalAlpha = fade;
-    for (let x = xStart; x < xEnd; x++) {
-      // Tree fully occludes anything behind it on this column, so respect
-      // the wall zBuffer the same way other sprites do.
-      let dstY1 = drawStartY + treeH;
-      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
-      if (proj.dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
-      if (dstY1 <= drawStartY) continue;
-      const u = (x - drawStartX) / treeW;
-      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
-      const dstH = dstY1 - drawStartY;
-      const srcH = Math.max(1, Math.floor((dstH / treeH) * canvas.height));
-      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
-    }
-    ctx.restore();
+    blitBillboard(canvas, drawStartX, drawStartY, treeW, treeH, proj.dist, fade, false);
   }
 
   // ---------- Pickup sprites ----------
@@ -283,23 +294,7 @@ const Raycaster = (() => {
 
     // Soft pre-despawn fade in the last 3 seconds.
     const lifeFade = Math.min(1, k.life / 3);
-
-    const xStart = Math.max(0, drawStartX);
-    const xEnd = Math.min(W, drawStartX + pickupW);
-    ctx.save();
-    ctx.globalAlpha = lifeFade;
-    for (let x = xStart; x < xEnd; x++) {
-      let dstY1 = drawStartY + pickupH;
-      if (zBuffer[x] < proj.dist) dstY1 = Math.min(dstY1, wallTopY[x]);
-      if (proj.dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
-      if (dstY1 <= drawStartY) continue;
-      const u = (x - drawStartX) / pickupW;
-      const srcX = Math.min(canvas.width - 1, Math.max(0, Math.floor(u * canvas.width)));
-      const dstH = dstY1 - drawStartY;
-      const srcH = Math.max(1, Math.floor((dstH / pickupH) * canvas.height));
-      ctx.drawImage(canvas, srcX, 0, 1, srcH, x, drawStartY, 1, dstH);
-    }
-    ctx.restore();
+    blitBillboard(canvas, drawStartX, drawStartY, pickupW, pickupH, proj.dist, lifeFade, false);
   }
 
   // ---------- Baked assets (concrete tile, star field) ----------
@@ -1234,6 +1229,17 @@ const Raycaster = (() => {
 
     const xStart = Math.max(0, x0);
     const xEnd = Math.min(W, x0 + w);
+    if (xEnd <= xStart || h <= 0) return;
+
+    // Fast path: if no wall in the span is nearer than the enemy, one drawImage.
+    let clipped = false;
+    for (let x = xStart; x < xEnd; x++) {
+      if (zBuffer[x] < dist) { clipped = true; break; }
+    }
+    if (!clipped) {
+      ctx.drawImage(tintBuf, 0, 0, sw, sh, x0, y0, w, h);
+      return;
+    }
     for (let x = xStart; x < xEnd; x++) {
       const u = (x - x0) / w;
       const srcX = Math.min(sw - 1, Math.max(0, Math.floor(u * sw)));
@@ -1241,9 +1247,6 @@ const Raycaster = (() => {
       // Tall opaque wall in front: clip the sprite to the area above the
       // wall's top so the silhouette of a big enemy still pokes over.
       if (zBuffer[x] < dist) dstY1 = Math.min(dstY1, wallTopY[x]);
-      // Short cover (sandbag / wreck) in front: hide everything below the
-      // horizon line in this column.
-      if (dist > shortDist[x]) dstY1 = Math.min(dstY1, horizon);
       if (dstY1 <= y0) continue;
       const dstH = dstY1 - y0;
       const srcH = Math.max(1, Math.floor((dstH / h) * sh));
