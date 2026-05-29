@@ -145,13 +145,16 @@ const Sprites = (() => {
 //   Sprites.register('boss', 'assets/boss.png', { scale: 2 });
 // and the renderer will pick them up automatically. While an asset streams
 // in, the renderer falls back to its procedural rectangle silhouette.
-Sprites.register('grunt',  'assets/zombie.png');
-Sprites.register('rusher', 'assets/rusher.png');
-Sprites.register('tank',   'assets/tank.png',   { scale: 1.5 });
-Sprites.register('ranger', 'assets/ranger.png');
-Sprites.register('boss',   'assets/boss.png',   { scale: 2.2 });
-Sprites.register('bomber', 'assets/bomber.png');
-Sprites.register('splitter', 'assets/splitter.png');
-// Splitter children re-use the grunt zombie art at 0.7× so they read as
-// "smaller broken-off pieces" rather than full-size clones of the parent.
-Sprites.register('splitterChild', 'assets/zombie.png', { scale: 0.7 });
+// Render scales sit ~20% below the old values so the enemies read as
+// human-sized against the taller trees instead of looming. The renderer and
+// the hitscan both read these, so shrinking here keeps aim/headshots aligned.
+Sprites.register('grunt',  'assets/zombie.png', { scale: 0.8 });
+Sprites.register('rusher', 'assets/rusher.png', { scale: 0.8 });
+Sprites.register('tank',   'assets/tank.png',   { scale: 1.2 });
+Sprites.register('ranger', 'assets/ranger.png', { scale: 0.8 });
+Sprites.register('boss',   'assets/boss.png',   { scale: 1.8 });
+Sprites.register('bomber', 'assets/bomber.png', { scale: 0.8 });
+Sprites.register('splitter', 'assets/splitter.png', { scale: 0.8 });
+// Splitter children re-use the grunt zombie art smaller so they read as
+// "broken-off pieces" rather than full-size clones of the parent.
+Sprites.register('splitterChild', 'assets/zombie.png', { scale: 0.55 });
