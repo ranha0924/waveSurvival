@@ -403,25 +403,28 @@ const Environment = (() => {
   // background and a baked contact shadow so it grounds on the floor.
   const props = [];               // { x, y, type, scale, flip } in world coords
   const propCanvases = {};        // tile type → canvas
-  // Collision radius per prop type (world units) — deliberately well under a
-  // half-tile so the object feels solid but the player can walk right up to it
-  // and slip between neighbours, instead of hitting a full-tile invisible wall.
-  const PROP_RADIUS = { 3: 0.34, 5: 0.32, 6: 0.30, 7: 0.16, 8: 0.30 };
+  // Collision footprint per prop type (world units) — sized to the OPAQUE part
+  // of each billboard at ground level (the 솟대 is just a thin pole; the jar /
+  // straw / cairn are fatter). The query is a point test against this radius,
+  // i.e. the entity radius is NOT added, so you're blocked only once your
+  // position is actually inside the object you can see — no invisible ring of
+  // dead space around it.
+  const PROP_RADIUS = { 3: 0.34, 5: 0.38, 6: 0.34, 7: 0.14, 8: 0.30 };
   let propGrid = null;            // "tileX,tileY" → prop, for O(1) nearby lookup
 
-  // True if a circle of radius entityR at (x,y) overlaps any nearby prop's
-  // collision circle. Called from GameMap.canMove for player + enemy movement,
-  // so it only scans the 3×3 tile neighbourhood (props are one-per-tile).
-  function propBlocks(x, y, entityR) {
+  // True if the point (x,y) lies inside any nearby prop's footprint. Called from
+  // GameMap.canMove for player + enemy movement, so it only scans the 3×3 tile
+  // neighbourhood (props are one-per-tile).
+  function propBlocks(x, y) {
     if (!propGrid) return false;
     const gx = Math.floor(x), gy = Math.floor(y);
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         const p = propGrid.get((gx + dx) + ',' + (gy + dy));
         if (!p) continue;
-        const rr = (PROP_RADIUS[p.type] || 0.30) + entityR;
+        const r = PROP_RADIUS[p.type] || 0.30;
         const ex = x - p.x, ey = y - p.y;
-        if (ex * ex + ey * ey < rr * rr) return true;
+        if (ex * ex + ey * ey < r * r) return true;
       }
     }
     return false;
