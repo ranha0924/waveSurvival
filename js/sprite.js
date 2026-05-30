@@ -154,7 +154,7 @@ Sprites.register('tank',   'assets/tank.png',   { scale: 1.2 });
 Sprites.register('ranger', 'assets/ranger.png', { scale: 0.8 });
 Sprites.register('boss',   'assets/boss.png',   { scale: 1.8 });
 Sprites.register('bomber', 'assets/bomber.png', { scale: 0.8 });
-Sprites.register('splitter', 'assets/splitter.png', { scale: 0.8 });
-// Splitter children re-use the grunt zombie art smaller so they read as
-// "broken-off pieces" rather than full-size clones of the parent.
-Sprites.register('splitterChild', 'assets/zombie.png', { scale: 0.55 });
+Sprites.register('splitter', 'assets/dokkaebibul.png', { scale: 0.8 });
+// Splitter children re-use the 도깨비불 flame at a smaller scale so they read
+// as little broken-off wisps of the parent fire.
+Sprites.register('splitterChild', 'assets/dokkaebibul.png', { scale: 0.5 });
