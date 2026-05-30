@@ -497,14 +497,8 @@ const Raycaster = (() => {
     ctx.fillRect(-M, horizon, W + 2 * M, H - horizon + M);
 
     const name = theme.name || 'sunset';
-    // All 굿판 themes are night-time, so every wave gets stars; the count /
-    // intensity climbs with darkness. Storm still pulses with lightning on
-    // top of its faint star field.
-    if (name === 'sunset') drawStars(horizon, 45, 0.6);
-    else if (name === 'dusk') drawStars(horizon, 55, 0.8);
-    else if (name === 'night') drawStars(horizon, 70, 1.0);
-    else if (name === 'storm') { drawStars(horizon, 30, 0.5); drawStormSky(horizon); }
-    drawMoon(horizon, name);
+    // Moon + stars removed per design — keep only the storm's lightning band.
+    if (name === 'storm') drawStormSky(horizon);
     // Forest silhouette sits in front of the celestial layer (so trees
     // occlude any star they overlap) but behind the walls + floor pass
     // (so any in-world wall taller than the horizon naturally hides the
