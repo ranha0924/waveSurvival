@@ -128,11 +128,13 @@ const Player = (() => {
       p.bobPhase += dt * (running ? 14 : 9);
       p.bobOffset = Math.sin(p.bobPhase) * (running ? 6 : 4);
 
-      // Footstep trigger: fire a step roughly every ~0.55 world units when
-      // walking (~0.40 when running) so the cadence matches the bob.
+      // Footstep trigger: fire a step roughly every ~1.35 world units when
+      // walking (~1.30 when running). With moveSpeed 3.0 / runSpeed 5.0 this
+      // lands at ~2.2 steps/s walking and ~3.8 steps/s running — natural
+      // strides, not the old frantic ~5–12 steps/s patter.
       // Tracked via an accumulator so framerate jitter doesn't drift it.
       p.footstepAccum = (p.footstepAccum || 0) + stepDist;
-      const strideLen = running ? 0.40 : 0.55;
+      const strideLen = running ? 1.30 : 1.35;
       if (p.footstepAccum >= strideLen) {
         p.footstepAccum -= strideLen;
         Audio.footstep();
