@@ -417,6 +417,7 @@
     game.wave = { number: 0, enemiesAlive: 0, queue: [], spawnTimer: 0, spawnInterval: 0.6 };
     // 굿판 — reset every run so a leftover timer from a previous run can't
     // bleed into the new one.
+    Audio.gutpanLoopStop && Audio.gutpanLoopStop();
     game.gutpan.active = false;
     game.gutpan.timer = 0;
     game.gutpan.lastTriggerCombo = 0;
@@ -525,6 +526,7 @@
   function pauseGame() {
     if (game.state !== STATE.PLAYING) return;
     game.state = STATE.PAUSED;
+    Audio.gutpanLoopStop && Audio.gutpanLoopStop();
     if (!game.touchMode) document.exitPointerLock();
     if (game.touchMode) Mobile.hideControls();
     UI.showPause();
@@ -648,6 +650,10 @@
 
     // Mirror onto the player so shoot/damageEnemy can branch on it.
     if (p) p.gutpanActive = g.active;
+
+    // Drive the 사물놀이 groove with the mode (both calls are idempotent).
+    if (g.active) Audio.gutpanLoopStart && Audio.gutpanLoopStart();
+    else Audio.gutpanLoopStop && Audio.gutpanLoopStop();
 
     // Spawn falling talismans at the screen edges while active. Density
     // scales with intensity so the effect fades out alongside the tint.
@@ -987,6 +993,7 @@
     game.state = STATE.GAMEOVER;
     if (!game.touchMode) document.exitPointerLock();
     if (game.touchMode) Mobile.hideControls();
+    Audio.gutpanLoopStop && Audio.gutpanLoopStop();
     Audio.gameOver();
     UI.hideHud();
 
