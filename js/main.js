@@ -594,6 +594,13 @@
     return slot;
   });
 
+  // 저승사자's thrown sickle (낫). Rendered spinning on each ranged projectile;
+  // falls back to the old glowing dot until the image loads.
+  const sickleImg = new Image();
+  let sickleLoaded = false;
+  sickleImg.onload = () => { sickleLoaded = true; };
+  sickleImg.src = 'assets/sickle.png';
+
   // Drive the active flag + remaining timer from the player's current streak,
   // and spawn falling-talisman particles while active. Called from the main
   // loop with dt seconds. Mirrors active flag onto game.player so
@@ -968,6 +975,7 @@
     const sinA = Math.sin(-game.player.angle);
     const FOV = Math.PI / 3;
 
+    const spin = performance.now() * 0.018;   // shared fast tumble
     for (const p of game.projectiles) {
       const dx = p.x - game.player.x;
       const dy = p.y - game.player.y;
@@ -975,16 +983,32 @@
       const ty = dx * sinA + dy * cosA;
       if (tx <= 0.05) continue;
       const screenX = (W / 2) * (1 + ty / (tx * Math.tan(FOV / 2)));
-      const sz = Math.max(3, 12 / tx);
       const screenY = H / 2 + game.player.bobOffset + game.player.pitch;
-      ctx.fillStyle = 'rgba(120, 200, 255, 0.9)';
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, sz, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, sz * 0.4, 0, Math.PI * 2);
-      ctx.fill();
+
+      if (sickleLoaded && sickleImg.width) {
+        // Spinning sickle billboard, sized by distance, with a stable per-shot
+        // phase so they don't all rotate in lockstep.
+        const sz = Math.max(10, 64 / tx);
+        const phase = (p.x * 13.1 + p.y * 7.7) % (Math.PI * 2);
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.rotate(spin + phase);
+        const prev = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sickleImg, -sz / 2, -sz / 2, sz, sz);
+        ctx.imageSmoothingEnabled = prev;
+        ctx.restore();
+      } else {
+        const sz = Math.max(3, 12 / tx);
+        ctx.fillStyle = 'rgba(120, 200, 255, 0.9)';
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, sz, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, sz * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
