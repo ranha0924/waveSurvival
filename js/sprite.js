@@ -152,7 +152,7 @@ Sprites.register('grunt',  'assets/cheonyeo.png', { scale: 0.85 });
 Sprites.register('rusher', 'assets/mongdal.png', { scale: 0.8 });
 Sprites.register('tank',   'assets/dokkaebi.png', { scale: 1.2 });
 Sprites.register('ranger', 'assets/jeoseung.png', { scale: 0.85 });
-Sprites.register('boss',   'assets/boss.png',   { scale: 1.8 });
+Sprites.register('boss',   'assets/gumiho.png', { scale: 1.8 });
 Sprites.register('bomber', 'assets/gaekgwi.png', { scale: 0.8 });
 Sprites.register('splitter', 'assets/dokkaebibul.png', { scale: 0.8 });
 // Splitter children re-use the 도깨비불 flame at a smaller scale so they read
