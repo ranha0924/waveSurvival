@@ -507,12 +507,15 @@ const UI = (() => {
       const e = 1 - (1 - prog) * (1 - prog);
       const px = t.sx + (tx - t.sx) * e;
       const py = t.sy + (ty - t.sy) * e;
-      const size = drawnW * t.scl * (0.18 * (1 - e) + 0.012);
+      const size = drawnW * t.scl * (0.20 * (1 - e) + 0.012);
       const alpha = prog < 0.8 ? 1 : (1 - prog) / 0.2;
 
-      // Fly laid flat (horizontal, +90°) with a tiny fixed tilt — straight line,
-      // no flutter or tumble.
-      const rot = Math.PI / 2 + t.lean;
+      // Laid flat, flying away: keep upright orientation but foreshorten the
+      // height (perspective squash) so it reads as a bill lying flat receding
+      // into the distance — not a card stood on its side. Slight fixed tilt.
+      const foreshort = 0.45 - 0.10 * prog;   // flatter the further it recedes
+      const wfac = 1.15;
+      const rot = t.lean;
 
       ctx.save();
       ctx.globalAlpha = Math.max(0, alpha);
@@ -520,14 +523,18 @@ const UI = (() => {
       ctx.rotate(rot);
       if (talismanLoaded && talismanImg.width) {
         const ar = talismanImg.width / talismanImg.height;
-        ctx.drawImage(talismanImg, -size * ar / 2, -size / 2, size * ar, size);
+        const w = size * ar * wfac;
+        const h = size * foreshort;
+        ctx.drawImage(talismanImg, -w / 2, -h / 2, w, h);
       } else {
         // Fallback so the effect reads before the real art is dropped in:
         // a small yellow talisman card with a red brushstroke mark.
+        const w = size * 0.7 * wfac;
+        const h = size * foreshort;
         ctx.fillStyle = '#f4c430';
-        ctx.fillRect(-size * 0.35, -size / 2, size * 0.7, size);
+        ctx.fillRect(-w / 2, -h / 2, w, h);
         ctx.fillStyle = '#c0202a';
-        ctx.fillRect(-size * 0.12, -size * 0.35, size * 0.24, size * 0.7);
+        ctx.fillRect(-w * 0.34, -h * 0.35, w * 0.68, h * 0.7);
       }
       ctx.restore();
     }
