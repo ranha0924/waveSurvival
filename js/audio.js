@@ -315,6 +315,137 @@ const Audio = (() => {
     setTimeout(() => tone(220, 0.18, 'sawtooth', 0.18, 0.002, 0.20), 30);
   }
 
+  // ---------- 사물놀이 굿판 모드 루프 (procedural) ----------
+  // 사물놀이 is four percussion voices; its identity is the 장단 (rhythmic
+  // cycle), not melodic timbre — which is exactly why it synthesises cleanly
+  // here where AI music models (trained on Western/melodic material) keep
+  // mangling the inharmonic Korean gongs. A look-ahead scheduler places hits
+  // on a fast 자진모리-style 12-step cycle and loops while 굿판 mode is
+  // active. Routed through its own bus so the groove sits under the SFX.
+  let samulGain = null;
+  let samulActive = false;
+  let samulTimer = null;
+  let samulNextTime = 0;
+  let samulStep = 0;
+  const SAMUL_STEPS = 12;
+  const SAMUL_STEP_DUR = 0.135;     // seconds per step → ~1.6s driving cycle
+
+  function ensureSamulBus() {
+    if (samulGain || !ctx) return;
+    samulGain = ctx.createGain();
+    samulGain.gain.value = 0.5;
+    samulGain.connect(masterGain);
+  }
+
+  // Scheduled (time-stamped) tone with a pitch glide + exponential decay.
+  function pTone(when, f0, f1, dur, type, vol, attack = 0.002, filterHz = 0) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(f0, when);
+    if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), when + dur);
+    let node = osc;
+    if (filterHz > 0) {
+      const fl = ctx.createBiquadFilter();
+      fl.type = 'lowpass'; fl.frequency.value = filterHz;
+      node.connect(fl); node = fl;
+    }
+    node.connect(g); g.connect(samulGain);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.linearRampToValueAtTime(vol, when + attack);
+    g.gain.exponentialRampToValueAtTime(0.0008, when + dur);
+    osc.start(when);
+    osc.stop(when + dur + 0.03);
+  }
+
+  function pNoise(when, dur, vol, filterHz, q = 1, type = 'lowpass') {
+    const n = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const fl = ctx.createBiquadFilter();
+    fl.type = type; fl.frequency.value = filterHz; fl.Q.value = q;
+    const g = ctx.createGain(); g.gain.value = vol;
+    src.connect(fl); fl.connect(g); g.connect(samulGain);
+    src.start(when);
+  }
+
+  // 꽹과리 — small brass gong: bright, piercing, leads the rhythm. Built from
+  // detuned inharmonic high partials + a short metallic noise transient.
+  function sKkwaenggwari(when, vol) {
+    const parts = [1664, 2393, 3261, 4129];
+    parts.forEach((f, i) => {
+      const det = 1 + (Math.random() * 0.012 - 0.006);
+      pTone(when, f * det, f * 0.97, 0.13 - i * 0.018, i < 2 ? 'square' : 'triangle', vol * (0.55 - i * 0.10));
+    });
+    pNoise(when, 0.05, vol * 0.5, 4200, 2, 'bandpass');
+  }
+  // 징 — large gong: deep boom + long shimmer that marks each cycle.
+  function sJing(when, vol) {
+    const parts = [182, 287, 437, 615, 822];
+    parts.forEach((f, i) => pTone(when, f, f * 0.995, 1.25 - i * 0.12, 'sine', vol * (0.42 - i * 0.06), 0.025));
+    pNoise(when, 0.7, vol * 0.13, 1300, 3, 'bandpass');
+  }
+  // 장구 북편 — low palm strike "쿵".
+  function sJangguLow(when, vol) {
+    pTone(when, 168, 92, 0.17, 'sine', vol, 0.001);
+    pNoise(when, 0.06, vol * 0.35, 600, 1);
+  }
+  // 장구 채편 — high stick strike "따/덕".
+  function sJangguHigh(when, vol) {
+    pNoise(when, 0.06, vol * 0.8, 2600, 1.2);
+    pTone(when, 430, 250, 0.07, 'triangle', vol * 0.4, 0.001);
+  }
+  // 북 — barrel drum, deep "둥".
+  function sBuk(when, vol) {
+    pTone(when, 120, 66, 0.22, 'sine', vol, 0.001);
+    pNoise(when, 0.09, vol * 0.45, 480, 1);
+  }
+
+  // Velocity tables per 12-step cycle (0 = silent). 꽹과리 drives the groove,
+  // 징 marks the cycle, 장구/북 lay the 쿵-따 foundation.
+  const PAT_KKW   = [1.0, 0,   0.5, 0.8, 0,   0.5, 1.0, 0,   0.5, 0.8, 0,   0.6];
+  const PAT_JING  = [1.0, 0,   0,   0,   0,   0,   0.45,0,   0,   0,   0,   0  ];
+  const PAT_JLOW  = [0.9, 0,   0,   0.85,0,   0,   0.9, 0,   0,   0.85,0,   0  ];
+  const PAT_JHIGH = [0,   0.4, 0.7, 0,   0,   0.7, 0,   0.4, 0.7, 0,   0,   0.7];
+  const PAT_BUK   = [0.9, 0,   0,   0.6, 0,   0,   0.9, 0,   0,   0.6, 0,   0  ];
+
+  function samulScheduleStep(step, when) {
+    if (PAT_KKW[step])   sKkwaenggwari(when, 0.16 * PAT_KKW[step]);
+    if (PAT_JING[step])  sJing(when, 0.26 * PAT_JING[step]);
+    if (PAT_JLOW[step])  sJangguLow(when, 0.26 * PAT_JLOW[step]);
+    if (PAT_JHIGH[step]) sJangguHigh(when, 0.20 * PAT_JHIGH[step]);
+    if (PAT_BUK[step])   sBuk(when, 0.30 * PAT_BUK[step]);
+  }
+
+  function samulScheduler() {
+    if (!ctx || !samulActive) return;
+    while (samulNextTime < ctx.currentTime + 0.12) {
+      samulScheduleStep(samulStep, samulNextTime);
+      samulNextTime += SAMUL_STEP_DUR;
+      samulStep = (samulStep + 1) % SAMUL_STEPS;
+    }
+  }
+
+  // Start/stop the 사물놀이 groove. Both are idempotent so callers can safely
+  // call start every active frame and stop every inactive frame.
+  function gutpanLoopStart() {
+    if (!enabled || !ctx || samulActive) return;
+    ensureSamulBus();
+    samulActive = true;
+    samulStep = 0;
+    samulNextTime = ctx.currentTime + 0.06;
+    samulTimer = setInterval(samulScheduler, 25);
+    samulScheduler();
+  }
+
+  function gutpanLoopStop() {
+    if (!samulActive) return;
+    samulActive = false;
+    if (samulTimer) { clearInterval(samulTimer); samulTimer = null; }
+  }
+
   return {
     init, resume,
     shootPistol, shootShotgun, shootMachineGun, shootSniper,
@@ -322,6 +453,6 @@ const Audio = (() => {
     enemyDeath, bossDeath, bossEnrage, explosion,
     playerHit, reload, emptyClick, footstep,
     waveStart, waveClear, gameOver, pickup, uiClick,
-    gutpanTrigger
+    gutpanTrigger, gutpanLoopStart, gutpanLoopStop
   };
 })();
