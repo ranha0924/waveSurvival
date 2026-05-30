@@ -446,7 +446,7 @@ const UI = (() => {
   // ---------- First-person gun overlay ----------
   // First-person gun sprites — one per weapon. Sniper falls back to the M4.
   const GUN_SPRITES = {
-    pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.22, y: 0.32 } },
+    pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.28, y: 0.16 } },
     shotgun:    { src: 'assets/shotgun.png',  muzzle: { x: 0.23, y: 0.05 } },
     machinegun: { src: 'assets/gun.png',      muzzle: { x: 0.20, y: 0.10 } },
     sniper:     { src: 'assets/sniper.png',   muzzle: { x: 0.19, y: 0.05 } }
@@ -470,15 +470,18 @@ const UI = (() => {
   talismanImg.src = 'assets/talisman_shot.png';
 
   const flyingTalismans = [];
-  const TALISMAN_DUR = 220; // ms muzzle → vanishing point
+  const TALISMAN_DUR = 300; // ms muzzle → vanishing point
 
-  // Called from Player.shoot when the 부적총 fires a shot.
+  // Called from Player.shoot when the 부적총 fires a shot. One talisman flies
+  // straight from the muzzle to the crosshair per shot.
   function fireTalisman() {
     flyingTalismans.push({
       born: (typeof performance !== 'undefined' ? performance.now() : Date.now()),
       sx: null, sy: null,          // spawn muzzle pos, captured on first draw
-      spin: (Math.random() - 0.5) * 0.6,
-      wobble: (Math.random() - 0.5) * 0.18
+      spin: (Math.random() - 0.5) * 0.8,
+      wobble: (Math.random() - 0.5) * 0.25,
+      ox: 0, oy: 0,
+      scl: 1
     });
   }
 
@@ -495,12 +498,16 @@ const UI = (() => {
       if (t.sx === null) { t.sx = muzzleX; t.sy = muzzleY; }
       const prog = (now - t.born) / TALISMAN_DUR;
       if (prog >= 1) { flyingTalismans.splice(i, 1); continue; }
+      if (prog < 0) continue;        // staggered ones not yet launched
 
-      // Ease-out toward the crosshair while shrinking into the distance.
+      // Each talisman flies toward a scattered point near the crosshair so the
+      // burst fans out, then shrinks into the distance.
+      const tx = cx + t.ox * drawnW;
+      const ty = cy + t.oy * drawnW;
       const e = 1 - (1 - prog) * (1 - prog);
-      const px = t.sx + (cx - t.sx) * e;
-      const py = t.sy + (cy - t.sy) * e + Math.sin(prog * Math.PI) * 18 * t.wobble;
-      const size = drawnW * (0.22 * (1 - e) + 0.015);
+      const px = t.sx + (tx - t.sx) * e;
+      const py = t.sy + (ty - t.sy) * e + Math.sin(prog * Math.PI) * 26 * t.wobble;
+      const size = drawnW * t.scl * (0.18 * (1 - e) + 0.012);
       const alpha = prog < 0.8 ? 1 : (1 - prog) / 0.2;
 
       ctx.save();
