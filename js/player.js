@@ -215,6 +215,11 @@ const Player = (() => {
     p.shake = w.kickback * 0.4;
     Audio[w.sound]();
 
+    // 부적총 — fling a paper talisman toward the crosshair on each shot.
+    if (w.id === 'pistol' && typeof UI !== 'undefined' && UI.fireTalisman) {
+      UI.fireTalisman();
+    }
+
     const dmgBonus = p.gutpanActive ? GUTPAN_DAMAGE_MULT : 1;
     const damage = w.damage * p.damageMult * dmgBonus;
     const pierceCount = (w.pierce || 0) + p.pierce;

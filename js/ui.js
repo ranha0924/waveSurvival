@@ -446,7 +446,7 @@ const UI = (() => {
   // ---------- First-person gun overlay ----------
   // First-person gun sprites — one per weapon. Sniper falls back to the M4.
   const GUN_SPRITES = {
-    pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.21, y: 0.06 } },
+    pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.82, y: 0.34 } },
     shotgun:    { src: 'assets/shotgun.png',  muzzle: { x: 0.23, y: 0.05 } },
     machinegun: { src: 'assets/gun.png',      muzzle: { x: 0.20, y: 0.10 } },
     sniper:     { src: 'assets/sniper.png',   muzzle: { x: 0.19, y: 0.05 } }
@@ -459,6 +459,70 @@ const UI = (() => {
     def.img.src = def.src;
   }
   const GUN_HEIGHT_FRAC = 0.55;
+
+  // ---------- 부적 발사체 (talisman projectile) ----------
+  // The 부적총 is hitscan for damage, but a paper talisman visibly flies from
+  // the muzzle toward the crosshair on each shot for "한 발이 의식" weight.
+  // Purely cosmetic + screen-space, so it stays self-contained in the HUD.
+  const talismanImg = new Image();
+  let talismanLoaded = false;
+  talismanImg.onload = () => { talismanLoaded = true; };
+  talismanImg.src = 'assets/talisman_shot.png';
+
+  const flyingTalismans = [];
+  const TALISMAN_DUR = 220; // ms muzzle → vanishing point
+
+  // Called from Player.shoot when the 부적총 fires a shot.
+  function fireTalisman() {
+    flyingTalismans.push({
+      born: (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+      sx: null, sy: null,          // spawn muzzle pos, captured on first draw
+      spin: (Math.random() - 0.5) * 0.6,
+      wobble: (Math.random() - 0.5) * 0.18
+    });
+  }
+
+  // Draw + advance the flying talismans. Called from renderGun once the muzzle
+  // screen position for this frame is known.
+  function renderTalismans(ctx, muzzleX, muzzleY, cx, cy, drawnW) {
+    if (flyingTalismans.length === 0) return;
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const prevSmoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+
+    for (let i = flyingTalismans.length - 1; i >= 0; i--) {
+      const t = flyingTalismans[i];
+      if (t.sx === null) { t.sx = muzzleX; t.sy = muzzleY; }
+      const prog = (now - t.born) / TALISMAN_DUR;
+      if (prog >= 1) { flyingTalismans.splice(i, 1); continue; }
+
+      // Ease-out toward the crosshair while shrinking into the distance.
+      const e = 1 - (1 - prog) * (1 - prog);
+      const px = t.sx + (cx - t.sx) * e;
+      const py = t.sy + (cy - t.sy) * e + Math.sin(prog * Math.PI) * 18 * t.wobble;
+      const size = drawnW * (0.22 * (1 - e) + 0.015);
+      const alpha = prog < 0.8 ? 1 : (1 - prog) / 0.2;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.translate(px, py);
+      ctx.rotate(prog * t.spin);
+      if (talismanLoaded && talismanImg.width) {
+        const ar = talismanImg.width / talismanImg.height;
+        ctx.drawImage(talismanImg, -size * ar / 2, -size / 2, size * ar, size);
+      } else {
+        // Fallback so the effect reads before the real art is dropped in:
+        // a small yellow talisman card with a red brushstroke mark.
+        ctx.fillStyle = '#f4c430';
+        ctx.fillRect(-size * 0.35, -size / 2, size * 0.7, size);
+        ctx.fillStyle = '#c0202a';
+        ctx.fillRect(-size * 0.12, -size * 0.35, size * 0.24, size * 0.7);
+      }
+      ctx.restore();
+    }
+
+    ctx.imageSmoothingEnabled = prevSmoothing;
+  }
 
   // Render the player's gun in 1st person + muzzle flash + tracer to crosshair
   function renderGun(ctx, player) {
@@ -494,6 +558,9 @@ const UI = (() => {
     // Crosshair target (screen center) — bullets always go here
     const cx = W / 2;
     const cy = H / 2;
+
+    // 부적 발사체 — paper talismans flying from muzzle toward the crosshair
+    renderTalismans(ctx, muzzleX, muzzleY, cx, cy, drawnW);
 
     // Muzzle flash + tracer line from muzzle to crosshair
     if (player.muzzleFlash > 0) {
@@ -546,7 +613,7 @@ const UI = (() => {
     showLockPrompt, hideLockPrompt,
     showGameOver, hideGameOver,
     showUpgradeMenu, hideUpgradeMenu,
-    renderGun,
+    renderGun, fireTalisman,
     showRecordBanner, updateTitleRecords, setHudBest,
     getNickInput, setNickInput
   };
