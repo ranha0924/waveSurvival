@@ -507,34 +507,35 @@ const UI = (() => {
       const e = 1 - (1 - prog) * (1 - prog);
       const px = t.sx + (tx - t.sx) * e;
       const py = t.sy + (ty - t.sy) * e;
-      const size = drawnW * t.scl * (0.20 * (1 - e) + 0.012);
-      const alpha = prog < 0.8 ? 1 : (1 - prog) / 0.2;
 
-      // Laid flat, flying away: keep upright orientation but foreshorten the
-      // height (perspective squash) so it reads as a bill lying flat receding
-      // into the distance — not a card stood on its side. Slight fixed tilt.
-      const foreshort = 0.45 - 0.10 * prog;   // flatter the further it recedes
-      const wfac = 1.15;
+      // The muzzle is a horizontal slit, so the bill leaves as a flat "ㅡ":
+      // the art is already landscape — keep it horizontal, squash the height a
+      // little for a laid-flat look, and shrink it as it recedes to the
+      // crosshair so it reads as a banknote spat straight out the barrel.
+      const billW = drawnW * t.scl * (0.16 * (1 - e) + 0.018);
+      const foreshort = 0.80 - 0.18 * prog;
       const rot = t.lean;
+      const alpha = prog < 0.85 ? 1 : (1 - prog) / 0.15;
 
       ctx.save();
       ctx.globalAlpha = Math.max(0, alpha);
       ctx.translate(px, py);
       ctx.rotate(rot);
       if (talismanLoaded && talismanImg.width) {
-        const ar = talismanImg.width / talismanImg.height;
-        const w = size * ar * wfac;
-        const h = size * foreshort;
+        const ar = talismanImg.width / talismanImg.height;   // landscape (>1)
+        const w = billW;
+        const h = (billW / ar) * foreshort;
         ctx.drawImage(talismanImg, -w / 2, -h / 2, w, h);
       } else {
-        // Fallback so the effect reads before the real art is dropped in:
-        // a small yellow talisman card with a red brushstroke mark.
-        const w = size * 0.7 * wfac;
-        const h = size * foreshort;
+        // Fallback: a flat horizontal yellow bill with red border bands.
+        const w = billW;
+        const h = (billW / 2.1) * foreshort;
+        const band = Math.max(1, h * 0.14);
         ctx.fillStyle = '#f4c430';
         ctx.fillRect(-w / 2, -h / 2, w, h);
         ctx.fillStyle = '#c0202a';
-        ctx.fillRect(-w * 0.34, -h * 0.35, w * 0.68, h * 0.7);
+        ctx.fillRect(-w / 2, -h / 2, w, band);
+        ctx.fillRect(-w / 2, h / 2 - band, w, band);
       }
       ctx.restore();
     }
