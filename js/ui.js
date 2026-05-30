@@ -446,7 +446,7 @@ const UI = (() => {
   // ---------- First-person gun overlay ----------
   // First-person gun sprites — one per weapon. Sniper falls back to the M4.
   const GUN_SPRITES = {
-    pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.82, y: 0.34 } },
+    pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.22, y: 0.32 } },
     shotgun:    { src: 'assets/shotgun.png',  muzzle: { x: 0.23, y: 0.05 } },
     machinegun: { src: 'assets/gun.png',      muzzle: { x: 0.20, y: 0.10 } },
     sniper:     { src: 'assets/sniper.png',   muzzle: { x: 0.19, y: 0.05 } }
