@@ -150,7 +150,7 @@ const Sprites = (() => {
 // the hitscan both read these, so shrinking here keeps aim/headshots aligned.
 Sprites.register('grunt',  'assets/cheonyeo.png', { scale: 0.85 });
 Sprites.register('rusher', 'assets/mongdal.png', { scale: 0.8 });
-Sprites.register('tank',   'assets/tank.png',   { scale: 1.2 });
+Sprites.register('tank',   'assets/dokkaebi.png', { scale: 1.2 });
 Sprites.register('ranger', 'assets/ranger.png', { scale: 0.8 });
 Sprites.register('boss',   'assets/boss.png',   { scale: 1.8 });
 Sprites.register('bomber', 'assets/bomber.png', { scale: 0.8 });
