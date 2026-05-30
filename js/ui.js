@@ -479,10 +479,7 @@ const UI = (() => {
     flyingTalismans.push({
       born: (typeof performance !== 'undefined' ? performance.now() : Date.now()),
       sx: null, sy: null,          // spawn muzzle pos, captured on first draw
-      tumble: (Math.random() < 0.5 ? -1 : 1) * (1.5 + Math.random() * 1.5), // turns over flight
-      flutterFreq: 9 + Math.random() * 6,
-      phase: Math.random() * Math.PI * 2,
-      wobble: (Math.random() - 0.5) * 0.25,
+      lean: (Math.random() - 0.5) * 0.16,       // tiny fixed tilt off horizontal
       ox: 0, oy: 0,
       scl: 1
     });
@@ -509,14 +506,13 @@ const UI = (() => {
       const ty = cy + t.oy * drawnW;
       const e = 1 - (1 - prog) * (1 - prog);
       const px = t.sx + (tx - t.sx) * e;
-      const py = t.sy + (ty - t.sy) * e + Math.sin(prog * Math.PI) * 26 * t.wobble;
+      const py = t.sy + (ty - t.sy) * e;
       const size = drawnW * t.scl * (0.18 * (1 - e) + 0.012);
       const alpha = prog < 0.8 ? 1 : (1 - prog) / 0.2;
 
-      // Tumble (in-plane rotation) + flutter (fake the paper turning edge-on by
-      // squeezing the width with a cosine) so it reads as fluttering money.
-      const rot = prog * t.tumble * Math.PI * 2 + Math.sin(prog * t.flutterFreq + t.phase) * 0.5;
-      const widthScale = 0.35 + 0.65 * Math.abs(Math.cos(prog * t.flutterFreq * 0.85 + t.phase));
+      // Fly laid flat (horizontal, +90°) with a tiny fixed tilt — straight line,
+      // no flutter or tumble.
+      const rot = Math.PI / 2 + t.lean;
 
       ctx.save();
       ctx.globalAlpha = Math.max(0, alpha);
@@ -524,16 +520,14 @@ const UI = (() => {
       ctx.rotate(rot);
       if (talismanLoaded && talismanImg.width) {
         const ar = talismanImg.width / talismanImg.height;
-        const w = size * ar * widthScale;
-        ctx.drawImage(talismanImg, -w / 2, -size / 2, w, size);
+        ctx.drawImage(talismanImg, -size * ar / 2, -size / 2, size * ar, size);
       } else {
         // Fallback so the effect reads before the real art is dropped in:
         // a small yellow talisman card with a red brushstroke mark.
-        const w = size * 0.7 * widthScale;
         ctx.fillStyle = '#f4c430';
-        ctx.fillRect(-w / 2, -size / 2, w, size);
+        ctx.fillRect(-size * 0.35, -size / 2, size * 0.7, size);
         ctx.fillStyle = '#c0202a';
-        ctx.fillRect(-w * 0.34, -size * 0.35, w * 0.68, size * 0.7);
+        ctx.fillRect(-size * 0.12, -size * 0.35, size * 0.24, size * 0.7);
       }
       ctx.restore();
     }
