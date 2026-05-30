@@ -148,7 +148,7 @@ const Sprites = (() => {
 // Render scales sit ~20% below the old values so the enemies read as
 // human-sized against the taller trees instead of looming. The renderer and
 // the hitscan both read these, so shrinking here keeps aim/headshots aligned.
-Sprites.register('grunt',  'assets/zombie.png', { scale: 0.8 });
+Sprites.register('grunt',  'assets/cheonyeo.png', { scale: 0.85 });
 Sprites.register('rusher', 'assets/rusher.png', { scale: 0.8 });
 Sprites.register('tank',   'assets/tank.png',   { scale: 1.2 });
 Sprites.register('ranger', 'assets/ranger.png', { scale: 0.8 });
