@@ -1,11 +1,11 @@
-/* Korean type system for the 굿판 UI:
-   --font-display : 붓글씨/전통 느낌의 제목 (Gugi 손글씨체 → Noto Serif KR 명조 폴백)
-   --font-body    : 본문·기록은 단정한 명조체 (Gowun Batang)
-   --font-ui      : HUD·버튼·라벨은 굵은 고딕 (Black Han Sans) — 작은 크기에서도 또렷 */
+/* Reverted to the original system UI font. (The 굿판 mode banner still uses
+   Noto Serif KR via the canvas in main.js.) All three variables resolve to
+   the same system stack so every `var(--font-*)` reference falls back to the
+   pre-redesign look. */
 :root {
-  --font-display: 'Gugi', 'Noto Serif KR', 'Gowun Batang', serif;
-  --font-body: 'Gowun Batang', 'Noto Serif KR', 'Batang', '바탕', serif;
-  --font-ui: 'Black Han Sans', 'Noto Serif KR', 'Malgun Gothic', sans-serif;
+  --font-display: 'Segoe UI', 'Malgun Gothic', sans-serif;
+  --font-body: 'Segoe UI', 'Malgun Gothic', sans-serif;
+  --font-ui: 'Segoe UI', 'Malgun Gothic', sans-serif;
 }
 
 * {
