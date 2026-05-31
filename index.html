@@ -12,7 +12,11 @@
      Gowun Batang: lighter Myeongjo fallback if either above fails to load. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Black+Han+Sans&family=Gowun+Batang:wght@400;700&family=Gugi&display=swap" rel="stylesheet">
+<!-- Warm up the Firebase hosts so the deferred leaderboard load is fast when
+     it fires after first paint, without blocking initial render. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@900&family=Black+Han+Sans&family=Gowun+Batang:wght@400;700&family=Gugi&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
