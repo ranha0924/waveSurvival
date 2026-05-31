@@ -401,7 +401,7 @@ const Player = (() => {
       spawnDeathBurst(
         particles,
         e.x, e.y,
-        e.type.bloodColor || [180, 30, 30],
+        [70, 150, 255],
         headshot,
         !!e.type.isBoss
       );
