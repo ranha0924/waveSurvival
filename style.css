@@ -32,7 +32,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, #1a1a1a, #000);
+  background: radial-gradient(circle at 50% 25%, #16243d, #070b14 70%);
 }
 
 #game-canvas {
@@ -166,7 +166,7 @@ html, body {
   font-family: var(--font-ui);
   font-size: 22px;
   font-weight: bold;
-  color: #ffaa44;
+  color: #3fb59b;
   letter-spacing: 2px;
 }
 
@@ -273,7 +273,7 @@ html, body {
 #weapon-name {
   font-family: var(--font-ui);
   font-size: 16px;
-  color: #ffaa44;
+  color: #3fb59b;
   font-weight: bold;
   letter-spacing: 1px;
 }
@@ -306,8 +306,8 @@ html, body {
   font-family: var(--font-display);
   font-size: clamp(36px, 10vmin, 80px);
   font-weight: bold;
-  color: #ffaa44;
-  text-shadow: 0 0 30px rgba(255, 170, 60, 0.9), 0 0 8px #000;
+  color: #3fb59b;
+  text-shadow: 0 0 30px rgba(63, 181, 155, 0.9), 0 0 8px #000;
   letter-spacing: clamp(3px, 1vmin, 8px);
   pointer-events: none;
   animation: banner-fade 2.5s ease-out forwards;
@@ -420,7 +420,7 @@ html, body {
 .overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(7, 11, 20, 0.9);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -434,10 +434,12 @@ html, body {
 .overlay h1 {
   font-family: var(--font-display);
   font-size: clamp(40px, 13vmin, 110px);
-  color: #ffaa44;
+  color: #ffd84a;
   letter-spacing: clamp(2px, 0.8vmin, 6px);
   margin-bottom: clamp(4px, 1vmin, 10px);
-  text-shadow: 0 0 30px rgba(255, 170, 60, 0.7), 0 3px 6px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 0 32px rgba(255, 200, 60, 0.55),
+               0 0 12px rgba(63, 181, 155, 0.5),
+               0 3px 6px rgba(0, 0, 0, 0.85);
 }
 
 .overlay h2 {
@@ -458,7 +460,7 @@ html, body {
 }
 
 .big-btn {
-  background: linear-gradient(180deg, #ffaa44, #cc7722);
+  background: linear-gradient(180deg, #3fb59b, #26715f);
   color: #1a1a1a;
   border: none;
   font-family: var(--font-ui);
@@ -470,17 +472,17 @@ html, body {
   cursor: pointer;
   letter-spacing: 2px;
   transition: transform 0.1s, box-shadow 0.2s;
-  box-shadow: 0 4px 0 #884400;
+  box-shadow: 0 4px 0 #143f36;
 }
 
 .big-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 0 #884400, 0 0 16px rgba(255, 170, 60, 0.5);
+  box-shadow: 0 6px 0 #143f36, 0 0 16px rgba(63, 181, 155, 0.5);
 }
 
 .big-btn:active {
   transform: translateY(2px);
-  box-shadow: 0 2px 0 #884400;
+  box-shadow: 0 2px 0 #143f36;
 }
 
 .big-btn.secondary {
@@ -493,6 +495,49 @@ html, body {
   box-shadow: 0 6px 0 #111;
 }
 
+/* ===== Title-screen layout =====
+   Header (title) on top, a responsive 3-column panel grid in the middle, and
+   a footer (nickname + start) pinned below — instead of one long stacked
+   column. Columns collapse to 1 on narrow screens via auto-fit. */
+#title-screen {
+  gap: clamp(8px, 2vmin, 20px);
+  padding-top: clamp(16px, 4vmin, 48px);
+  padding-bottom: clamp(16px, 4vmin, 40px);
+}
+.title-header { text-align: center; }
+.title-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: clamp(10px, 2vmin, 22px);
+  align-items: start;
+  width: min(1080px, 94vw);
+  margin: clamp(4px, 1vmin, 12px) auto 0;
+}
+.tg-col {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.6vmin, 16px);
+  min-width: 0;
+}
+/* Panels fill their grid cell instead of carrying their own width/margins. */
+.title-grid #best-records,
+.title-grid #daily-records,
+.title-grid #online-records,
+.title-grid .controls-help {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  height: 100%;
+}
+.title-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 1.6vmin, 16px);
+  margin-top: clamp(6px, 1.4vmin, 14px);
+}
+.title-footer #nick-row { margin: 0; }
+
 /* Title screen: best-records panel + nickname input row. */
 #best-records {
   margin: clamp(6px, 1.5vmin, 14px) 0 clamp(8px, 2vmin, 20px);
@@ -500,7 +545,7 @@ html, body {
   background: rgba(255, 200, 40, 0.06);
   border: 1px solid rgba(255, 200, 40, 0.35);
   border-radius: 8px;
-  box-shadow: 0 0 20px rgba(255, 170, 60, 0.15) inset;
+  box-shadow: 0 0 20px rgba(63, 181, 155, 0.15) inset;
   max-width: 90vw;
 }
 .best-records-title {
@@ -533,7 +578,7 @@ html, body {
   font-weight: bold;
 }
 .best-row .value .by {
-  color: #ffaa44;
+  color: #3fb59b;
   font-weight: normal;
   margin-left: 4px;
   font-size: 0.85em;
@@ -595,14 +640,14 @@ html, body {
 #online-records {
   margin: clamp(4px, 1vmin, 10px) 0 clamp(8px, 2vmin, 16px);
   padding: clamp(8px, 2vmin, 16px) clamp(12px, 3vmin, 24px);
-  background: rgba(255, 170, 60, 0.05);
-  border: 1px solid rgba(255, 170, 60, 0.35);
+  background: rgba(63, 181, 155, 0.05);
+  border: 1px solid rgba(63, 181, 155, 0.35);
   border-radius: 8px;
   max-width: 92vw;
 }
 .online-records-title {
   font-family: var(--font-ui);
-  color: #ffc066;
+  color: #5cc7b0;
   font-size: clamp(13px, 2.4vmin, 17px);
   letter-spacing: 2px;
   margin-bottom: clamp(6px, 1.4vmin, 12px);
@@ -644,7 +689,7 @@ html, body {
   line-height: 1.5;
 }
 .online-list .ol-rank {
-  color: #ffaa44;
+  color: #3fb59b;
   font-weight: bold;
   min-width: 1.4em;
   text-align: right;
@@ -683,7 +728,7 @@ html, body {
 }
 #nick-row label {
   font-family: var(--font-ui);
-  color: #ffaa44;
+  color: #3fb59b;
   font-size: clamp(12px, 2.2vmin, 15px);
   letter-spacing: 2px;
   font-weight: bold;
@@ -718,7 +763,7 @@ html, body {
 
 .controls-help h3 {
   font-family: var(--font-ui);
-  color: #ffaa44;
+  color: #3fb59b;
   margin-bottom: clamp(4px, 1.2vmin, 10px);
   font-size: clamp(13px, 2.4vmin, 18px);
   letter-spacing: 2px;
@@ -735,7 +780,7 @@ html, body {
 }
 
 .controls-help b {
-  color: #ffcc66;
+  color: #8fd9c8;
   display: inline-block;
   min-width: 80px;
 }
@@ -765,9 +810,9 @@ html, body {
 }
 
 .upgrade-card:hover {
-  border-color: #ffaa44;
+  border-color: #3fb59b;
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(255, 170, 60, 0.3);
+  box-shadow: 0 8px 24px rgba(63, 181, 155, 0.3);
 }
 
 .upgrade-card .icon {
@@ -779,7 +824,7 @@ html, body {
   font-family: var(--font-ui);
   font-size: clamp(14px, 2.6vmin, 19px);
   font-weight: bold;
-  color: #ffaa44;
+  color: #3fb59b;
   margin-bottom: clamp(4px, 1vmin, 8px);
   letter-spacing: 1px;
 }
@@ -818,7 +863,7 @@ html, body {
 }
 
 .result span {
-  color: #ffaa44;
+  color: #3fb59b;
   font-weight: bold;
 }
 
@@ -844,7 +889,7 @@ html, body {
   color: #fff;
   letter-spacing: 2px;
 }
-#new-record-header .nr-by span { color: #ffaa44; font-weight: bold; }
+#new-record-header .nr-by span { color: #3fb59b; font-weight: bold; }
 
 @keyframes nr-pulse {
   0%, 100% { transform: scale(1); }
@@ -862,7 +907,7 @@ html, body {
 }
 .cmp-title {
   font-family: var(--font-ui);
-  color: #ffaa44;
+  color: #3fb59b;
   font-size: clamp(12px, 2.2vmin, 15px);
   letter-spacing: 2px;
   text-align: center;
@@ -902,7 +947,7 @@ html, body {
   font-family: var(--font-ui);
   font-size: 28px;
   letter-spacing: 1px;
-  color: #ffaa44;
+  color: #3fb59b;
 }
 
 /* ===== Mobile touch controls ===== */
