@@ -618,9 +618,9 @@
   // hanja drawn in. The asset names are reserved so the player can drop
   // 1..3 files in and have them picked up without a code change.
   const TALISMAN_SRCS = [
-    { src: 'assets/talisman_01.png', char: '長壽' },
-    { src: 'assets/talisman_02.png', char: '護身' },
-    { src: 'assets/talisman_03.png', char: '氣福' }
+    { src: 'assets/talisman_01.webp', char: '長壽' },
+    { src: 'assets/talisman_02.webp', char: '護身' },
+    { src: 'assets/talisman_03.webp', char: '氣福' }
   ];
   const TALISMAN_IMAGES = TALISMAN_SRCS.map((entry) => {
     const img = new Image();
