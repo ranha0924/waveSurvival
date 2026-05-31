@@ -240,9 +240,22 @@
     game.nick = Records.loadNick();
     UI.setNickInput(game.nick);
     UI.updateTitleRecords(Records.load(), Records.loadDaily());
-    refreshLeaderboard();
     UI.showTitle();
     requestAnimationFrame(loop);
+    // Defer the online leaderboard — loading the Firebase SDK + running the
+    // Firestore reads is a few hundred KB of network that must NOT compete
+    // with first paint / asset load. Kick it once the browser is idle.
+    deferIdle(refreshLeaderboard);
+  }
+
+  // Run `fn` when the main thread is idle (after first paint), falling back to
+  // a short timeout where requestIdleCallback isn't available (Safari).
+  function deferIdle(fn) {
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(() => fn(), { timeout: 2500 });
+    } else {
+      setTimeout(fn, 400);
+    }
   }
 
   // Pull the shared Firestore leaderboard and paint it onto the title screen.
