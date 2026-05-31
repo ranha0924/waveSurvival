@@ -319,6 +319,137 @@ const Environment = (() => {
     return cv;
   }
 
+  // ---------- Ground grass tufts ----------
+  // Small non-colliding floor decoration scattered across the open earth so
+  // the ground reads as overgrown forest floor instead of bare soil. Several
+  // seeded variants (lush green tuft, dry straw-grass, broad blades, a
+  // flowering weed and tall reedy stalks) give the scatter some variety.
+  // The player and enemies walk straight through — pure atmosphere.
+  const grass = [];            // { x, y, variant, scale, flip }
+  const grassCanvases = [];
+  const GRASS_VARIANTS = 5;
+
+  // Generic clump builder: fans `blades` curved blades up from a base point,
+  // colouring each from `palette`. opts tweaks spread / length / lean / width
+  // and an optional flower colour dabbed on the blade tips.
+  function buildGrassClump(seed, blades, palette, opts) {
+    opts = opts || {};
+    const W = 32, H = 28;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const c = cv.getContext('2d');
+    const r = rng(seed);
+    const baseX = W / 2, baseY = H - 1;
+    const spread = opts.spread || 20;
+    const minLen = opts.minLen || 12;
+    const lenVar = opts.lenVar || 11;
+    const lean = opts.lean || 6;
+    const width = opts.width || 2;
+    // Faint contact shadow so the tuft sits on the floor.
+    c.fillStyle = 'rgba(0,0,0,0.22)';
+    c.beginPath(); c.ellipse(baseX, baseY - 1, spread * 0.5, 2.2, 0, 0, Math.PI * 2); c.fill();
+    c.lineCap = 'round';
+    const tips = [];
+    for (let i = 0; i < blades; i++) {
+      const t = blades > 1 ? i / (blades - 1) : 0.5;
+      const off = (t - 0.5) * spread;
+      const bx = baseX + off + (r() - 0.5) * 2;
+      const len = minLen + r() * lenVar;
+      const tipX = bx + off * 0.45 + (r() - 0.5) * lean;
+      const tipY = baseY - len;
+      const midX = (bx + tipX) / 2 + (r() - 0.5) * (opts.curve || 5);
+      const midY = (baseY + tipY) / 2;
+      // Dark outline pass for silhouette, then the colour on top.
+      c.strokeStyle = 'rgba(0,0,0,0.45)';
+      c.lineWidth = width + 1.2;
+      c.beginPath();
+      c.moveTo(bx, baseY);
+      c.quadraticCurveTo(midX, midY, tipX, tipY);
+      c.stroke();
+      c.strokeStyle = palette[Math.floor(r() * palette.length)];
+      c.lineWidth = width;
+      c.beginPath();
+      c.moveTo(bx, baseY);
+      c.quadraticCurveTo(midX, midY, tipX, tipY);
+      c.stroke();
+      tips.push({ x: tipX, y: tipY });
+    }
+    if (opts.flower) {
+      for (const tp of tips) {
+        if (r() < (opts.flowerChance || 0.35)) {
+          c.fillStyle = opts.flower;
+          c.beginPath(); c.arc(tp.x, tp.y, opts.flowerSize || 1.6, 0, Math.PI * 2); c.fill();
+          c.fillStyle = 'rgba(255,255,255,0.35)';
+          c.fillRect(Math.round(tp.x), Math.round(tp.y) - 1, 1, 1);
+        }
+      }
+    }
+    return cv;
+  }
+
+  function buildGrass() {
+    grassCanvases.length = 0;
+    // 0 — lush green tuft
+    grassCanvases[0] = buildGrassClump(101, 9,
+      ['#2c4a1e', '#365a24', '#24401a', '#3f6a2c'],
+      { spread: 20, minLen: 13, lenVar: 11, lean: 6, width: 2 });
+    // 1 — dry straw-grass, shorter & tan
+    grassCanvases[1] = buildGrassClump(202, 8,
+      ['#5a4a22', '#6e5a2a', '#4a3c1a', '#7a6630'],
+      { spread: 18, minLen: 9, lenVar: 8, lean: 7, width: 2 });
+    // 2 — broad cool blades, fewer and wider
+    grassCanvases[2] = buildGrassClump(303, 6,
+      ['#2a4630', '#34543a', '#223c28'],
+      { spread: 16, minLen: 11, lenVar: 9, lean: 4, width: 3, curve: 7 });
+    // 3 — flowering weed (pale blossoms at the tips)
+    grassCanvases[3] = buildGrassClump(404, 9,
+      ['#33502a', '#3c5e30', '#2a441f'],
+      { spread: 19, minLen: 12, lenVar: 10, lean: 6, width: 2,
+        flower: '#d8cad6', flowerChance: 0.5, flowerSize: 1.8 });
+    // 4 — tall reedy stalks, thin and upright
+    grassCanvases[4] = buildGrassClump(505, 7,
+      ['#33502a', '#3c5e30', '#46703a'],
+      { spread: 10, minLen: 16, lenVar: 9, lean: 3, width: 1.5, curve: 3 });
+  }
+
+  // Scatter grass tufts across open earth tiles. Skips the same structure /
+  // gate buffer as the trees and a tiny pocket right at the player's feet.
+  // Multiple tufts per tile (0–3) with full-tile jitter so the scatter looks
+  // natural rather than grid-aligned. No spatial index — grass never collides.
+  function placeGrass() {
+    grass.length = 0;
+    if (typeof GameMap === 'undefined') return;
+    const r = rng(13579);
+    const start = GameMap.PLAYER_START || { x: 21.5, y: 27.5 };
+    for (let y = 1; y < GameMap.H - 1; y++) {
+      for (let x = 1; x < GameMap.W - 1; x++) {
+        if (GameMap.getTile(x, y) !== 0) continue;
+        // Keep a 1-tile buffer off shrine furniture (2–8) and spawn gates (9).
+        let nearStruct = false;
+        for (let dy = -1; dy <= 1 && !nearStruct; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const tt = GameMap.getTile(x + dx, y + dy);
+            if (tt >= 2 && tt <= 9) { nearStruct = true; break; }
+          }
+        }
+        if (nearStruct) continue;
+        const n = Math.floor(r() * 3.3);   // 0–3 tufts
+        for (let k = 0; k < n; k++) {
+          const wx = x + r();
+          const wy = y + r();
+          const dxs = wx - start.x, dys = wy - start.y;
+          if (dxs * dxs + dys * dys < 4) continue;   // clear pocket at spawn
+          grass.push({
+            x: wx, y: wy,
+            variant: Math.floor(r() * GRASS_VARIANTS),
+            scale: 0.7 + r() * 0.7,
+            flip: r() < 0.5
+          });
+        }
+      }
+    }
+  }
+
   // Decide which tiles get a tree. Skips perimeter walls, spawn gates,
   // the player spawn pocket, and any tile adjacent to a structure so the
   // shrine's walls / jars / poles don't visually fuse with tree trunks.
@@ -769,9 +900,11 @@ const Environment = (() => {
     propCanvases[6] = buildRubble();
     propCanvases[7] = buildSotdae();
     propCanvases[8] = buildJar();
+    buildGrass();
     placeTrees();
     placeFlags();
     placeProps();
+    placeGrass();
   }
   function update() {}
 
@@ -784,11 +917,14 @@ const Environment = (() => {
   function getFlagCanvas() { return flagCanvas; }
   function getProps() { return props; }
   function getPropCanvas(type) { return propCanvases[type] || null; }
+  function getGrass() { return grass; }
+  function getGrassCanvas(variant) { return grassCanvases[variant] || null; }
 
   return {
     init, update, themeForWave,
     getTrees, getTreeCanvas, getTreeBottomPad, treeBlocks,
     getFlags, getFlagCanvas,
-    getProps, getPropCanvas, propBlocks
+    getProps, getPropCanvas, propBlocks,
+    getGrass, getGrassCanvas
   };
 })();
