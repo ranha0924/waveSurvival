@@ -160,7 +160,7 @@ const Raycaster = (() => {
     const horizon = H / 2 + horizonOffset;
     const lineH = H / proj.dist;
     const aspect = canvas.width / canvas.height;
-    const grassH = Math.max(2, Math.floor(lineH * 0.30 * (g.scale || 1)));
+    const grassH = Math.max(2, Math.floor(lineH * 0.42 * (g.scale || 1)));
     const grassW = Math.max(2, Math.floor(grassH * aspect));
     const groundedBottom = horizon + lineH / 2;
     const drawStartY = Math.floor(groundedBottom - grassH);
