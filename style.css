@@ -507,11 +507,17 @@ html, body {
 .title-header { text-align: center; }
 .title-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: clamp(10px, 2vmin, 22px);
+  /* Centre column (online ranking) gets extra width so the leaderboard reads
+     as the focal panel; side columns hold records / controls. */
+  grid-template-columns: 1fr 1.6fr 1fr;
+  gap: clamp(10px, 2vmin, 24px);
   align-items: start;
-  width: min(1080px, 94vw);
+  width: min(1200px, 95vw);
   margin: clamp(4px, 1vmin, 12px) auto 0;
+}
+/* Collapse to a single stacked column on narrow / portrait screens. */
+@media (max-width: 920px) {
+  .title-grid { grid-template-columns: 1fr; width: min(520px, 94vw); }
 }
 .tg-col {
   display: flex;
@@ -644,23 +650,24 @@ html, body {
    전체 best-by-score and 오늘의 도전 best-by-score. */
 #online-records {
   margin: clamp(4px, 1vmin, 10px) 0 clamp(8px, 2vmin, 16px);
-  padding: clamp(8px, 2vmin, 16px) clamp(12px, 3vmin, 24px);
-  background: rgba(63, 181, 155, 0.05);
-  border: 1px solid rgba(63, 181, 155, 0.35);
-  border-radius: 8px;
+  padding: clamp(12px, 2.6vmin, 24px) clamp(16px, 3.4vmin, 32px);
+  background: rgba(63, 181, 155, 0.07);
+  border: 1px solid rgba(63, 181, 155, 0.4);
+  border-radius: 10px;
+  box-shadow: 0 0 24px rgba(63, 181, 155, 0.12) inset;
   max-width: 92vw;
 }
 .online-records-title {
   font-family: var(--font-ui);
   color: #5cc7b0;
-  font-size: clamp(13px, 2.4vmin, 17px);
+  font-size: clamp(16px, 3vmin, 22px);
   letter-spacing: 2px;
-  margin-bottom: clamp(6px, 1.4vmin, 12px);
+  margin-bottom: clamp(10px, 2vmin, 18px);
   text-align: center;
 }
 .online-records-title .online-status {
   color: #888;
-  font-size: 0.72em;
+  font-size: 0.68em;
   letter-spacing: 1px;
   margin-left: 6px;
   font-family: var(--font-body);
@@ -668,30 +675,30 @@ html, body {
 .online-cols {
   display: grid;
   grid-template-columns: repeat(2, minmax(150px, 1fr));
-  gap: clamp(10px, 3vmin, 28px);
+  gap: clamp(14px, 3.2vmin, 34px);
 }
 .online-col-head {
   font-family: var(--font-ui);
   color: #ffd84a;
-  font-size: clamp(11px, 1.9vmin, 13px);
+  font-size: clamp(13px, 2.3vmin, 16px);
   letter-spacing: 1.5px;
   text-align: center;
-  margin-bottom: clamp(3px, 0.8vmin, 6px);
-  padding-bottom: 3px;
-  border-bottom: 1px solid rgba(255, 200, 40, 0.2);
+  margin-bottom: clamp(5px, 1.2vmin, 10px);
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 200, 40, 0.25);
 }
 .online-list {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: clamp(3px, 0.8vmin, 6px);
 }
 .online-list li {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  font-size: clamp(11px, 2vmin, 14px);
-  line-height: 1.5;
+  gap: 8px;
+  font-size: clamp(13px, 2.4vmin, 17px);
+  line-height: 1.6;
 }
 .online-list .ol-rank {
   color: #3fb59b;
