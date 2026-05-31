@@ -20,12 +20,13 @@ const Leaderboard = (() => {
   // apiKey 는 클라이언트에 공개돼도 되는 식별자입니다 (보안은 Firestore 규칙으로 처리).
   // ====================================================================
   const firebaseConfig = {
-    apiKey:            "PASTE_API_KEY",
-    authDomain:        "PASTE_PROJECT.firebaseapp.com",
-    projectId:         "PASTE_PROJECT_ID",
-    storageBucket:     "PASTE_PROJECT.appspot.com",
-    messagingSenderId: "PASTE_SENDER_ID",
-    appId:             "PASTE_APP_ID"
+    apiKey:            "AIzaSyC2DzmpKEdUZLKOcfN37anRKd3UFvZhaA8",
+    authDomain:        "wavesurvival-b1f89.firebaseapp.com",
+    projectId:         "wavesurvival-b1f89",
+    storageBucket:     "wavesurvival-b1f89.firebasestorage.app",
+    messagingSenderId: "281540873378",
+    appId:             "1:281540873378:web:f48fc450d1805d113a9bfb",
+    measurementId:     "G-Z5M3DYG8TZ"
   };
   // ====================================================================
 
