@@ -472,7 +472,7 @@ const UI = (() => {
   // First-person gun sprites — one per weapon. Sniper falls back to the M4.
   const GUN_SPRITES = {
     pistol:     { src: 'assets/pistol.webp',   muzzle: { x: 0.28, y: 0.16 } },
-    shotgun:    { src: 'assets/shotgun.webp',  muzzle: { x: 0.34, y: 0.22 } },
+    shotgun:    { src: 'assets/shotgun.webp',  muzzle: { x: 0.34, y: 0.13 } },
     machinegun: { src: 'assets/gun.webp',      muzzle: { x: 0.20, y: 0.10 } },
     sniper:     { src: 'assets/sniper.webp',   muzzle: { x: 0.19, y: 0.05 } }
   };
