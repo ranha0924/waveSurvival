@@ -181,7 +181,7 @@ const UI = (() => {
     const wrap = $('best-records');
     if (wrap) {
       const fmt = (rec) => rec && rec.value > 0
-        ? `${rec.value.toLocaleString()}<span class="by"> by ${escapeHtml(rec.name || '익명')}</span>`
+        ? rec.value.toLocaleString()
         : '<span class="empty">기록 없음</span>';
       $('best-wave-title').innerHTML  = fmt(records.bestWave);
       $('best-score-title').innerHTML = fmt(records.bestScore);
