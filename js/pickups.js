@@ -228,41 +228,28 @@ const Pickups = (() => {
     while (list.length > MAX_ON_FLOOR) list.shift();
   }
 
-  // Drop tables. Ranger biases toward sniper ammo, tank toward medkits +
-  // heavier ammo, boss is handled by onEnemyKilled directly with a guaranteed
-  // multi-drop burst.
+  // Drop tables. Only healing items drop now — ammo no longer drops.
+  // Boss is handled by onEnemyKilled directly with a guaranteed drop.
   function rollDrop(enemyTypeId) {
     const r = Math.random();
     if (enemyTypeId === 'tank') {
       if (r < 0.25) return 'medkit';
-      if (r < 0.40) return 'ammo_mg';
-      if (r < 0.52) return 'ammo_sg';
-      if (r < 0.60) return 'ammo_sniper';
       return null;
     }
     if (enemyTypeId === 'ranger') {
       if (r < 0.10) return 'bandage';
-      if (r < 0.18) return 'ammo_sniper';
-      if (r < 0.24) return 'ammo_mg';
-      if (r < 0.28) return 'ammo_sg';
       return null;
     }
     // grunt / rusher / bomber / splitter / splitterChild
     if (r < 0.12) return 'bandage';
-    if (r < 0.17) return 'ammo_mg';
-    if (r < 0.20) return 'ammo_sg';
-    if (r < 0.22) return 'ammo_sniper';
     return null;
   }
 
   function onEnemyKilled(e) {
     if (!e || !e.type) return;
     if (e.type.isBoss) {
-      // Boss drops a guaranteed burst around the body.
-      spawn('medkit',      e.x + 0.30, e.y + 0.05);
-      spawn('ammo_mg',     e.x - 0.30, e.y + 0.05);
-      spawn('ammo_sg',     e.x + 0.05, e.y + 0.30);
-      spawn('ammo_sniper', e.x + 0.05, e.y - 0.30);
+      // Boss drops a guaranteed medkit around the body.
+      spawn('medkit', e.x + 0.30, e.y + 0.05);
       return;
     }
     const t = rollDrop(e.type.id);
