@@ -1122,7 +1122,7 @@ const Raycaster = (() => {
     // they read against the dark night themes: boost ambient, soften the
     // distance falloff, and clamp to a visible floor so far ghosts don't sink
     // into black.
-    const lightFactor = Math.max(0.5, Math.min(1, (theme.ambient + 0.3) * (1 - fog * 0.5)));
+    const lightFactor = Math.max(0.7, Math.min(1, (theme.ambient + 0.5) * (1 - fog * 0.5)));
 
     if (sprite) {
       drawImageBillboard(sprite, drawStartX, drawStartY, spriteW, spriteH,
