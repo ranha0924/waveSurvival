@@ -1118,7 +1118,11 @@ const Raycaster = (() => {
     const x0 = Math.max(0, drawStartX);
     const x1 = Math.min(W, drawStartX + spriteW);
     const fog = Math.min(1, proj.dist / theme.fogDist);
-    const lightFactor = theme.ambient * (1 - fog * 0.6);
+    // Enemies (귀신) are lit noticeably brighter than the surrounding world so
+    // they read against the dark night themes: boost ambient, soften the
+    // distance falloff, and clamp to a visible floor so far ghosts don't sink
+    // into black.
+    const lightFactor = Math.max(0.7, Math.min(1, (theme.ambient + 0.5) * (1 - fog * 0.5)));
 
     if (sprite) {
       drawImageBillboard(sprite, drawStartX, drawStartY, spriteW, spriteH,

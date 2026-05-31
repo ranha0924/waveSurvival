@@ -181,7 +181,7 @@ const UI = (() => {
     const wrap = $('best-records');
     if (wrap) {
       const fmt = (rec) => rec && rec.value > 0
-        ? `${rec.value.toLocaleString()}<span class="by"> by ${escapeHtml(rec.name || '익명')}</span>`
+        ? rec.value.toLocaleString()
         : '<span class="empty">기록 없음</span>';
       $('best-wave-title').innerHTML  = fmt(records.bestWave);
       $('best-score-title').innerHTML = fmt(records.bestScore);
@@ -199,6 +199,31 @@ const UI = (() => {
       $('daily-score').innerHTML = fmtDaily(dr.bestScore);
     }
   }
+  // ---------- Online leaderboard (Firestore) ----------
+  // Each list takes either an array of {name, score, wave} rows, [] for an
+  // empty board, or null when the board is offline/disabled.
+  function renderOnlineList(el, rows) {
+    if (!el) return;
+    if (rows == null) { el.innerHTML = '<li class="ol-empty">오프라인</li>'; return; }
+    if (rows.length === 0) { el.innerHTML = '<li class="ol-empty">아직 기록 없음</li>'; return; }
+    el.innerHTML = rows.map((r, i) =>
+      '<li>' +
+        `<span class="ol-rank">${i + 1}</span>` +
+        `<span class="ol-name">${escapeHtml(r.name || '익명')}</span>` +
+        `<span class="ol-score">${Number(r.score || 0).toLocaleString()}</span>` +
+        `<span class="ol-wave">W${Number(r.wave || 0)}</span>` +
+      '</li>'
+    ).join('');
+  }
+  function setLeaderboard(allTime, daily) {
+    renderOnlineList($('online-alltime'), allTime);
+    renderOnlineList($('online-daily'), daily);
+  }
+  function setLeaderboardStatus(text) {
+    const el = $('online-status');
+    if (el) el.textContent = text || '';
+  }
+
   function getNickInput() {
     const el = $('nick-input');
     return el ? el.value : '';
@@ -446,10 +471,10 @@ const UI = (() => {
   // ---------- First-person gun overlay ----------
   // First-person gun sprites — one per weapon. Sniper falls back to the M4.
   const GUN_SPRITES = {
-    pistol:     { src: 'assets/pistol.png',   muzzle: { x: 0.28, y: 0.16 } },
-    shotgun:    { src: 'assets/shotgun.png',  muzzle: { x: 0.76, y: 0.59 } },
-    machinegun: { src: 'assets/gun.png',      muzzle: { x: 0.20, y: 0.10 } },
-    sniper:     { src: 'assets/sniper.png',   muzzle: { x: 0.19, y: 0.05 } }
+    pistol:     { src: 'assets/pistol.webp',   muzzle: { x: 0.28, y: 0.16 } },
+    shotgun:    { src: 'assets/shotgun.webp',  muzzle: { x: 0.76, y: 0.59 } },
+    machinegun: { src: 'assets/gun.webp',      muzzle: { x: 0.20, y: 0.10 } },
+    sniper:     { src: 'assets/sniper.webp',   muzzle: { x: 0.19, y: 0.05 } }
   };
   for (const w in GUN_SPRITES) {
     const def = GUN_SPRITES[w];
@@ -634,6 +659,7 @@ const UI = (() => {
     showUpgradeMenu, hideUpgradeMenu,
     renderGun, fireTalisman,
     showRecordBanner, updateTitleRecords, setHudBest,
+    setLeaderboard, setLeaderboardStatus,
     getNickInput, setNickInput
   };
 })();

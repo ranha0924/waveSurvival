@@ -358,7 +358,9 @@ const Environment = (() => {
         const dxs = wx - start.x, dys = wy - start.y;
         if (dxs * dxs + dys * dys < 16) continue;
         if (blockedByStructure(x, y)) continue;
-        if (r() > 0.55) continue;
+        // Lower placement chance keeps the forest readable while trimming the
+        // sprite count (was 0.55) so init/sort/draw stays lighter.
+        if (r() > 0.35) continue;
         const jx = (r() - 0.5) * 0.6;
         const jy = (r() - 0.5) * 0.6;
         trees.push({

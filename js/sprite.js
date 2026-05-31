@@ -148,13 +148,13 @@ const Sprites = (() => {
 // Render scales sit ~20% below the old values so the enemies read as
 // human-sized against the taller trees instead of looming. The renderer and
 // the hitscan both read these, so shrinking here keeps aim/headshots aligned.
-Sprites.register('grunt',  'assets/cheonyeo.png', { scale: 0.85 });
-Sprites.register('rusher', 'assets/mongdal.png', { scale: 0.8 });
-Sprites.register('tank',   'assets/dokkaebi.png', { scale: 1.2 });
-Sprites.register('ranger', 'assets/jeoseung.png', { scale: 0.85 });
-Sprites.register('boss',   'assets/gumiho.png', { scale: 1.8 });
-Sprites.register('bomber', 'assets/gaekgwi.png', { scale: 0.8 });
-Sprites.register('splitter', 'assets/dokkaebibul.png', { scale: 0.8 });
+Sprites.register('grunt',  'assets/cheonyeo.webp', { scale: 0.85 });
+Sprites.register('rusher', 'assets/mongdal.webp', { scale: 0.8 });
+Sprites.register('tank',   'assets/dokkaebi.webp', { scale: 1.2 });
+Sprites.register('ranger', 'assets/jeoseung.webp', { scale: 0.85 });
+Sprites.register('boss',   'assets/gumiho.webp', { scale: 1.8 });
+Sprites.register('bomber', 'assets/gaekgwi.webp', { scale: 0.8 });
+Sprites.register('splitter', 'assets/dokkaebibul.webp', { scale: 0.8 });
 // Splitter children re-use the 도깨비불 flame at a smaller scale so they read
 // as little broken-off wisps of the parent fire.
-Sprites.register('splitterChild', 'assets/dokkaebibul.png', { scale: 0.5 });
+Sprites.register('splitterChild', 'assets/dokkaebibul.webp', { scale: 0.5 });

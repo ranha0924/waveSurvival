@@ -1,3 +1,13 @@
+/* Reverted to the original system UI font. (The 굿판 mode banner still uses
+   Noto Serif KR via the canvas in main.js.) All three variables resolve to
+   the same system stack so every `var(--font-*)` reference falls back to the
+   pre-redesign look. */
+:root {
+  --font-display: 'Segoe UI', 'Malgun Gothic', sans-serif;
+  --font-body: 'Segoe UI', 'Malgun Gothic', sans-serif;
+  --font-ui: 'Segoe UI', 'Malgun Gothic', sans-serif;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -11,7 +21,7 @@ html, body {
   overflow: hidden;
   background: #000;
   color: #eee;
-  font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+  font-family: var(--font-body);
 }
 
 #game-container {
@@ -22,7 +32,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, #1a1a1a, #000);
+  background: radial-gradient(circle at 50% 25%, #16243d, #070b14 70%);
 }
 
 #game-canvas {
@@ -58,6 +68,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: clamp(4px, 1.2vmin, 12px);
+  font-family: var(--font-ui);
   font-weight: bold;
   line-height: 1;
 }
@@ -152,9 +163,10 @@ html, body {
 }
 
 #wave-info {
+  font-family: var(--font-ui);
   font-size: 22px;
   font-weight: bold;
-  color: #ffaa44;
+  color: #3fb59b;
   letter-spacing: 2px;
 }
 
@@ -171,6 +183,7 @@ html, body {
 }
 
 #combo-info {
+  font-family: var(--font-ui);
   font-size: 16px;
   font-weight: bold;
   color: #ffdd33;
@@ -258,12 +271,15 @@ html, body {
 }
 
 #weapon-name {
+  font-family: var(--font-ui);
   font-size: 16px;
-  color: #ffaa44;
+  color: #3fb59b;
   font-weight: bold;
+  letter-spacing: 1px;
 }
 
 #ammo-text {
+  font-family: var(--font-ui);
   font-size: 24px;
   font-weight: bold;
   color: #fff;
@@ -287,10 +303,11 @@ html, body {
   top: 30%;
   left: 50%;
   transform: translate(-50%, -50%);
+  font-family: var(--font-display);
   font-size: clamp(36px, 10vmin, 80px);
   font-weight: bold;
-  color: #ffaa44;
-  text-shadow: 0 0 30px rgba(255, 170, 60, 0.9), 0 0 8px #000;
+  color: #3fb59b;
+  text-shadow: 0 0 30px rgba(63, 181, 155, 0.9), 0 0 8px #000;
   letter-spacing: clamp(3px, 1vmin, 8px);
   pointer-events: none;
   animation: banner-fade 2.5s ease-out forwards;
@@ -307,6 +324,7 @@ html, body {
   z-index: 30;
 }
 #record-banner-title {
+  font-family: var(--font-display);
   font-size: clamp(28px, 8vmin, 64px);
   font-weight: 900;
   color: #ffd84a;
@@ -402,7 +420,7 @@ html, body {
 .overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(7, 11, 20, 0.9);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -414,15 +432,19 @@ html, body {
 }
 
 .overlay h1 {
-  font-size: clamp(24px, 8vmin, 64px);
-  color: #ffaa44;
+  font-family: var(--font-display);
+  font-size: clamp(40px, 13vmin, 110px);
+  color: #ffd84a;
   letter-spacing: clamp(2px, 0.8vmin, 6px);
   margin-bottom: clamp(4px, 1vmin, 10px);
-  text-shadow: 0 0 20px rgba(255, 170, 60, 0.6);
+  text-shadow: 0 0 32px rgba(255, 200, 60, 0.55),
+               0 0 12px rgba(63, 181, 155, 0.5),
+               0 3px 6px rgba(0, 0, 0, 0.85);
 }
 
 .overlay h2 {
-  font-size: clamp(20px, 6vmin, 48px);
+  font-family: var(--font-display);
+  font-size: clamp(24px, 7vmin, 54px);
   color: #ff5566;
   letter-spacing: clamp(2px, 0.6vmin, 4px);
   margin-bottom: clamp(8px, 2vmin, 20px);
@@ -430,6 +452,7 @@ html, body {
 }
 
 .overlay .subtitle {
+  font-family: var(--font-body);
   font-size: clamp(12px, 2.4vmin, 18px);
   color: #aaa;
   margin-bottom: clamp(10px, 3vmin, 30px);
@@ -437,10 +460,11 @@ html, body {
 }
 
 .big-btn {
-  background: linear-gradient(180deg, #ffaa44, #cc7722);
+  background: linear-gradient(180deg, #3fb59b, #26715f);
   color: #1a1a1a;
   border: none;
-  font-size: clamp(14px, 2.8vmin, 22px);
+  font-family: var(--font-ui);
+  font-size: clamp(15px, 3vmin, 24px);
   font-weight: bold;
   padding: clamp(8px, 1.6vmin, 14px) clamp(18px, 4.5vmin, 36px);
   margin: clamp(4px, 1vmin, 8px);
@@ -448,17 +472,17 @@ html, body {
   cursor: pointer;
   letter-spacing: 2px;
   transition: transform 0.1s, box-shadow 0.2s;
-  box-shadow: 0 4px 0 #884400;
+  box-shadow: 0 4px 0 #143f36;
 }
 
 .big-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 0 #884400, 0 0 16px rgba(255, 170, 60, 0.5);
+  box-shadow: 0 6px 0 #143f36, 0 0 16px rgba(63, 181, 155, 0.5);
 }
 
 .big-btn:active {
   transform: translateY(2px);
-  box-shadow: 0 2px 0 #884400;
+  box-shadow: 0 2px 0 #143f36;
 }
 
 .big-btn.secondary {
@@ -471,6 +495,55 @@ html, body {
   box-shadow: 0 6px 0 #111;
 }
 
+/* ===== Title-screen layout =====
+   Header (title) on top, a responsive 3-column panel grid in the middle, and
+   a footer (nickname + start) pinned below — instead of one long stacked
+   column. Columns collapse to 1 on narrow screens via auto-fit. */
+#title-screen {
+  gap: clamp(8px, 2vmin, 20px);
+  padding-top: clamp(16px, 4vmin, 48px);
+  padding-bottom: clamp(16px, 4vmin, 40px);
+}
+.title-header { text-align: center; }
+.title-grid {
+  display: grid;
+  /* Centre column (online ranking) gets extra width so the leaderboard reads
+     as the focal panel; side columns hold records / controls. */
+  grid-template-columns: 1fr 1.6fr 1fr;
+  gap: clamp(10px, 2vmin, 24px);
+  align-items: start;
+  width: min(1200px, 95vw);
+  margin: clamp(4px, 1vmin, 12px) auto 0;
+}
+/* Collapse to a single stacked column on narrow / portrait screens. */
+@media (max-width: 920px) {
+  .title-grid { grid-template-columns: 1fr; width: min(520px, 94vw); }
+}
+.tg-col {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.6vmin, 16px);
+  min-width: 0;
+}
+/* Panels fill their grid cell instead of carrying their own width/margins. */
+.title-grid #best-records,
+.title-grid #daily-records,
+.title-grid #online-records,
+.title-grid .controls-help {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  height: 100%;
+}
+.title-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 1.6vmin, 16px);
+  margin-top: clamp(6px, 1.4vmin, 14px);
+}
+.title-footer #nick-row { margin: 0; }
+
 /* Title screen: best-records panel + nickname input row. */
 #best-records {
   margin: clamp(6px, 1.5vmin, 14px) 0 clamp(8px, 2vmin, 20px);
@@ -478,10 +551,11 @@ html, body {
   background: rgba(255, 200, 40, 0.06);
   border: 1px solid rgba(255, 200, 40, 0.35);
   border-radius: 8px;
-  box-shadow: 0 0 20px rgba(255, 170, 60, 0.15) inset;
+  box-shadow: 0 0 20px rgba(63, 181, 155, 0.15) inset;
   max-width: 90vw;
 }
 .best-records-title {
+  font-family: var(--font-ui);
   color: #ffd84a;
   font-size: clamp(14px, 2.6vmin, 18px);
   letter-spacing: 2px;
@@ -490,27 +564,32 @@ html, body {
 }
 .best-records-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(160px, 1fr));
-  gap: clamp(4px, 1vmin, 10px) clamp(14px, 3vmin, 28px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(4px, 1vmin, 8px) clamp(12px, 2.5vmin, 22px);
 }
 .best-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
+  min-width: 0;
   font-size: clamp(12px, 2.2vmin, 16px);
 }
 .best-row .label {
   color: #aaa;
   letter-spacing: 1.5px;
   font-weight: bold;
+  flex: none;
 }
 .best-row .value {
   color: #fff;
   font-weight: bold;
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 .best-row .value .by {
-  color: #ffaa44;
+  color: #3fb59b;
   font-weight: normal;
   margin-left: 4px;
   font-size: 0.85em;
@@ -532,6 +611,7 @@ html, body {
   max-width: 90vw;
 }
 .daily-records-title {
+  font-family: var(--font-ui);
   color: #6ee0ff;
   font-size: clamp(13px, 2.4vmin, 17px);
   letter-spacing: 2px;
@@ -566,6 +646,92 @@ html, body {
   letter-spacing: 1px;
 }
 
+/* Online (Firestore) leaderboard panel — gold-framed, two columns:
+   전체 best-by-score and 오늘의 도전 best-by-score. */
+#online-records {
+  margin: clamp(4px, 1vmin, 10px) 0 clamp(8px, 2vmin, 16px);
+  padding: clamp(12px, 2.6vmin, 24px) clamp(16px, 3.4vmin, 32px);
+  background: rgba(63, 181, 155, 0.07);
+  border: 1px solid rgba(63, 181, 155, 0.4);
+  border-radius: 10px;
+  box-shadow: 0 0 24px rgba(63, 181, 155, 0.12) inset;
+  max-width: 92vw;
+}
+.online-records-title {
+  font-family: var(--font-ui);
+  color: #5cc7b0;
+  font-size: clamp(16px, 3vmin, 22px);
+  letter-spacing: 2px;
+  margin-bottom: clamp(10px, 2vmin, 18px);
+  text-align: center;
+}
+.online-records-title .online-status {
+  color: #888;
+  font-size: 0.68em;
+  letter-spacing: 1px;
+  margin-left: 6px;
+  font-family: var(--font-body);
+}
+.online-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: clamp(14px, 3.2vmin, 34px);
+}
+.online-col-head {
+  font-family: var(--font-ui);
+  color: #ffd84a;
+  font-size: clamp(13px, 2.3vmin, 16px);
+  letter-spacing: 1.5px;
+  text-align: center;
+  margin-bottom: clamp(5px, 1.2vmin, 10px);
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 200, 40, 0.25);
+}
+.online-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3px, 0.8vmin, 6px);
+}
+.online-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: clamp(13px, 2.4vmin, 17px);
+  line-height: 1.6;
+}
+.online-list .ol-rank {
+  color: #3fb59b;
+  font-weight: bold;
+  min-width: 1.4em;
+  text-align: right;
+}
+.online-list li:nth-child(1) .ol-rank { color: #ffd84a; }
+.online-list .ol-name {
+  color: #fff;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.online-list .ol-score {
+  color: #66ddff;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+.online-list .ol-wave {
+  color: #888;
+  font-size: 0.82em;
+  min-width: 2.4em;
+  text-align: right;
+}
+.online-list .ol-empty {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  justify-content: center;
+}
+
 #nick-row {
   display: flex;
   align-items: center;
@@ -573,7 +739,8 @@ html, body {
   margin-bottom: clamp(8px, 2vmin, 16px);
 }
 #nick-row label {
-  color: #ffaa44;
+  font-family: var(--font-ui);
+  color: #3fb59b;
   font-size: clamp(12px, 2.2vmin, 15px);
   letter-spacing: 2px;
   font-weight: bold;
@@ -607,7 +774,8 @@ html, body {
 }
 
 .controls-help h3 {
-  color: #ffaa44;
+  font-family: var(--font-ui);
+  color: #3fb59b;
   margin-bottom: clamp(4px, 1.2vmin, 10px);
   font-size: clamp(13px, 2.4vmin, 18px);
   letter-spacing: 2px;
@@ -624,7 +792,7 @@ html, body {
 }
 
 .controls-help b {
-  color: #ffcc66;
+  color: #8fd9c8;
   display: inline-block;
   min-width: 80px;
 }
@@ -654,9 +822,9 @@ html, body {
 }
 
 .upgrade-card:hover {
-  border-color: #ffaa44;
+  border-color: #3fb59b;
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(255, 170, 60, 0.3);
+  box-shadow: 0 8px 24px rgba(63, 181, 155, 0.3);
 }
 
 .upgrade-card .icon {
@@ -665,10 +833,12 @@ html, body {
 }
 
 .upgrade-card .title {
-  font-size: clamp(13px, 2.4vmin, 18px);
+  font-family: var(--font-ui);
+  font-size: clamp(14px, 2.6vmin, 19px);
   font-weight: bold;
-  color: #ffaa44;
+  color: #3fb59b;
   margin-bottom: clamp(4px, 1vmin, 8px);
+  letter-spacing: 1px;
 }
 
 .upgrade-card .desc {
@@ -705,7 +875,7 @@ html, body {
 }
 
 .result span {
-  color: #ffaa44;
+  color: #3fb59b;
   font-weight: bold;
 }
 
@@ -715,6 +885,7 @@ html, body {
   text-align: center;
 }
 #new-record-header .nr-title {
+  font-family: var(--font-display);
   font-size: clamp(22px, 6vmin, 44px);
   font-weight: 900;
   color: #ffd84a;
@@ -730,7 +901,7 @@ html, body {
   color: #fff;
   letter-spacing: 2px;
 }
-#new-record-header .nr-by span { color: #ffaa44; font-weight: bold; }
+#new-record-header .nr-by span { color: #3fb59b; font-weight: bold; }
 
 @keyframes nr-pulse {
   0%, 100% { transform: scale(1); }
@@ -747,7 +918,8 @@ html, body {
   min-width: clamp(260px, 50vmin, 420px);
 }
 .cmp-title {
-  color: #ffaa44;
+  font-family: var(--font-ui);
+  color: #3fb59b;
   font-size: clamp(12px, 2.2vmin, 15px);
   letter-spacing: 2px;
   text-align: center;
@@ -784,8 +956,10 @@ html, body {
 
 #lock-prompt {
   background: rgba(0, 0, 0, 0.6);
+  font-family: var(--font-ui);
   font-size: 28px;
-  color: #ffaa44;
+  letter-spacing: 1px;
+  color: #3fb59b;
 }
 
 /* ===== Mobile touch controls ===== */
@@ -847,6 +1021,7 @@ html, body {
   background: rgba(0, 0, 0, 0.4);
   border: 2px solid rgba(255, 255, 255, 0.4);
   color: #fff;
+  font-family: var(--font-ui);
   font-weight: bold;
   display: flex;
   align-items: center;

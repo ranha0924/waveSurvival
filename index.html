@@ -12,6 +12,10 @@
      Gowun Batang: lighter Myeongjo fallback if either above fails to load. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Warm up the Firebase hosts so the deferred leaderboard load is fast when
+     it fires after first paint, without blocking initial render. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@900&family=Black+Han+Sans&family=Gowun+Batang:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css" />
 </head>
@@ -61,45 +65,71 @@
 
     <!-- Title Screen -->
     <div id="title-screen" class="overlay">
-      <h1>굿판</h1>
-      <p class="subtitle">한국 무속 웨이브 서바이벌</p>
+      <div class="title-header">
+        <h1>굿판</h1>
+        <p class="subtitle">한국 무속 웨이브 서바이벌</p>
+      </div>
 
-      <div id="best-records">
-        <div class="best-records-title">🏆 최고 기록</div>
-        <div class="best-records-grid">
-          <div class="best-row"><span class="label">WAVE</span> <span id="best-wave-title" class="value"></span></div>
-          <div class="best-row"><span class="label">SCORE</span> <span id="best-score-title" class="value"></span></div>
-          <div class="best-row"><span class="label">KILLS</span> <span id="best-kills-title" class="value"></span></div>
-          <div class="best-row"><span class="label">COMBO</span> <span id="best-combo-title" class="value"></span></div>
+      <div class="title-grid">
+        <div class="tg-col">
+          <div id="best-records">
+            <div class="best-records-title">🏆 최고 기록</div>
+            <div class="best-records-grid">
+              <div class="best-row"><span class="label">WAVE</span> <span id="best-wave-title" class="value"></span></div>
+              <div class="best-row"><span class="label">SCORE</span> <span id="best-score-title" class="value"></span></div>
+              <div class="best-row"><span class="label">KILLS</span> <span id="best-kills-title" class="value"></span></div>
+              <div class="best-row"><span class="label">COMBO</span> <span id="best-combo-title" class="value"></span></div>
+            </div>
+          </div>
+
+          <div id="daily-records">
+            <div class="daily-records-title">📅 오늘의 도전 <span id="daily-date" class="daily-date"></span></div>
+            <div class="daily-records-grid">
+              <div class="daily-row"><span class="label">WAVE</span> <span id="daily-wave" class="value"></span></div>
+              <div class="daily-row"><span class="label">SCORE</span> <span id="daily-score" class="value"></span></div>
+            </div>
+            <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
+          </div>
+        </div>
+
+        <div class="tg-col">
+          <div id="online-records">
+            <div class="online-records-title">🌐 온라인 랭킹 <span id="online-status" class="online-status"></span></div>
+            <div class="online-cols">
+              <div class="online-col">
+                <div class="online-col-head">전체</div>
+                <ol id="online-alltime" class="online-list"></ol>
+              </div>
+              <div class="online-col">
+                <div class="online-col-head">오늘의 도전</div>
+                <ol id="online-daily" class="online-list"></ol>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tg-col">
+          <div class="controls-help">
+            <h3>조작법</h3>
+            <ul>
+              <li><b>W A S D</b> — 이동</li>
+              <li><b>마우스</b> — 시점 회전</li>
+              <li><b>좌클릭</b> — 사격</li>
+              <li><b>R</b> — 재장전</li>
+              <li><b>Shift</b> — 달리기</li>
+              <li><b>1 ~ 4</b> — 무기 교체</li>
+              <li><b>ESC</b> — 일시정지</li>
+            </ul>
+          </div>
         </div>
       </div>
 
-      <div id="daily-records">
-        <div class="daily-records-title">📅 오늘의 도전 <span id="daily-date" class="daily-date"></span></div>
-        <div class="daily-records-grid">
-          <div class="daily-row"><span class="label">WAVE</span> <span id="daily-wave" class="value"></span></div>
-          <div class="daily-row"><span class="label">SCORE</span> <span id="daily-score" class="value"></span></div>
+      <div class="title-footer">
+        <div id="nick-row">
+          <label for="nick-input">닉네임</label>
+          <input id="nick-input" type="text" maxlength="12" placeholder="이름을 입력 (최대 12자)" autocomplete="off" />
         </div>
-        <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
-      </div>
-
-      <div id="nick-row">
-        <label for="nick-input">닉네임</label>
-        <input id="nick-input" type="text" maxlength="12" placeholder="이름을 입력 (최대 12자)" autocomplete="off" />
-      </div>
-
-      <button id="start-btn" class="big-btn">게임 시작</button>
-      <div class="controls-help">
-        <h3>조작법</h3>
-        <ul>
-          <li><b>W A S D</b> — 이동</li>
-          <li><b>마우스</b> — 시점 회전</li>
-          <li><b>좌클릭</b> — 사격</li>
-          <li><b>R</b> — 재장전</li>
-          <li><b>Shift</b> — 달리기</li>
-          <li><b>1 ~ 4</b> — 무기 교체</li>
-          <li><b>ESC</b> — 일시정지</li>
-        </ul>
+        <button id="start-btn" class="big-btn">게임 시작</button>
       </div>
     </div>
 
@@ -169,6 +199,7 @@
   <script src="js/walltextures.js"></script>
   <script src="js/sprite.js"></script>
   <script src="js/pickups.js"></script>
+  <script src="js/leaderboard.js"></script>
   <script src="js/raycaster.js"></script>
   <script src="js/weapon.js"></script>
   <script src="js/player.js"></script>

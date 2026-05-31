@@ -57,35 +57,46 @@ const Pickups = (() => {
     return cv;
   }
 
-  // Pixel-art first-aid box: cream body, oversized red cross on the front,
-  // a top carrying handle and a small latch in the middle.
+  // Pixel-art herbal-medicine packet (한약 한 첩): a folded kraft-paper bundle
+  // tied with a twine cross, with a couple of dried roots/herbs poking out the
+  // top. Warm hanji-paper tones instead of the old red-cross first-aid box.
   function buildMedkit() {
     const cv = newCanvas(32, 32);
     const c = cv.getContext('2d');
     const px = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
-    // Handle
-    px(13, 5, 6, 1, '#9c8666');
-    px(12, 6, 8, 2, '#c4a87a');
-    px(12, 6, 8, 1, '#dec48e');
-    // Box body
-    px(4, 8, 24, 19, '#f0e8d0');
-    px(4, 8, 24,  1, '#fff8e0');
-    px(4, 9, 24,  1, '#e8dec0');
-    px(4, 26, 24, 1, '#806c50');
-    px(4,  8,  1, 19, '#c6b48c');
-    px(27, 8,  1, 19, '#a08c66');
-    // Hinge dots top
-    px(7,  9, 1, 1, '#604838');
-    px(24, 9, 1, 1, '#604838');
-    // Latch
-    px(14, 18, 4, 3, '#3a2e22');
-    px(14, 18, 4, 1, '#6a5a40');
-    px(15, 19, 2, 1, '#dec48e');   // latch button highlight
-    // Red cross
-    px(13, 11, 6, 11, '#cc1818');
-    px(10, 14, 12, 5, '#cc1818');
-    px(13, 11, 6,  1, '#ff5040');  // cross top highlight
-    px(10, 14, 1,  5, '#ff5040');  // cross left highlight
+    // Dried herbs / roots peeking out of the top of the wrap
+    px(11, 3, 1, 5, '#6f8a3a');   // herb stalk left
+    px(10, 2, 1, 2, '#85a64a');   // leaf
+    px(12, 4, 1, 2, '#5c7430');
+    px(19, 4, 1, 4, '#7a5a32');   // root right
+    px(20, 3, 1, 2, '#9a7642');
+    px(18, 5, 1, 2, '#6a4c28');
+    px(15, 4, 1, 4, '#8a6a3a');   // root middle
+    px(16, 5, 1, 3, '#a8814c');
+    // Folded paper packet body (kraft / hanji paper)
+    px(6, 8, 20, 19, '#d8b888');
+    px(6, 8, 20,  1, '#ecd0a2');   // top highlight
+    px(6, 9, 20,  1, '#e0c596');
+    px(6, 26, 20, 1, '#9a7c50');   // bottom shadow
+    px(6,  8,  1, 19, '#e4c896');  // left highlight
+    px(25, 8,  1, 19, '#b0905c');  // right shadow
+    // Fold creases down the packet
+    px(12, 8, 1, 19, '#c0a070');
+    px(13, 8, 1, 19, '#e0c596');
+    px(19, 8, 1, 19, '#c0a070');
+    px(20, 8, 1, 19, '#e0c596');
+    // Bottom fold flap
+    px(6, 22, 20, 1, '#b8966a');
+    px(6, 23, 20, 1, '#e0c596');
+    // Twine tie — vertical strand
+    px(15, 8, 2, 19, '#9c3a2a');
+    px(15, 8, 1, 19, '#c45a44');   // twine highlight
+    // Twine tie — horizontal strand
+    px(6, 16, 20, 2, '#9c3a2a');
+    px(6, 16, 20, 1, '#c45a44');
+    // Knot in the centre
+    px(14, 15, 4, 4, '#7a2c1e');
+    px(15, 16, 2, 2, '#c45a44');
     return cv;
   }
 
@@ -228,41 +239,28 @@ const Pickups = (() => {
     while (list.length > MAX_ON_FLOOR) list.shift();
   }
 
-  // Drop tables. Ranger biases toward sniper ammo, tank toward medkits +
-  // heavier ammo, boss is handled by onEnemyKilled directly with a guaranteed
-  // multi-drop burst.
+  // Drop tables. Only healing items drop now — ammo no longer drops.
+  // Boss is handled by onEnemyKilled directly with a guaranteed drop.
   function rollDrop(enemyTypeId) {
     const r = Math.random();
     if (enemyTypeId === 'tank') {
       if (r < 0.25) return 'medkit';
-      if (r < 0.40) return 'ammo_mg';
-      if (r < 0.52) return 'ammo_sg';
-      if (r < 0.60) return 'ammo_sniper';
       return null;
     }
     if (enemyTypeId === 'ranger') {
       if (r < 0.10) return 'bandage';
-      if (r < 0.18) return 'ammo_sniper';
-      if (r < 0.24) return 'ammo_mg';
-      if (r < 0.28) return 'ammo_sg';
       return null;
     }
     // grunt / rusher / bomber / splitter / splitterChild
     if (r < 0.12) return 'bandage';
-    if (r < 0.17) return 'ammo_mg';
-    if (r < 0.20) return 'ammo_sg';
-    if (r < 0.22) return 'ammo_sniper';
     return null;
   }
 
   function onEnemyKilled(e) {
     if (!e || !e.type) return;
     if (e.type.isBoss) {
-      // Boss drops a guaranteed burst around the body.
-      spawn('medkit',      e.x + 0.30, e.y + 0.05);
-      spawn('ammo_mg',     e.x - 0.30, e.y + 0.05);
-      spawn('ammo_sg',     e.x + 0.05, e.y + 0.30);
-      spawn('ammo_sniper', e.x + 0.05, e.y - 0.30);
+      // Boss drops a guaranteed medkit around the body.
+      spawn('medkit', e.x + 0.30, e.y + 0.05);
       return;
     }
     const t = rollDrop(e.type.id);
