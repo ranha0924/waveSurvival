@@ -472,7 +472,7 @@ const UI = (() => {
   // First-person gun sprites — one per weapon. Sniper falls back to the M4.
   const GUN_SPRITES = {
     pistol:     { src: 'assets/pistol.webp',   muzzle: { x: 0.28, y: 0.16 } },
-    shotgun:    { src: 'assets/shotgun.webp',  muzzle: { x: 0.76, y: 0.59 } },
+    shotgun:    { src: 'assets/shotgun.webp',  muzzle: { x: 0.80, y: 0.56 } },
     machinegun: { src: 'assets/gun.webp',      muzzle: { x: 0.20, y: 0.10 } },
     sniper:     { src: 'assets/sniper.webp',   muzzle: { x: 0.19, y: 0.05 } }
   };
@@ -583,10 +583,11 @@ const UI = (() => {
     const drawnH = H * GUN_HEIGHT_FRAC;
     const drawnW = drawnH * aspect;
 
-    // Anchor bottom-right with sway / bob / kickback offset
+    // Anchor toward the lower-right, but pulled left a bit so the weapon sits
+    // more centred in view rather than hugging the right edge.
     const swayX = Math.cos(player.bobPhase * 0.5) * 6;
     const swayY = Math.sin(player.bobPhase) * 3;
-    const drawX = W - drawnW + swayX;
+    const drawX = W - drawnW + swayX - W * 0.12;
     const drawY = H - drawnH + bob * 0.6 + kick * 1.4 + swayY;
 
     // Preserve pixel-art crispness
