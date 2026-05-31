@@ -83,6 +83,20 @@
         <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
       </div>
 
+      <div id="online-records">
+        <div class="online-records-title">🌐 온라인 랭킹 <span id="online-status" class="online-status"></span></div>
+        <div class="online-cols">
+          <div class="online-col">
+            <div class="online-col-head">전체</div>
+            <ol id="online-alltime" class="online-list"></ol>
+          </div>
+          <div class="online-col">
+            <div class="online-col-head">오늘의 도전</div>
+            <ol id="online-daily" class="online-list"></ol>
+          </div>
+        </div>
+      </div>
+
       <div id="nick-row">
         <label for="nick-input">닉네임</label>
         <input id="nick-input" type="text" maxlength="12" placeholder="이름을 입력 (최대 12자)" autocomplete="off" />
@@ -169,6 +183,7 @@
   <script src="js/walltextures.js"></script>
   <script src="js/sprite.js"></script>
   <script src="js/pickups.js"></script>
+  <script src="js/leaderboard.js"></script>
   <script src="js/raycaster.js"></script>
   <script src="js/weapon.js"></script>
   <script src="js/player.js"></script>

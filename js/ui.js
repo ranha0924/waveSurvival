@@ -199,6 +199,31 @@ const UI = (() => {
       $('daily-score').innerHTML = fmtDaily(dr.bestScore);
     }
   }
+  // ---------- Online leaderboard (Firestore) ----------
+  // Each list takes either an array of {name, score, wave} rows, [] for an
+  // empty board, or null when the board is offline/disabled.
+  function renderOnlineList(el, rows) {
+    if (!el) return;
+    if (rows == null) { el.innerHTML = '<li class="ol-empty">오프라인</li>'; return; }
+    if (rows.length === 0) { el.innerHTML = '<li class="ol-empty">아직 기록 없음</li>'; return; }
+    el.innerHTML = rows.map((r, i) =>
+      '<li>' +
+        `<span class="ol-rank">${i + 1}</span>` +
+        `<span class="ol-name">${escapeHtml(r.name || '익명')}</span>` +
+        `<span class="ol-score">${Number(r.score || 0).toLocaleString()}</span>` +
+        `<span class="ol-wave">W${Number(r.wave || 0)}</span>` +
+      '</li>'
+    ).join('');
+  }
+  function setLeaderboard(allTime, daily) {
+    renderOnlineList($('online-alltime'), allTime);
+    renderOnlineList($('online-daily'), daily);
+  }
+  function setLeaderboardStatus(text) {
+    const el = $('online-status');
+    if (el) el.textContent = text || '';
+  }
+
   function getNickInput() {
     const el = $('nick-input');
     return el ? el.value : '';
@@ -634,6 +659,7 @@ const UI = (() => {
     showUpgradeMenu, hideUpgradeMenu,
     renderGun, fireTalisman,
     showRecordBanner, updateTitleRecords, setHudBest,
+    setLeaderboard, setLeaderboardStatus,
     getNickInput, setNickInput
   };
 })();
