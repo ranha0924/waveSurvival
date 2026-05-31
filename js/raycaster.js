@@ -125,17 +125,6 @@ const Raycaster = (() => {
     if (typeof Environment !== 'undefined' && Environment.getProps) {
       for (const p of Environment.getProps()) push(p.x, p.y, 'prop', p);
     }
-    if (typeof Environment !== 'undefined' && Environment.getGrass) {
-      // Grass is low to the ground and small, so cull it tighter than trees —
-      // distant tufts vanish into the soil anyway and there are a lot of them.
-      const maxGrassD2 = Math.pow((theme.fogDist || 16) * 0.9, 2);
-      for (const g of Environment.getGrass()) {
-        const dx = g.x - player.x, dy = g.y - player.y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 > maxGrassD2) continue;
-        sprites.push({ dist: d2, type: 'grass', ref: g });
-      }
-    }
     sprites.sort((a, b) => b.dist - a.dist);
 
     for (const s of sprites) {
@@ -144,31 +133,8 @@ const Raycaster = (() => {
       else if (s.type === 'tree') drawTreeSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'flag') drawFlagSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'prop') drawPropSprite(player, s.ref, horizonOffset, theme);
-      else if (s.type === 'grass') drawGrassSprite(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
     }
-  }
-
-  // Ground grass tufts — small floor decoration anchored with its base on the
-  // floor, like a short prop. No collision; wall zBuffer clipping still applies
-  // so a tuft behind a wall stays hidden. Fades into the haze with distance.
-  function drawGrassSprite(player, g, horizonOffset, theme) {
-    const proj = projectSprite(player, g.x, g.y);
-    if (!proj) return;
-    const canvas = Environment.getGrassCanvas(g.variant);
-    if (!canvas) return;
-    const horizon = H / 2 + horizonOffset;
-    const lineH = H / proj.dist;
-    const aspect = canvas.width / canvas.height;
-    const grassH = Math.max(2, Math.floor(lineH * 0.42 * (g.scale || 1)));
-    const grassW = Math.max(2, Math.floor(grassH * aspect));
-    const groundedBottom = horizon + lineH / 2;
-    const drawStartY = Math.floor(groundedBottom - grassH);
-    const drawStartX = Math.floor(proj.screenX - grassW / 2);
-    const fogD = (theme && theme.fogDist) || 16;
-    const fade = Math.max(0, Math.min(1, 1 - (proj.dist - fogD * 0.35) / (fogD * 0.65)));
-    if (fade <= 0.02) return;
-    blitBillboard(canvas, drawStartX, drawStartY, grassW, grassH, proj.dist, fade, g.flip);
   }
 
   // Shared billboard blitter. The classic raycaster path blits one 1px column
