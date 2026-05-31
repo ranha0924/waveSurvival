@@ -360,8 +360,8 @@ const Environment = (() => {
       const midX = (bx + tipX) / 2 + (r() - 0.5) * (opts.curve || 5);
       const midY = (baseY + tipY) / 2;
       // Dark outline pass for silhouette, then the colour on top.
-      c.strokeStyle = 'rgba(0,0,0,0.45)';
-      c.lineWidth = width + 1.2;
+      c.strokeStyle = 'rgba(0,0,0,0.35)';
+      c.lineWidth = width + 0.8;
       c.beginPath();
       c.moveTo(bx, baseY);
       c.quadraticCurveTo(midX, midY, tipX, tipY);
@@ -389,27 +389,30 @@ const Environment = (() => {
 
   function buildGrass() {
     grassCanvases.length = 0;
+    // Colours are kept fairly bright/saturated on purpose: the night themes
+    // darken the whole scene, so muted greens vanished into the soil. These
+    // moonlit-but-legible tones still read against the dark earth floor.
     // 0 — lush green tuft
     grassCanvases[0] = buildGrassClump(101, 9,
-      ['#2c4a1e', '#365a24', '#24401a', '#3f6a2c'],
-      { spread: 20, minLen: 13, lenVar: 11, lean: 6, width: 2 });
+      ['#4e8030', '#5e943c', '#447028', '#6aa848'],
+      { spread: 20, minLen: 14, lenVar: 11, lean: 6, width: 2 });
     // 1 — dry straw-grass, shorter & tan
     grassCanvases[1] = buildGrassClump(202, 8,
-      ['#5a4a22', '#6e5a2a', '#4a3c1a', '#7a6630'],
-      { spread: 18, minLen: 9, lenVar: 8, lean: 7, width: 2 });
+      ['#8c7238', '#a48848', '#76602c', '#bc9c52'],
+      { spread: 18, minLen: 10, lenVar: 8, lean: 7, width: 2 });
     // 2 — broad cool blades, fewer and wider
     grassCanvases[2] = buildGrassClump(303, 6,
-      ['#2a4630', '#34543a', '#223c28'],
-      { spread: 16, minLen: 11, lenVar: 9, lean: 4, width: 3, curve: 7 });
+      ['#4a7450', '#588256', '#3c6244'],
+      { spread: 16, minLen: 12, lenVar: 9, lean: 4, width: 3, curve: 7 });
     // 3 — flowering weed (pale blossoms at the tips)
     grassCanvases[3] = buildGrassClump(404, 9,
-      ['#33502a', '#3c5e30', '#2a441f'],
-      { spread: 19, minLen: 12, lenVar: 10, lean: 6, width: 2,
-        flower: '#d8cad6', flowerChance: 0.5, flowerSize: 1.8 });
+      ['#52803a', '#62924a', '#467030'],
+      { spread: 19, minLen: 13, lenVar: 10, lean: 6, width: 2,
+        flower: '#ecdcee', flowerChance: 0.55, flowerSize: 2.0 });
     // 4 — tall reedy stalks, thin and upright
     grassCanvases[4] = buildGrassClump(505, 7,
-      ['#33502a', '#3c5e30', '#46703a'],
-      { spread: 10, minLen: 16, lenVar: 9, lean: 3, width: 1.5, curve: 3 });
+      ['#4e7c3a', '#5c9046', '#68a052'],
+      { spread: 10, minLen: 17, lenVar: 9, lean: 3, width: 1.6, curve: 3 });
   }
 
   // Scatter grass tufts across open earth tiles. Skips the same structure /
