@@ -311,10 +311,11 @@ const Player = (() => {
       if (p.slowOnHit) {
         c.e.slowTimer = Math.max(c.e.slowTimer || 0, 1.0);
       }
-      // Spawn impact particles at hit point
+      // Spawn impact particles at hit point — fixed spectral blue spray for
+      // every 귀신 regardless of its blood colour.
       const ix = p.x + dirX * c.proj;
       const iy = p.y + dirY * c.proj;
-      spawnHitParticles(particles, ix, iy, c.e.type.bloodColor || [180, 30, 30]);
+      spawnHitParticles(particles, ix, iy, [70, 150, 255]);
       hits++;
     }
 
