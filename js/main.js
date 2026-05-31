@@ -240,8 +240,31 @@
     game.nick = Records.loadNick();
     UI.setNickInput(game.nick);
     UI.updateTitleRecords(Records.load(), Records.loadDaily());
+    refreshLeaderboard();
     UI.showTitle();
     requestAnimationFrame(loop);
+  }
+
+  // Pull the shared Firestore leaderboard and paint it onto the title screen.
+  // Safe to call when the board is unconfigured/offline — it just shows the
+  // appropriate status and the local records keep covering personal bests.
+  function refreshLeaderboard() {
+    if (typeof Leaderboard === 'undefined') return;
+    if (!Leaderboard.configured()) {
+      UI.setLeaderboardStatus('미설정');
+      UI.setLeaderboard(null, null);
+      return;
+    }
+    UI.setLeaderboardStatus('불러오는 중…');
+    Promise.all([Leaderboard.topAllTime(), Leaderboard.topDaily()])
+      .then(([allTime, daily]) => {
+        UI.setLeaderboard(allTime, daily);
+        UI.setLeaderboardStatus(allTime == null ? '오프라인' : '');
+      })
+      .catch(() => {
+        UI.setLeaderboard(null, null);
+        UI.setLeaderboardStatus('오프라인');
+      });
   }
 
   function resumeGame() {
@@ -274,6 +297,7 @@
       UI.hideHud();
       if (game.touchMode) Mobile.hideControls();
       UI.updateTitleRecords(Records.load(), Records.loadDaily());
+      refreshLeaderboard();
       UI.showTitle();
       game.state = STATE.TITLE;
     });
@@ -1044,6 +1068,13 @@
     const daily = Records.loadDaily();
     bumpRecords(daily.records, stats, nick);
     Records.saveDaily(daily);
+
+    // Push the run to the shared online board (no-op when unconfigured /
+    // offline), then refresh the cached title-screen ranking so it's current
+    // the next time the player backs out to the menu.
+    if (typeof Leaderboard !== 'undefined') {
+      Leaderboard.submitRun(stats, nick).then((ok) => { if (ok) refreshLeaderboard(); });
+    }
 
     UI.showGameOver(resultStats, prev, broken, game.nick);
   }

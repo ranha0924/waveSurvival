@@ -590,6 +590,91 @@ html, body {
   letter-spacing: 1px;
 }
 
+/* Online (Firestore) leaderboard panel — gold-framed, two columns:
+   전체 best-by-score and 오늘의 도전 best-by-score. */
+#online-records {
+  margin: clamp(4px, 1vmin, 10px) 0 clamp(8px, 2vmin, 16px);
+  padding: clamp(8px, 2vmin, 16px) clamp(12px, 3vmin, 24px);
+  background: rgba(255, 170, 60, 0.05);
+  border: 1px solid rgba(255, 170, 60, 0.35);
+  border-radius: 8px;
+  max-width: 92vw;
+}
+.online-records-title {
+  font-family: var(--font-ui);
+  color: #ffc066;
+  font-size: clamp(13px, 2.4vmin, 17px);
+  letter-spacing: 2px;
+  margin-bottom: clamp(6px, 1.4vmin, 12px);
+  text-align: center;
+}
+.online-records-title .online-status {
+  color: #888;
+  font-size: 0.72em;
+  letter-spacing: 1px;
+  margin-left: 6px;
+  font-family: var(--font-body);
+}
+.online-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: clamp(10px, 3vmin, 28px);
+}
+.online-col-head {
+  font-family: var(--font-ui);
+  color: #ffd84a;
+  font-size: clamp(11px, 1.9vmin, 13px);
+  letter-spacing: 1.5px;
+  text-align: center;
+  margin-bottom: clamp(3px, 0.8vmin, 6px);
+  padding-bottom: 3px;
+  border-bottom: 1px solid rgba(255, 200, 40, 0.2);
+}
+.online-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.online-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: clamp(11px, 2vmin, 14px);
+  line-height: 1.5;
+}
+.online-list .ol-rank {
+  color: #ffaa44;
+  font-weight: bold;
+  min-width: 1.4em;
+  text-align: right;
+}
+.online-list li:nth-child(1) .ol-rank { color: #ffd84a; }
+.online-list .ol-name {
+  color: #fff;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.online-list .ol-score {
+  color: #66ddff;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+.online-list .ol-wave {
+  color: #888;
+  font-size: 0.82em;
+  min-width: 2.4em;
+  text-align: right;
+}
+.online-list .ol-empty {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  justify-content: center;
+}
+
 #nick-row {
   display: flex;
   align-items: center;
