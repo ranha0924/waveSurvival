@@ -32,8 +32,13 @@ const Random = (() => {
     return `${y}-${m}-${day}`;
   }
 
+  // Bump this to re-roll the daily challenge (a fresh 권능/wave sequence for
+  // every date). Each increment shifts the seed so "today's daily" becomes a
+  // new deterministic run — used to refresh the day's pick on request.
+  const DAILY_SEED_VERSION = 1;
+
   function seed(n) { state = (n | 0) || 1; }
-  function seedToday() { seed(todayKey()); }
+  function seedToday() { seed((todayKey() + DAILY_SEED_VERSION * 0x9E3779B1) | 0); }
   function next() { return mulberry32(); }
   function int(maxExclusive) { return Math.floor(next() * maxExclusive); }
   function pick(arr) { return arr[int(arr.length)]; }
