@@ -32,7 +32,7 @@ const Leaderboard = (() => {
 
   const SDK = 'https://www.gstatic.com/firebasejs/10.12.5';
   const ALLTIME = 'leaderboard';
-  const TOP_N = 10;
+  const TOP_N = 30;
 
   let fs = null;            // firestore module namespace (set after lazy import)
   let db = null;

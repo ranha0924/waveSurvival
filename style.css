@@ -692,7 +692,19 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: clamp(3px, 0.8vmin, 6px);
+  /* Show the top 5 only; ranks 6–30 are reachable by scrolling. Height is
+     5 rows (line-height 1.6 × font) + 4 inter-row gaps. */
+  max-height: calc(5 * 1.6 * clamp(13px, 2.4vmin, 17px) + 4 * clamp(3px, 0.8vmin, 6px) + 2px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 200, 40, 0.5) transparent;
 }
+.online-list::-webkit-scrollbar { width: 6px; }
+.online-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 200, 40, 0.5);
+  border-radius: 3px;
+}
+.online-list::-webkit-scrollbar-track { background: transparent; }
 .online-list li {
   display: flex;
   align-items: baseline;
