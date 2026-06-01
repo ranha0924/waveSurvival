@@ -137,24 +137,19 @@
             </section>
           </div>
 
-          <!-- 랭킹 탭: 전체 화면 -->
+          <!-- 랭킹 탭: 전체 화면을 반으로 (왼쪽 전체 / 오른쪽 오늘) -->
           <div class="title-view view-ranking">
-            <div class="ranking-screen">
-              <div class="ranking-header">
-                <button type="button" class="ranking-back" data-view="records">← 돌아가기</button>
-                <h2 class="ranking-title">온라인 랭킹 <span id="online-status" class="online-status"></span></h2>
-                <span class="ranking-spacer" aria-hidden="true"></span>
-              </div>
-              <div class="ranking-boards">
-                <section class="ranking-board hanji-panel">
-                  <div class="rank-group-head">전체</div>
-                  <ol id="online-alltime" class="online-list"></ol>
-                </section>
-                <section class="ranking-board hanji-panel">
-                  <div class="rank-group-head">오늘의 도전</div>
-                  <ol id="online-daily" class="online-list"></ol>
-                </section>
-              </div>
+            <button type="button" class="ranking-back" data-view="records">← 돌아가기</button>
+            <span id="online-status" class="online-status ranking-status"></span>
+            <div class="ranking-split">
+              <section class="ranking-half">
+                <div class="rank-half-head">전체</div>
+                <ol id="online-alltime" class="online-list"></ol>
+              </section>
+              <section class="ranking-half">
+                <div class="rank-half-head">오늘의 도전</div>
+                <ol id="online-daily" class="online-list"></ol>
+              </section>
             </div>
           </div>
         </div>
