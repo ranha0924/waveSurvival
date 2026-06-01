@@ -1590,21 +1590,39 @@ html, body {
   .smoke { display: none; }
 }
 
-/* ---------- 타이틀 온라인 랭킹: 좁은 2열에서도 이름이 보이게 (한 항목 2줄) ---------- */
+/* ---------- 타이틀 온라인 랭킹: 전체/오늘 탭 + full-width 여유로운 행 ---------- */
 #title-screen #online-records.hanji-panel { max-width: clamp(280px, 40vw, 400px); }
-#title-screen .online-list li {
-  display: grid;
-  grid-template-columns: 1.6em minmax(0, 1fr) auto;
-  grid-template-areas:
-    "rank name  name"
-    "rank score wave";
-  column-gap: 6px; row-gap: 0;
-  align-items: baseline; line-height: 1.32;
+.rank-tabs { display: flex; gap: 6px; margin-bottom: 9px; }
+.rank-tab {
+  flex: 1; padding: clamp(5px,1vmin,8px) 8px;
+  font-family: 'Gowun Batang', serif;
+  font-size: clamp(12px, 1.9vmin, 15px);
+  color: #b6a886; background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(216,177,58,0.3); border-radius: 4px;
+  cursor: pointer; letter-spacing: 0.08em;
+  transition: color .15s, background .15s, border-color .15s;
 }
-#title-screen .online-list .ol-rank  { grid-area: rank; align-self: center; }
-#title-screen .online-list .ol-name  { grid-area: name; min-width: 0; }
-#title-screen .online-list .ol-score { grid-area: score; font-size: 0.85em; }
-#title-screen .online-list .ol-wave  { grid-area: wave; font-size: 0.8em; text-align: right; }
-#title-screen .online-list li.ol-empty { display: block; text-align: center; }
-/* 2줄 항목 높이에 맞춰 약 5개 노출 후 스크롤 */
-#title-screen .online-list { max-height: calc(5 * 2.5 * clamp(12px, 2vmin, 15px) + 10px); }
+.rank-tab:hover { color: #f0cf86; background: rgba(216,177,58,0.1); }
+.rank-tab.active {
+  color: #1a140a; font-weight: 700;
+  background: linear-gradient(180deg, #ecc756, #c79a26);
+  border-color: #ecc756;
+}
+/* 한 번에 하나의 보드만 표시 (online-list 는 flex column) */
+.rank-board { display: none; }
+.rank-board.active { display: flex; }
+
+/* full-width 단일 줄 — 여유로운 행 + 옅은 구분선 */
+#title-screen .online-list { gap: 0; max-height: clamp(160px, 32vh, 250px); }
+#title-screen .online-list li {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: clamp(5px, 1.1vmin, 9px) 4px;
+  font-size: clamp(13px, 2.1vmin, 16px); line-height: 1.3;
+  border-bottom: 1px solid rgba(216,177,58,0.12);
+}
+#title-screen .online-list li:last-child { border-bottom: none; }
+#title-screen .online-list .ol-rank { min-width: 1.6em; }
+#title-screen .online-list .ol-name { flex: 1; min-width: 0; }
+#title-screen .online-list li.ol-empty {
+  display: block; text-align: center; border: none; padding: 16px 4px;
+}

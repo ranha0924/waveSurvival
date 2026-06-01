@@ -124,15 +124,13 @@
         <aside class="shrine-side shrine-right">
           <section id="online-records" class="hanji-panel">
             <h3 class="panel-title">온라인 랭킹 <span id="online-status" class="online-status"></span></h3>
-            <div class="online-cols">
-              <div class="online-col">
-                <div class="online-col-head">전체</div>
-                <ol id="online-alltime" class="online-list"></ol>
-              </div>
-              <div class="online-col">
-                <div class="online-col-head">오늘</div>
-                <ol id="online-daily" class="online-list"></ol>
-              </div>
+            <div class="rank-tabs" role="tablist">
+              <button type="button" class="rank-tab active" data-board="alltime">전체</button>
+              <button type="button" class="rank-tab" data-board="daily">오늘</button>
+            </div>
+            <div class="rank-bodies">
+              <ol id="online-alltime" class="online-list rank-board active"></ol>
+              <ol id="online-daily" class="online-list rank-board"></ol>
             </div>
           </section>
 
