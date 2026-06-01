@@ -311,13 +311,14 @@
       });
     });
 
-    // Top-level title tabs — 기록 / 랭킹 view switch.
-    document.querySelectorAll('#title-screen .title-tab').forEach((btn) => {
+    // Title view switch — handles the 기록/랭킹 tabs AND the ranking "돌아가기"
+    // button (any element with data-view). 랭킹 takes over the full screen.
+    document.querySelectorAll('#title-screen [data-view]').forEach((btn) => {
       btn.addEventListener('click', () => {
         Audio.uiClick();
         const view = btn.dataset.view;
         document.querySelectorAll('#title-screen .title-tab').forEach((b) =>
-          b.classList.toggle('active', b === btn));
+          b.classList.toggle('active', b.dataset.view === view));
         document.querySelectorAll('#title-screen .title-view').forEach((v) =>
           v.classList.toggle('active', v.classList.contains('view-' + view)));
       });
