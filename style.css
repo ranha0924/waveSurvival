@@ -1634,3 +1634,69 @@ html, body {
 #title-screen .online-list li.ol-empty {
   display: block; text-align: center; border: none; padding: 16px 4px;
 }
+
+/* ====================================================================
+   타이틀 탭 구조 (기록 / 랭킹) + 전체 축소
+   제단을 상단 헤더로, 그 아래 탭으로 기록/랭킹 뷰 전환.
+   ==================================================================== */
+.shrine-content {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center;
+  gap: clamp(8px, 1.8vmin, 18px);
+  width: min(960px, 94vw); margin: 0 auto;
+}
+
+/* 제단(헤더) 축소 */
+.altar { gap: clamp(6px, 1.2vmin, 12px); }
+.talisman { width: clamp(116px, 16vw, 166px); }
+#title-screen .gut-title { font-size: clamp(44px, 7vw, 84px); }
+.altar-subtitle { font-size: clamp(11px, 1.9vmin, 15px); letter-spacing: 0.18em; }
+.talisman-paper { padding: clamp(14px, 2.4vmin, 24px) 0 clamp(20px, 3vmin, 30px); }
+
+/* 탭 바 */
+.title-tabs { position: relative; z-index: 1; display: flex; gap: 8px; }
+.title-tab {
+  min-width: clamp(78px, 14vw, 120px);
+  padding: clamp(6px, 1.1vmin, 9px) clamp(14px, 2.4vw, 22px);
+  font-family: 'Gowun Batang', serif; font-size: clamp(14px, 2.1vmin, 17px);
+  color: #c9b78c; background: rgba(20, 16, 12, 0.6);
+  border: 1px solid rgba(216, 177, 58, 0.35); border-bottom: none;
+  border-radius: 7px 7px 0 0; cursor: pointer; letter-spacing: 0.1em;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.title-tab:hover { color: #ffe6a6; }
+.title-tab.active {
+  color: #1a140a; font-weight: 700;
+  background: linear-gradient(180deg, #ecc756, #c79a26);
+  border-color: #ecc756;
+}
+
+/* 뷰 컨테이너 / 전환 */
+.title-views { position: relative; z-index: 1; width: 100%; display: flex; justify-content: center; }
+.title-view { display: none; width: 100%; }
+.title-view.active { display: flex; }
+
+/* 기록 뷰: 패널 3개 가로 정렬(좁으면 줄바꿈) */
+.view-records {
+  flex-wrap: wrap; justify-content: center; align-items: flex-start;
+  gap: clamp(10px, 1.6vmin, 18px);
+}
+#title-screen .view-records .hanji-panel { max-width: clamp(188px, 25vw, 246px); }
+
+/* 랭킹 뷰: 중앙 넓은 패널에 전체+오늘 스택 */
+.view-ranking { justify-content: center; }
+#title-screen .view-ranking #online-records.hanji-panel { max-width: clamp(300px, 56vw, 460px); width: 100%; }
+.rank-stack { display: flex; flex-direction: column; gap: clamp(10px, 1.6vmin, 16px); }
+.rank-group-head {
+  font-family: 'Gowun Batang', serif; font-size: clamp(12px, 1.9vmin, 15px);
+  color: #c9b78c; letter-spacing: 0.08em;
+  padding-bottom: 4px; margin-bottom: 4px;
+  border-bottom: 1px dashed rgba(216, 177, 58, 0.3);
+}
+/* 각 랭킹 리스트 고정 높이(균일) */
+#title-screen .rank-group .online-list { height: clamp(148px, 24vh, 198px); max-height: none; }
+
+@media (max-width: 720px) {
+  #title-screen .view-records .hanji-panel { max-width: none; flex: 1 1 100%; }
+  #title-screen .view-ranking #online-records.hanji-panel { max-width: none; }
+}

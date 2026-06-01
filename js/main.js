@@ -311,17 +311,15 @@
       });
     });
 
-    // Ranking tabs — show one board (전체 / 오늘) full-width at a time.
-    document.querySelectorAll('#online-records .rank-tab').forEach((btn) => {
+    // Top-level title tabs — 기록 / 랭킹 view switch.
+    document.querySelectorAll('#title-screen .title-tab').forEach((btn) => {
       btn.addEventListener('click', () => {
         Audio.uiClick();
-        const board = btn.dataset.board;
-        document.querySelectorAll('#online-records .rank-tab').forEach((b) =>
+        const view = btn.dataset.view;
+        document.querySelectorAll('#title-screen .title-tab').forEach((b) =>
           b.classList.toggle('active', b === btn));
-        const all = document.getElementById('online-alltime');
-        const day = document.getElementById('online-daily');
-        if (all) all.classList.toggle('active', board === 'alltime');
-        if (day) day.classList.toggle('active', board === 'daily');
+        document.querySelectorAll('#title-screen .title-view').forEach((v) =>
+          v.classList.toggle('active', v.classList.contains('view-' + view)));
       });
     });
     document.getElementById('restart-btn').addEventListener('click', () => {
