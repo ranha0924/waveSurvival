@@ -469,12 +469,13 @@ const UI = (() => {
   function hideUpgradeMenu() { $('upgrade-screen').classList.add('hidden'); }
 
   // ---------- First-person gun overlay ----------
-  // First-person gun sprites — one per weapon. Sniper falls back to the M4.
+  // First-person gun sprites — one per weapon. The 복숭아활 has a second
+  // "release" frame (string loosed, arrow gone) shown briefly on each shot.
   const GUN_SPRITES = {
     pistol:     { src: 'assets/pistol.webp',   muzzle: { x: 0.28, y: 0.16 } },
     shotgun:    { src: 'assets/shotgun.webp',  muzzle: { x: 0.34, y: 0.13 } },
     machinegun: { src: 'assets/gun.webp',      muzzle: { x: 0.20, y: 0.10 } },
-    sniper:     { src: 'assets/sniper.webp',   muzzle: { x: 0.19, y: 0.05 } }
+    sniper:     { src: 'assets/sniper.webp', fireSrc: 'assets/sniper_fire.webp', muzzle: { x: 0.30, y: 0.42 } }
   };
   for (const w in GUN_SPRITES) {
     const def = GUN_SPRITES[w];
@@ -482,6 +483,12 @@ const UI = (() => {
     def.loaded = false;
     def.img.onload = () => { def.loaded = true; };
     def.img.src = def.src;
+    if (def.fireSrc) {
+      def.fireImg = new Image();
+      def.fireLoaded = false;
+      def.fireImg.onload = () => { def.fireLoaded = true; };
+      def.fireImg.src = def.fireSrc;
+    }
   }
   const GUN_HEIGHT_FRAC = 0.55;
 
@@ -577,7 +584,11 @@ const UI = (() => {
 
     const def = GUN_SPRITES[player.currentWeapon] || GUN_SPRITES.pistol;
     if (!def.loaded) return;
-    const img = def.img;
+    // Swap to the release frame for the first moment after a shot (used by the
+    // 복숭아활: string loosed + arrow gone). Both frames share the same canvas
+    // crop so the bow doesn't jump.
+    const firing = def.fireImg && def.fireLoaded && player.muzzleFlash > 0.5;
+    const img = firing ? def.fireImg : def.img;
 
     const aspect = img.width / img.height;
     const drawnH = H * GUN_HEIGHT_FRAC;
