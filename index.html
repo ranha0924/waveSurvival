@@ -83,32 +83,7 @@
         <span class="smoke s3"></span><span class="smoke s4"></span>
       </div>
 
-      <div class="shrine-stage">
-        <aside class="shrine-side shrine-left">
-          <section id="best-records" class="hanji-panel">
-            <h3 class="panel-title">최고 기록</h3>
-            <div class="best-records-grid">
-              <div class="best-row"><span class="label">웨이브</span> <span id="best-wave-title" class="value"></span></div>
-              <div class="best-row"><span class="label">점수</span> <span id="best-score-title" class="value"></span></div>
-              <div class="best-row"><span class="label">천도</span> <span id="best-kills-title" class="value"></span></div>
-              <div class="best-row"><span class="label">연(連)</span> <span id="best-combo-title" class="value"></span></div>
-            </div>
-          </section>
-
-          <section class="controls-help hanji-panel">
-            <h3 class="panel-title">조작법</h3>
-            <ul>
-              <li><b>W A S D</b> — 이동</li>
-              <li><b>마우스</b> — 시점 회전</li>
-              <li><b>좌클릭</b> — 사격</li>
-              <li><b>R</b> — 재장전</li>
-              <li><b>Shift</b> — 달리기</li>
-              <li><b>1 ~ 4</b> — 무기 교체</li>
-              <li><b>ESC</b> — 일시정지</li>
-            </ul>
-          </section>
-        </aside>
-
+      <div class="shrine-content">
         <div class="altar">
           <div class="talisman">
             <span class="talisman-cord" aria-hidden="true"></span>
@@ -121,28 +96,64 @@
           <p class="altar-subtitle">한국 무속 웨이브 서바이벌</p>
         </div>
 
-        <aside class="shrine-side shrine-right">
-          <section id="online-records" class="hanji-panel">
-            <h3 class="panel-title">온라인 랭킹 <span id="online-status" class="online-status"></span></h3>
-            <div class="rank-tabs" role="tablist">
-              <button type="button" class="rank-tab active" data-board="alltime">전체</button>
-              <button type="button" class="rank-tab" data-board="daily">오늘</button>
-            </div>
-            <div class="rank-bodies">
-              <ol id="online-alltime" class="online-list rank-board active"></ol>
-              <ol id="online-daily" class="online-list rank-board"></ol>
-            </div>
-          </section>
+        <div class="title-tabs" role="tablist">
+          <button type="button" class="title-tab active" data-view="records">기록</button>
+          <button type="button" class="title-tab" data-view="ranking">랭킹</button>
+        </div>
 
-          <section id="daily-records" class="hanji-panel">
-            <h3 class="panel-title">오늘의 도전 <span id="daily-date" class="daily-date"></span></h3>
-            <div class="daily-records-grid">
-              <div class="daily-row"><span class="label">웨이브</span> <span id="daily-wave" class="value"></span></div>
-              <div class="daily-row"><span class="label">점수</span> <span id="daily-score" class="value"></span></div>
-            </div>
-            <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
-          </section>
-        </aside>
+        <div class="title-views">
+          <!-- 기록 탭 -->
+          <div class="title-view view-records active">
+            <section id="best-records" class="hanji-panel">
+              <h3 class="panel-title">최고 기록</h3>
+              <div class="best-records-grid">
+                <div class="best-row"><span class="label">웨이브</span> <span id="best-wave-title" class="value"></span></div>
+                <div class="best-row"><span class="label">점수</span> <span id="best-score-title" class="value"></span></div>
+                <div class="best-row"><span class="label">천도</span> <span id="best-kills-title" class="value"></span></div>
+                <div class="best-row"><span class="label">연(連)</span> <span id="best-combo-title" class="value"></span></div>
+              </div>
+            </section>
+
+            <section id="daily-records" class="hanji-panel">
+              <h3 class="panel-title">오늘의 도전 <span id="daily-date" class="daily-date"></span></h3>
+              <div class="daily-records-grid">
+                <div class="daily-row"><span class="label">웨이브</span> <span id="daily-wave" class="value"></span></div>
+                <div class="daily-row"><span class="label">점수</span> <span id="daily-score" class="value"></span></div>
+              </div>
+              <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
+            </section>
+
+            <section class="controls-help hanji-panel">
+              <h3 class="panel-title">조작법</h3>
+              <ul>
+                <li><b>W A S D</b> — 이동</li>
+                <li><b>마우스</b> — 시점 회전</li>
+                <li><b>좌클릭</b> — 사격</li>
+                <li><b>R</b> — 재장전</li>
+                <li><b>Shift</b> — 달리기</li>
+                <li><b>1 ~ 4</b> — 무기 교체</li>
+                <li><b>ESC</b> — 일시정지</li>
+              </ul>
+            </section>
+          </div>
+
+          <!-- 랭킹 탭 (일일 + 전체 함께) -->
+          <div class="title-view view-ranking">
+            <section id="online-records" class="hanji-panel">
+              <h3 class="panel-title">온라인 랭킹 <span id="online-status" class="online-status"></span></h3>
+              <div class="rank-stack">
+                <div class="rank-group">
+                  <div class="rank-group-head">전체</div>
+                  <ol id="online-alltime" class="online-list"></ol>
+                </div>
+                <div class="rank-group">
+                  <div class="rank-group-head">오늘의 도전</div>
+                  <ol id="online-daily" class="online-list"></ol>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
       </div>
 
       <div class="title-footer">
