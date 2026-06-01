@@ -474,7 +474,7 @@ const UI = (() => {
   const GUN_SPRITES = {
     pistol:     { src: 'assets/pistol.webp',   muzzle: { x: 0.28, y: 0.16 } },
     shotgun:    { src: 'assets/shotgun.webp',  muzzle: { x: 0.34, y: 0.13 } },
-    machinegun: { src: 'assets/gun.webp',      muzzle: { x: 0.20, y: 0.10 } },
+    machinegun: { src: 'assets/gun.webp',      muzzle: { x: 0.28, y: 0.06 } },
     sniper:     { src: 'assets/sniper.webp', fireSrc: 'assets/sniper_fire.webp', muzzle: { x: 0.30, y: 0.42 } }
   };
   for (const w in GUN_SPRITES) {
