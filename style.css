@@ -1589,3 +1589,22 @@ html, body {
   #title-screen .gut-title, .ignite-flame { animation: none !important; }
   .smoke { display: none; }
 }
+
+/* ---------- 타이틀 온라인 랭킹: 좁은 2열에서도 이름이 보이게 (한 항목 2줄) ---------- */
+#title-screen #online-records.hanji-panel { max-width: clamp(280px, 40vw, 400px); }
+#title-screen .online-list li {
+  display: grid;
+  grid-template-columns: 1.6em minmax(0, 1fr) auto;
+  grid-template-areas:
+    "rank name  name"
+    "rank score wave";
+  column-gap: 6px; row-gap: 0;
+  align-items: baseline; line-height: 1.32;
+}
+#title-screen .online-list .ol-rank  { grid-area: rank; align-self: center; }
+#title-screen .online-list .ol-name  { grid-area: name; min-width: 0; }
+#title-screen .online-list .ol-score { grid-area: score; font-size: 0.85em; }
+#title-screen .online-list .ol-wave  { grid-area: wave; font-size: 0.8em; text-align: right; }
+#title-screen .online-list li.ol-empty { display: block; text-align: center; }
+/* 2줄 항목 높이에 맞춰 약 5개 노출 후 스크롤 */
+#title-screen .online-list { max-height: calc(5 * 2.5 * clamp(12px, 2vmin, 15px) + 10px); }
