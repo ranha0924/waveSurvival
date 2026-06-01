@@ -83,73 +83,77 @@
         <span class="smoke s3"></span><span class="smoke s4"></span>
       </div>
 
-      <nav class="title-nav">
-        <button type="button" class="nav-btn" data-view="ranking">🏆 랭킹</button>
-      </nav>
+      <div class="shrine-content">
+        <!-- 네비게이션 -->
+        <nav class="title-nav">
+          <button type="button" class="nav-btn" data-view="ranking">🏆 랭킹</button>
+        </nav>
 
-      <div class="shrine-stage">
-        <aside class="shrine-side shrine-left">
-          <section id="best-records" class="hanji-panel">
-            <h3 class="panel-title">최고 기록</h3>
-            <div class="best-records-grid">
-              <div class="best-row"><span class="label">웨이브</span> <span id="best-wave-title" class="value"></span></div>
-              <div class="best-row"><span class="label">점수</span> <span id="best-score-title" class="value"></span></div>
-              <div class="best-row"><span class="label">천도</span> <span id="best-kills-title" class="value"></span></div>
-              <div class="best-row"><span class="label">연(連)</span> <span id="best-combo-title" class="value"></span></div>
-            </div>
-          </section>
+        <!-- 3열 레이아웃: 좌측 기록 | 중앙 굿판 | 우측 조작법 -->
+        <div class="shrine-stage">
+          <div class="shrine-left">
+            <section id="best-records" class="hanji-panel">
+              <h3 class="panel-title">최고 기록</h3>
+              <div class="best-records-grid">
+                <div class="best-row"><span class="label">웨이브</span> <span id="best-wave-title" class="value"></span></div>
+                <div class="best-row"><span class="label">점수</span> <span id="best-score-title" class="value"></span></div>
+                <div class="best-row"><span class="label">천도</span> <span id="best-kills-title" class="value"></span></div>
+                <div class="best-row"><span class="label">연(連)</span> <span id="best-combo-title" class="value"></span></div>
+              </div>
+            </section>
 
-          <section id="daily-records" class="hanji-panel">
-            <h3 class="panel-title">오늘의 도전 <span id="daily-date" class="daily-date"></span></h3>
-            <div class="daily-records-grid">
-              <div class="daily-row"><span class="label">웨이브</span> <span id="daily-wave" class="value"></span></div>
-              <div class="daily-row"><span class="label">점수</span> <span id="daily-score" class="value"></span></div>
-            </div>
-            <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
-          </section>
-        </aside>
-
-        <div class="altar">
-          <div class="talisman">
-            <span class="talisman-cord" aria-hidden="true"></span>
-            <div class="talisman-paper">
-              <h1 class="gut-title">굿판</h1>
-              <span class="talisman-seal" aria-hidden="true">護</span>
-            </div>
-            <div class="talisman-fray" aria-hidden="true"></div>
+            <section id="daily-records" class="hanji-panel">
+              <h3 class="panel-title">오늘의 도전 <span id="daily-date" class="daily-date"></span></h3>
+              <div class="daily-records-grid">
+                <div class="daily-row"><span class="label">웨이브</span> <span id="daily-wave" class="value"></span></div>
+                <div class="daily-row"><span class="label">점수</span> <span id="daily-score" class="value"></span></div>
+              </div>
+              <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
+            </section>
           </div>
-          <p class="altar-subtitle">한국 무속 웨이브 서바이벌</p>
+
+          <div class="altar">
+            <div class="talisman">
+              <span class="talisman-cord" aria-hidden="true"></span>
+              <div class="talisman-paper">
+                <h1 class="gut-title">굿판</h1>
+                <span class="talisman-seal" aria-hidden="true">護</span>
+              </div>
+              <div class="talisman-fray" aria-hidden="true"></div>
+            </div>
+            <p class="altar-subtitle">한국 무속 웨이브 서바이벌</p>
+          </div>
+
+          <div class="shrine-right">
+            <section class="controls-help hanji-panel">
+              <h3 class="panel-title">조작법</h3>
+              <ul>
+                <li><b>W A S D</b> — 이동</li>
+                <li><b>마우스</b> — 시점 회전</li>
+                <li><b>좌클릭</b> — 사격</li>
+                <li><b>R</b> — 재장전</li>
+                <li><b>Shift</b> — 달리기</li>
+                <li><b>1 ~ 4</b> — 무기 교체</li>
+                <li><b>ESC</b> — 일시정지</li>
+              </ul>
+            </section>
+          </div>
         </div>
 
-        <aside class="shrine-side shrine-right">
-          <section class="controls-help hanji-panel">
-            <h3 class="panel-title">조작법</h3>
-            <ul>
-              <li><b>W A S D</b> — 이동</li>
-              <li><b>마우스</b> — 시점 회전</li>
-              <li><b>좌클릭</b> — 사격</li>
-              <li><b>R</b> — 재장전</li>
-              <li><b>Shift</b> — 달리기</li>
-              <li><b>1 ~ 4</b> — 무기 교체</li>
-              <li><b>ESC</b> — 일시정지</li>
-            </ul>
-          </section>
-        </aside>
-      </div>
-
-      <!-- 랭킹: 전체 화면을 반으로 (왼쪽 전체 / 오른쪽 오늘) -->
-      <div class="title-view view-ranking">
-        <button type="button" class="ranking-back" data-view="records">← 돌아가기</button>
-        <span id="online-status" class="online-status ranking-status"></span>
-        <div class="ranking-split">
-          <section class="ranking-half">
-            <div class="rank-half-head">전체</div>
-            <ol id="online-alltime" class="online-list"></ol>
-          </section>
-          <section class="ranking-half">
-            <div class="rank-half-head">오늘의 도전</div>
-            <ol id="online-daily" class="online-list"></ol>
-          </section>
+        <!-- 랭킹 오버레이 (숨김 상태) -->
+        <div class="title-view view-ranking">
+          <button type="button" class="ranking-back" data-view="records">← 돌아가기</button>
+          <span id="online-status" class="online-status ranking-status"></span>
+          <div class="ranking-split">
+            <section class="ranking-half">
+              <div class="rank-half-head">전체</div>
+              <ol id="online-alltime" class="online-list"></ol>
+            </section>
+            <section class="ranking-half">
+              <div class="rank-half-head">오늘의 도전</div>
+              <ol id="online-daily" class="online-list"></ol>
+            </section>
+          </div>
         </div>
       </div>
 
