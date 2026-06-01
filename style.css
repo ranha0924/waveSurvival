@@ -1750,3 +1750,8 @@ html, body {
   .ranking-half { height: 50%; padding-top: clamp(16px, 3vh, 26px); }
   .ranking-half:first-child { border-right: none; border-bottom: 2px solid rgba(216, 177, 58, 0.4); padding-top: clamp(52px, 9vh, 70px); }
 }
+
+/* 랭킹(풀스크린) 표시 중엔 제단·탭·푸터(모드/닉네임/게임 시작) 전부 숨김 — 오직 랭킹만. */
+#title-screen.ranking-active .title-footer,
+#title-screen.ranking-active .altar,
+#title-screen.ranking-active .title-tabs { display: none; }

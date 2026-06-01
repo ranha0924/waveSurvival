@@ -321,6 +321,10 @@
           b.classList.toggle('active', b.dataset.view === view));
         document.querySelectorAll('#title-screen .title-view').forEach((v) =>
           v.classList.toggle('active', v.classList.contains('view-' + view)));
+        // While the 랭킹 (full-screen) view is up, hide everything else
+        // (제단·탭·푸터: 모드/닉네임/게임 시작) so only the ranking shows.
+        const ts = document.getElementById('title-screen');
+        if (ts) ts.classList.toggle('ranking-active', view === 'ranking');
       });
     });
     document.getElementById('restart-btn').addEventListener('click', () => {
