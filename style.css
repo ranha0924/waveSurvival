@@ -1446,7 +1446,8 @@ html, body {
   box-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
 #title-screen .gut-title {
-  font-family: 'Gugi', 'Nanum Brush Script', 'Black Han Sans', serif;
+  /* 궁서체 (system Gungseo) with graceful serif fallbacks. */
+  font-family: 'Gungsuh', 'GungsuhChe', '궁서', '궁서체', 'Batang', 'BatangChe', 'Noto Serif KR', serif;
   font-size: clamp(60px, 10vw, 116px);
   line-height: 0.9; margin: 0;
   color: var(--cinnabar);
