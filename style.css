@@ -1751,10 +1751,28 @@ html, body {
   .ranking-half:first-child { border-right: none; border-bottom: 2px solid rgba(216, 177, 58, 0.4); padding-top: clamp(52px, 9vh, 70px); }
 }
 
-/* 랭킹(풀스크린) 표시 중엔 제단·탭·푸터(모드/닉네임/게임 시작) 전부 숨김 — 오직 랭킹만. */
-#title-screen.ranking-active .title-footer,
-#title-screen.ranking-active .altar,
-#title-screen.ranking-active .title-tabs { display: none; }
+/* 랭킹(풀스크린) 표시 중엔 네비·무대·푸터(모드/닉네임/게임 시작) 전부 숨김 — 오직 랭킹만. */
+#title-screen.ranking-active .title-nav,
+#title-screen.ranking-active .shrine-stage,
+#title-screen.ranking-active .title-footer { display: none; }
+
+/* 상단 네비게이션 (랭킹) */
+.title-nav {
+  position: absolute; top: clamp(12px, 2.4vh, 22px); right: clamp(14px, 2.6vw, 28px);
+  z-index: 2; display: flex; gap: 8px;
+}
+.nav-btn {
+  font-family: 'Gowun Batang', serif; font-size: clamp(13px, 2vmin, 16px);
+  color: #f0cf86; background: rgba(20, 16, 12, 0.62);
+  border: 1px solid rgba(216, 177, 58, 0.4); border-radius: 6px;
+  padding: clamp(7px, 1.2vmin, 10px) clamp(14px, 2vw, 20px);
+  cursor: pointer; letter-spacing: 0.08em;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.nav-btn:hover {
+  color: #1a140a; font-weight: 700;
+  background: linear-gradient(180deg, #ecc756, #c79a26); border-color: #ecc756;
+}
 
 /* 기록(메인) 뷰: 3열 그리드 (최고 기록 / 오늘의 도전 / 조작법) */
 .title-view.view-records.active {
