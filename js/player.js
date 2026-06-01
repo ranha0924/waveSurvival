@@ -563,7 +563,7 @@ const Player = (() => {
     if (!w.ammoInfinite && w.reserveAmmo <= 0) return;
     p.reloading = true;
     p.reloadTimer = w.reloadTime;
-    Audio.reload();
+    Audio.reload(w.reloadTime);
   }
 
   function finishReload(p) {
