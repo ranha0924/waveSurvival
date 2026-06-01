@@ -435,20 +435,12 @@ const UI = (() => {
     if (player.soulSiphon) ownedToggles.add('혼(魂) 흡수');
     if (player.autoHeal) ownedToggles.add('회생부(回生符)');
     const filtered = upgrades.filter((u) => !ownedToggles.has(u.title));
-    const weaponCards = getWeaponUnlockUpgrades(player);
-    const pool = [...filtered, ...weaponCards];
+    const pool = [...filtered, ...getWeaponUnlockUpgrades(player)];
 
-    // Pick 3 random unique. While any weapon is still locked, guarantee one
-    // weapon-unlock card per screen so the arsenal (esp. 복숭아활) shows up
-    // early instead of being lost in the random pool for many waves.
+    // Pick 3 random unique
     const picks = [];
     const usedIdx = new Set();
     // Seeded so the daily run gets the same upgrade card pool at each wave.
-    if (weaponCards.length > 0) {
-      const chosen = weaponCards[Random.int(weaponCards.length)];
-      picks.push(chosen);
-      usedIdx.add(pool.indexOf(chosen));
-    }
     while (picks.length < 3 && usedIdx.size < pool.length) {
       const idx = Random.int(pool.length);
       if (usedIdx.has(idx)) continue;
