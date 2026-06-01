@@ -154,6 +154,7 @@ Sprites.register('tank',   'assets/dokkaebi.webp', { scale: 1.2 });
 Sprites.register('ranger', 'assets/jeoseung.webp', { scale: 0.85 });
 Sprites.register('boss',   'assets/gumiho.webp', { scale: 1.8 });
 Sprites.register('bomber', 'assets/gaekgwi.webp', { scale: 0.8 });
+Sprites.register('jiangshi', 'assets/gangsi.webp', { scale: 1.0 });
 Sprites.register('splitter', 'assets/dokkaebibul.webp', { scale: 0.8 });
 // Splitter children re-use the 도깨비불 flame at a smaller scale so they read
 // as little broken-off wisps of the parent fire.
