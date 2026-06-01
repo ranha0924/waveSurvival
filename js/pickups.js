@@ -11,7 +11,7 @@
 // until its life timer expires (~45s) or the player comes back for it.
 const Pickups = (() => {
   const types = {
-    bandage:     { name: '영약(靈藥)',  effect: 'heal', amount: 30 },
+    bandage:     { name: '산삼(山蔘)',  effect: 'heal', amount: 30 },
     medkit:      { name: '한약 한 첩',  effect: 'heal', amount: 50 },
     ammo_mg:     { name: '방울 다발',   effect: 'ammo', weapon: 'machinegun', amount: 30 },
     ammo_sg:     { name: '소금 한 줌',  effect: 'ammo', weapon: 'shotgun',    amount: 12 },
@@ -30,30 +30,39 @@ const Pickups = (() => {
     return cv;
   }
 
-  // Pixel-art rolled bandage with a red cross stamp on the wrap. The
-  // bandage is a pill-shaped roll viewed from the side.
-  function buildBandage() {
+  // Pixel-art 산삼 (wild ginseng): a forked "man-shaped" pale root with green
+  // palmate leaves and a small cluster of red berries on top — the classic
+  // mountain-ginseng silhouette.
+  function buildGinseng() {
     const cv = newCanvas(32, 32);
     const c = cv.getContext('2d');
     const px = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
-    // Roll body — vertical gradient bands give a hint of cylindrical shape
-    px(4, 11, 24, 10, '#dccfa7');
-    px(4, 11, 24,  1, '#fff5d4');   // top highlight
-    px(4, 12, 24,  1, '#f0e0b8');
-    px(4, 19, 24,  1, '#8a724a');
-    px(4, 20, 24,  1, '#6e5634');   // bottom shadow
-    px(4, 11,  1, 10, '#a89070');
-    px(27,11,  1, 10, '#82684a');
-    // Stripe seams along the roll
-    for (let i = 0; i < 5; i++) {
-      px(7 + i * 4, 13, 1, 6, '#b89868');
-      px(7 + i * 4, 13, 1, 1, '#d6b87c');
-    }
-    // Red cross stamp
-    px(15, 13, 2, 6, '#c8201a');
-    px(13, 15, 6, 2, '#c8201a');
-    px(15, 13, 2, 1, '#ff5050');
-    px(13, 15, 1, 2, '#ff5050');
+    // Red berry cluster on top
+    px(14, 2, 2, 2, '#d42424');
+    px(16, 3, 2, 2, '#d42424');
+    px(15, 4, 2, 2, '#b01c1c');
+    px(14, 2, 1, 1, '#ff7a7a');
+    px(16, 3, 1, 1, '#ff7a7a');
+    // Stem
+    px(15, 5, 2, 9, '#5a7a30');
+    // Palmate leaves fanning left and right
+    px(14, 5, 4, 2, '#5aa043');
+    px(7, 8, 7, 2, '#4c9038');  px(6, 10, 7, 2, '#3f7d30');  px(8, 12, 6, 2, '#3a7029');
+    px(18, 8, 7, 2, '#4c9038'); px(19, 10, 7, 2, '#3f7d30'); px(18, 12, 6, 2, '#3a7029');
+    px(7, 8, 7, 1, '#74bf57');  px(18, 8, 7, 1, '#74bf57');  // leaf highlights
+    // Root body (man-shaped torso)
+    px(13, 14, 6, 7, '#e9d6a6');
+    px(13, 14, 1, 7, '#f2e6c2');   // left highlight
+    px(18, 15, 1, 6, '#cbb682');   // right shade
+    // Arms splaying out
+    px(10, 16, 3, 2, '#e4cf9e'); px(9, 17, 2, 2, '#dcc592');
+    px(19, 16, 3, 2, '#e4cf9e'); px(21, 17, 2, 2, '#dcc592');
+    // Forked legs
+    px(13, 21, 2, 5, '#e9d6a6'); px(11, 24, 2, 4, '#e0cb96');
+    px(17, 21, 2, 5, '#e9d6a6'); px(19, 24, 2, 4, '#e0cb96');
+    px(15, 21, 1, 5, '#cbb682');
+    // Whisker roots
+    px(10, 27, 1, 2, '#d8c48e'); px(21, 27, 1, 2, '#d8c48e'); px(15, 26, 2, 3, '#e0cb96');
     return cv;
   }
 
@@ -219,7 +228,7 @@ const Pickups = (() => {
   }
 
   function init() {
-    canvases.bandage     = buildBandage();
+    canvases.bandage     = buildGinseng();
     canvases.medkit      = buildMedkit();
     canvases.ammo_mg     = buildAmmoMG();
     canvases.ammo_sg     = buildAmmoSG();
