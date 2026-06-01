@@ -1321,6 +1321,9 @@ html, body {
   gap: clamp(10px, 2.4vmin, 26px);
   overflow-y: auto;
   text-align: left;
+  /* 상단(및 하단) 여백 — 위젯이 화면 끝에 붙지 않도록. */
+  padding-top: clamp(28px, 6vh, 64px);
+  padding-bottom: clamp(20px, 4vh, 48px);
 }
 @media (max-width: 920px) {
   #title-screen { justify-content: flex-start; }
@@ -1612,8 +1615,13 @@ html, body {
 .rank-board { display: none; }
 .rank-board.active { display: flex; }
 
-/* full-width 단일 줄 — 여유로운 행 + 옅은 구분선 */
-#title-screen .online-list { gap: 0; max-height: clamp(160px, 32vh, 250px); }
+/* full-width 단일 줄 — 여유로운 행 + 옅은 구분선.
+   탭을 바꿔도 위젯 크기가 변하지 않도록 고정 높이(항목 수 무관). */
+#title-screen .online-list {
+  gap: 0;
+  height: clamp(175px, 30vh, 245px);
+  max-height: none;
+}
 #title-screen .online-list li {
   display: flex; align-items: baseline; gap: 10px;
   padding: clamp(5px, 1.1vmin, 9px) 4px;
