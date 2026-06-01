@@ -85,9 +85,11 @@ const Leaderboard = (() => {
     };
   }
 
-  // Write the finished run to both the all-time board and today's board.
+  // Write the finished run to the all-time board, plus today's board when the
+  // run was an 오늘의 굿판 (isDaily) — free-play runs use random seeds so they
+  // must not pollute the same-seed daily comparison.
   // Fire-and-forget from the caller's perspective; resolves true on success.
-  async function submitRun(stats, nick) {
+  async function submitRun(stats, nick, isDaily) {
     const ok = await init();
     if (!ok || !db) return false;
     try {
@@ -95,10 +97,11 @@ const Leaderboard = (() => {
       const row = clean(stats, nick);
       if (row.score <= 0 && row.wave <= 0) return false;   // skip empty runs
       const base = { ...row, ts: fs.serverTimestamp() };
-      await Promise.all([
-        fs.addDoc(fs.collection(db, ALLTIME), { ...base, day }),
-        fs.addDoc(fs.collection(db, 'daily', day, 'runs'), base)
-      ]);
+      const writes = [fs.addDoc(fs.collection(db, ALLTIME), { ...base, day })];
+      if (isDaily) {
+        writes.push(fs.addDoc(fs.collection(db, 'daily', day, 'runs'), base));
+      }
+      await Promise.all(writes);
       return true;
     } catch (e) {
       console.warn('[Leaderboard] 기록 전송 실패', e);
