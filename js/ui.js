@@ -475,7 +475,7 @@ const UI = (() => {
     pistol:     { src: 'assets/pistol.webp',   muzzle: { x: 0.28, y: 0.16 } },
     shotgun:    { src: 'assets/shotgun.webp',  muzzle: { x: 0.34, y: 0.13 } },
     machinegun: { src: 'assets/gun.webp',      muzzle: { x: 0.28, y: 0.06 } },
-    sniper:     { src: 'assets/sniper.webp', fireSrc: 'assets/sniper_fire.webp', muzzle: { x: 0.30, y: 0.42 } }
+    sniper:     { src: 'assets/sniper.webp', fireSrc: 'assets/sniper_fire.webp', scale: 1.28, muzzle: { x: 0.30, y: 0.42 } }
   };
   for (const w in GUN_SPRITES) {
     const def = GUN_SPRITES[w];
@@ -591,7 +591,8 @@ const UI = (() => {
     const img = firing ? def.fireImg : def.img;
 
     const aspect = img.width / img.height;
-    const drawnH = H * GUN_HEIGHT_FRAC;
+    // Optional per-weapon size multiplier (e.g. the 복숭아활 reads bigger).
+    const drawnH = H * GUN_HEIGHT_FRAC * (def.scale || 1);
     const drawnW = drawnH * aspect;
 
     // Anchor toward the lower-right, but pulled left a bit so the weapon sits
