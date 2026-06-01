@@ -1274,9 +1274,9 @@ html, body {
   margin-bottom: 6px;
 }
 .mode-btn {
-  flex: 1;
+  flex: 1 1 0;
   max-width: 420px;
-  min-width: fit-content;
+  min-width: 0;
   padding: clamp(8px, 1.4vmin, 12px) clamp(14px, 2.4vmin, 22px);
   white-space: nowrap;
   font-family: var(--font-ui);
