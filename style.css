@@ -1755,3 +1755,18 @@ html, body {
 #title-screen.ranking-active .title-footer,
 #title-screen.ranking-active .altar,
 #title-screen.ranking-active .title-tabs { display: none; }
+
+/* 기록(메인) 뷰: 3열 그리드 (최고 기록 / 오늘의 도전 / 조작법) */
+.title-view.view-records.active {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 1.8vmin, 20px);
+  align-items: start;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+#title-screen .view-records .hanji-panel { max-width: none; width: 100%; }
+@media (max-width: 720px) {
+  .title-view.view-records.active { grid-template-columns: 1fr; max-width: 460px; }
+}
