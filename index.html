@@ -16,7 +16,7 @@
      it fires after first paint, without blocking initial render. -->
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@900&family=Black+Han+Sans&family=Gowun+Batang:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;900&family=Black+Han+Sans&family=Gowun+Batang:wght@400;700&family=Gugi&family=Nanum+Brush+Script&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -72,52 +72,31 @@
 
     <!-- Title Screen -->
     <div id="title-screen" class="overlay">
-      <div class="title-header">
-        <h1>굿판</h1>
-        <p class="subtitle">한국 무속 웨이브 서바이벌</p>
+      <!-- 밤 굿당 분위기 레이어 (비상호작용) -->
+      <div class="shrine-atmos" aria-hidden="true">
+        <div class="atmos-mtn atmos-mtn-far"></div>
+        <div class="atmos-mtn atmos-mtn-near"></div>
+        <div class="atmos-altar-glow"></div>
+        <div class="candle candle-l"><span class="halo"></span><span class="stick"></span><span class="flame"></span></div>
+        <div class="candle candle-r"><span class="halo"></span><span class="stick"></span><span class="flame"></span></div>
+        <span class="smoke s1"></span><span class="smoke s2"></span>
+        <span class="smoke s3"></span><span class="smoke s4"></span>
       </div>
 
-      <div class="title-grid">
-        <div class="tg-col">
-          <div id="best-records">
-            <div class="best-records-title">🏆 최고 기록</div>
+      <div class="shrine-stage">
+        <aside class="shrine-side shrine-left">
+          <section id="best-records" class="hanji-panel">
+            <h3 class="panel-title">최고 기록</h3>
             <div class="best-records-grid">
-              <div class="best-row"><span class="label">WAVE</span> <span id="best-wave-title" class="value"></span></div>
-              <div class="best-row"><span class="label">SCORE</span> <span id="best-score-title" class="value"></span></div>
-              <div class="best-row"><span class="label">KILLS</span> <span id="best-kills-title" class="value"></span></div>
-              <div class="best-row"><span class="label">COMBO</span> <span id="best-combo-title" class="value"></span></div>
+              <div class="best-row"><span class="label">웨이브</span> <span id="best-wave-title" class="value"></span></div>
+              <div class="best-row"><span class="label">점수</span> <span id="best-score-title" class="value"></span></div>
+              <div class="best-row"><span class="label">천도</span> <span id="best-kills-title" class="value"></span></div>
+              <div class="best-row"><span class="label">연(連)</span> <span id="best-combo-title" class="value"></span></div>
             </div>
-          </div>
+          </section>
 
-          <div id="daily-records">
-            <div class="daily-records-title">📅 오늘의 도전 <span id="daily-date" class="daily-date"></span></div>
-            <div class="daily-records-grid">
-              <div class="daily-row"><span class="label">WAVE</span> <span id="daily-wave" class="value"></span></div>
-              <div class="daily-row"><span class="label">SCORE</span> <span id="daily-score" class="value"></span></div>
-            </div>
-            <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
-          </div>
-        </div>
-
-        <div class="tg-col">
-          <div id="online-records">
-            <div class="online-records-title">🌐 온라인 랭킹 <span id="online-status" class="online-status"></span></div>
-            <div class="online-cols">
-              <div class="online-col">
-                <div class="online-col-head">전체</div>
-                <ol id="online-alltime" class="online-list"></ol>
-              </div>
-              <div class="online-col">
-                <div class="online-col-head">오늘의 도전</div>
-                <ol id="online-daily" class="online-list"></ol>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="tg-col">
-          <div class="controls-help">
-            <h3>조작법</h3>
+          <section class="controls-help hanji-panel">
+            <h3 class="panel-title">조작법</h3>
             <ul>
               <li><b>W A S D</b> — 이동</li>
               <li><b>마우스</b> — 시점 회전</li>
@@ -127,8 +106,45 @@
               <li><b>1 ~ 4</b> — 무기 교체</li>
               <li><b>ESC</b> — 일시정지</li>
             </ul>
+          </section>
+        </aside>
+
+        <div class="altar">
+          <div class="talisman">
+            <span class="talisman-cord" aria-hidden="true"></span>
+            <div class="talisman-paper">
+              <h1 class="gut-title">굿판</h1>
+              <span class="talisman-seal" aria-hidden="true">護</span>
+            </div>
+            <div class="talisman-fray" aria-hidden="true"></div>
           </div>
+          <p class="altar-subtitle">한국 무속 웨이브 서바이벌</p>
         </div>
+
+        <aside class="shrine-side shrine-right">
+          <section id="online-records" class="hanji-panel">
+            <h3 class="panel-title">온라인 랭킹 <span id="online-status" class="online-status"></span></h3>
+            <div class="online-cols">
+              <div class="online-col">
+                <div class="online-col-head">전체</div>
+                <ol id="online-alltime" class="online-list"></ol>
+              </div>
+              <div class="online-col">
+                <div class="online-col-head">오늘</div>
+                <ol id="online-daily" class="online-list"></ol>
+              </div>
+            </div>
+          </section>
+
+          <section id="daily-records" class="hanji-panel">
+            <h3 class="panel-title">오늘의 도전 <span id="daily-date" class="daily-date"></span></h3>
+            <div class="daily-records-grid">
+              <div class="daily-row"><span class="label">웨이브</span> <span id="daily-wave" class="value"></span></div>
+              <div class="daily-row"><span class="label">점수</span> <span id="daily-score" class="value"></span></div>
+            </div>
+            <div class="daily-records-note">매일 같은 적 배치 · 같은 업그레이드 카드</div>
+          </section>
+        </aside>
       </div>
 
       <div class="title-footer">
@@ -139,9 +155,9 @@
         <div id="mode-desc">매판 랜덤 — 자유롭게 연습하고 개인 기록에 도전</div>
         <div id="nick-row">
           <label for="nick-input">닉네임</label>
-          <input id="nick-input" type="text" maxlength="12" placeholder="이름을 입력 (최대 12자)" autocomplete="off" />
+          <input id="nick-input" type="text" maxlength="12" placeholder="이름을 올리시오 (최대 12자)" autocomplete="off" />
         </div>
-        <button id="start-btn" class="big-btn">게임 시작</button>
+        <button id="start-btn" class="big-btn ignite"><span class="ignite-flame" aria-hidden="true"></span>부적 사르기</button>
       </div>
     </div>
 
