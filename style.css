@@ -1700,3 +1700,52 @@ html, body {
   #title-screen .view-records .hanji-panel { max-width: none; flex: 1 1 100%; }
   #title-screen .view-ranking #online-records.hanji-panel { max-width: none; }
 }
+
+/* ====================================================================
+   랭킹 탭: 전체 화면 (풀스크린)
+   '랭킹' 탭을 누르면 화면 전체를 덮고 전체+오늘 랭킹을 크게 표시.
+   ==================================================================== */
+.title-view.view-ranking.active {
+  position: fixed; inset: 0; z-index: 7;
+  background: radial-gradient(125% 95% at 50% 6%, #1b1426 0%, #0d0a13 52%, #050409 100%);
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: clamp(16px, 3.5vh, 40px) clamp(16px, 4vw, 56px);
+  overflow-y: auto;
+}
+.ranking-screen {
+  width: min(1000px, 96vw);
+  display: flex; flex-direction: column; gap: clamp(12px, 2.4vh, 24px);
+}
+.ranking-header { display: flex; align-items: center; gap: 12px; }
+.ranking-title {
+  flex: 1; text-align: center; margin: 0;
+  font-family: 'Gowun Batang', 'Noto Serif KR', serif;
+  font-size: clamp(22px, 4.5vmin, 38px); font-weight: 700;
+  color: #f0cf86; letter-spacing: 0.08em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+}
+.ranking-title .online-status { font-size: 0.5em; color: #9a8e74; font-weight: 400; letter-spacing: 0; }
+.ranking-back {
+  font-family: 'Gowun Batang', serif; font-size: clamp(13px, 2vmin, 16px);
+  color: #ffe6a6; background: rgba(20, 16, 12, 0.7);
+  border: 1px solid rgba(216, 177, 58, 0.45); border-radius: 6px;
+  padding: clamp(7px, 1.3vmin, 11px) clamp(12px, 2vw, 18px);
+  cursor: pointer; white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.ranking-back:hover { background: rgba(216, 177, 58, 0.18); color: #fff2cc; }
+.ranking-spacer { width: clamp(70px, 12vw, 130px); }
+.ranking-boards { display: flex; gap: clamp(14px, 2.4vw, 32px); }
+.ranking-board { flex: 1; min-width: 0; }
+.ranking-board .rank-group-head {
+  font-family: 'Gowun Batang', serif; font-size: clamp(15px, 2.4vmin, 19px);
+  color: #f0cf86; letter-spacing: 0.08em;
+  padding-bottom: 6px; margin-bottom: 8px;
+  border-bottom: 1px solid rgba(196, 32, 43, 0.7);
+}
+.view-ranking .online-list { height: clamp(260px, 62vh, 600px); max-height: none; }
+@media (max-width: 720px) {
+  .ranking-boards { flex-direction: column; }
+  .view-ranking .online-list { height: clamp(200px, 36vh, 360px); }
+  .ranking-spacer { display: none; }
+}
