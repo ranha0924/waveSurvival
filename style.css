@@ -1204,3 +1204,64 @@ html, body {
   0%, 100% { transform: scale(1); }
   50%      { transform: scale(1.02); }
 }
+
+/* ---------- 보스(구미호) 등장 컷씬 ---------- */
+#boss-cutscene {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.6vmin, 14px);
+  background: radial-gradient(ellipse at center,
+              rgba(20, 0, 24, 0.72) 0%, rgba(0, 0, 0, 0.94) 75%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+#boss-cutscene.hidden { display: none; }
+#boss-cutscene.show { opacity: 1; }
+#boss-cutscene-img {
+  height: 62%;
+  max-height: 62vh;
+  width: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 24px rgba(200, 40, 220, 0.55));
+  transform: translateY(24px) scale(0.86);
+  opacity: 0;
+}
+#boss-cutscene.show #boss-cutscene-img {
+  animation: bossRise 0.6s cubic-bezier(0.18, 0.9, 0.3, 1.2) forwards;
+}
+@keyframes bossRise {
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+#boss-cutscene-name {
+  font-family: var(--font-display, serif);
+  font-size: clamp(40px, 11vmin, 96px);
+  font-weight: 900;
+  color: #ff3b5c;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 18px rgba(255, 0, 60, 0.7), 0 4px 10px rgba(0, 0, 0, 0.8);
+  transform: scale(0.8);
+  opacity: 0;
+}
+#boss-cutscene.show #boss-cutscene-name {
+  animation: bossName 0.5s ease-out 0.18s forwards;
+}
+@keyframes bossName {
+  to { transform: scale(1); opacity: 1; }
+}
+#boss-cutscene-round {
+  font-family: var(--font-display, serif);
+  font-size: clamp(18px, 4vmin, 34px);
+  color: #ffd84a;
+  letter-spacing: 0.2em;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+}
+#boss-cutscene.show #boss-cutscene-round {
+  animation: bossName 0.5s ease-out 0.34s forwards;
+}

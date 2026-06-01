@@ -126,6 +126,15 @@ const Enemies = (() => {
     e.attackTimer -= dt;
     e.hitFlash = Math.max(0, e.hitFlash - dt);
 
+    // 강시 — a forehead-부적 headshot stuns it: frozen in place (no move /
+    // no attack) until the timer drains. Set in Player.damageEnemy.
+    if (e.stunTimer && e.stunTimer > 0) {
+      e.stunTimer -= dt;
+      e.hopOffset = 0;
+      e.lastX = e.x; e.lastY = e.y;
+      return;
+    }
+
     const dx = player.x - e.x;
     const dy = player.y - e.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -194,12 +203,23 @@ const Enemies = (() => {
       }
     }
 
+    // 강시 — bouncing lunge: surge forward on each hop's up-swing and pause
+    // at the bottom, with a visual vertical bounce (hopOffset read by the
+    // renderer). Average speed stays near the type's base speed.
+    let hopMult = 1;
+    if (e.type.id === 'jiangshi') {
+      e.hopPhase = (e.hopPhase || Math.random() * 6.28) + dt * 7.0;
+      const s = Math.sin(e.hopPhase);
+      hopMult = Math.max(0, s) * 3.0;
+      e.hopOffset = Math.max(0, s) * 0.5;
+    }
+
     // 한(恨) 서림 — card-set slow tick. While slowTimer > 0 the enemy moves
     // at 50% speed; the timer decays in real time so the slow auto-clears
     // a second after the last hit.
     if (e.slowTimer && e.slowTimer > 0) e.slowTimer -= dt;
     const slowed = e.slowTimer && e.slowTimer > 0;
-    const speed = e.type.speed * (slowed ? 0.5 : 1);
+    const speed = e.type.speed * (slowed ? 0.5 : 1) * hopMult;
     const dxs = moveX * speed * dt;
     const dys = moveY * speed * dt;
     const moved = GameMap.tryMove(e.x, e.y, dxs, dys, e.type.radius);

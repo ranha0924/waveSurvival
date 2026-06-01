@@ -1106,7 +1106,9 @@ const Raycaster = (() => {
       spriteH = Math.floor(baseH * scale);
       spriteW = Math.floor(spriteH * aspect);
       const groundedBottom = horizon + baseH / 2;
-      drawStartY = Math.floor(groundedBottom - spriteH);
+      // 강시 hop — lift the sprite off the ground for the bounce.
+      const hop = (e.hopOffset || 0) * spriteH * 0.5;
+      drawStartY = Math.floor(groundedBottom - spriteH - hop);
       drawStartX = proj.screenX - Math.floor(spriteW / 2);
     } else {
       spriteH = Math.floor(baseH);
