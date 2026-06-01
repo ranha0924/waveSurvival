@@ -1393,21 +1393,7 @@ html, body {
   100% { transform: translate(20px,-230px) scale(1.7); opacity: 0; }
 }
 
-/* ---------- 무대(3열) ---------- */
-.shrine-stage {
-  position: relative; z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0,1fr) clamp(200px,24vw,300px) minmax(0,1fr);
-  align-items: center;
-  gap: clamp(12px, 2.6vw, 44px);
-  width: min(1180px, 95vw);
-  margin: 0 auto;
-}
-.shrine-side { display: flex; flex-direction: column; gap: clamp(10px, 1.8vmin, 18px); min-width: 0; }
-.shrine-left  { align-items: flex-end; }
-.shrine-right { align-items: flex-start; }
-.shrine-left .controls-help { transform: translateY(10px); }
-.shrine-right #daily-records { transform: translateY(10px); }
+/* ---------- 무대(3열): .shrine-content 안에서 정의됨 ---------- */
 
 /* ---------- 중앙 부적 제단 ---------- */
 .altar {
@@ -1577,12 +1563,6 @@ html, body {
 
 /* ---------- 반응형: 좁은 화면은 세로 스택, 부적이 맨 위 ---------- */
 @media (max-width: 920px) {
-  .shrine-stage { grid-template-columns: 1fr; width: min(460px, 94vw); gap: 14px; }
-  .altar { order: -1; }
-  .shrine-side { align-items: stretch; }
-  .shrine-left .controls-help,
-  .shrine-right #daily-records { transform: none; }
-  #title-screen .hanji-panel { max-width: none; }
   .candle-l { left: 3%; } .candle-r { right: 3%; }
 }
 
@@ -1636,69 +1616,67 @@ html, body {
 }
 
 /* ====================================================================
-   타이틀 탭 구조 (기록 / 랭킹) + 전체 축소
-   제단을 상단 헤더로, 그 아래 탭으로 기록/랭킹 뷰 전환.
+   타이틀 3열 레이아웃: 좌측 기록 | 중앙 굿판 | 우측 조작법
    ==================================================================== */
 .shrine-content {
   position: relative; z-index: 1;
   display: flex; flex-direction: column; align-items: center;
   gap: clamp(8px, 1.8vmin, 18px);
-  width: min(960px, 94vw); margin: 0 auto;
+  width: min(1060px, 96vw); margin: 0 auto;
 }
 
-/* 제단(헤더) 축소 */
+/* 네비게이션 */
+.title-nav {
+  position: relative; z-index: 2;
+  display: flex; justify-content: flex-end;
+  width: 100%; padding: 0 clamp(4px, 1vw, 12px);
+}
+.nav-btn {
+  font-family: 'Gowun Batang', serif; font-size: clamp(13px, 2vmin, 16px);
+  color: #ffe6a6; background: rgba(20, 16, 12, 0.7);
+  border: 1px solid rgba(216, 177, 58, 0.45); border-radius: 6px;
+  padding: clamp(6px, 1.1vmin, 9px) clamp(14px, 2.4vw, 22px);
+  cursor: pointer; letter-spacing: 0.1em;
+  transition: background .15s, color .15s, border-color .15s, box-shadow .15s;
+}
+.nav-btn:hover {
+  background: rgba(216, 177, 58, 0.18); color: #fff2cc;
+  border-color: rgba(216, 177, 58, 0.7);
+  box-shadow: 0 0 14px rgba(216, 177, 58, 0.25);
+}
+
+/* 3열 그리드 */
+.shrine-stage {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: clamp(14px, 2.4vmin, 28px);
+  width: 100%;
+}
+.shrine-left, .shrine-right {
+  display: flex; flex-direction: column;
+  gap: clamp(10px, 1.6vmin, 16px);
+}
+.shrine-left { align-items: flex-end; }
+.shrine-right { align-items: flex-start; }
+
+/* 제단(중앙) 축소 */
 .altar { gap: clamp(6px, 1.2vmin, 12px); }
 .talisman { width: clamp(116px, 16vw, 166px); }
 #title-screen .gut-title { font-size: clamp(44px, 7vw, 84px); }
 .altar-subtitle { font-size: clamp(11px, 1.9vmin, 15px); letter-spacing: 0.18em; }
 .talisman-paper { padding: clamp(14px, 2.4vmin, 24px) 0 clamp(20px, 3vmin, 30px); }
 
-/* 탭 바 */
-.title-tabs { position: relative; z-index: 1; display: flex; gap: 8px; }
-.title-tab {
-  min-width: clamp(78px, 14vw, 120px);
-  padding: clamp(6px, 1.1vmin, 9px) clamp(14px, 2.4vw, 22px);
-  font-family: 'Gowun Batang', serif; font-size: clamp(14px, 2.1vmin, 17px);
-  color: #c9b78c; background: rgba(20, 16, 12, 0.6);
-  border: 1px solid rgba(216, 177, 58, 0.35); border-bottom: none;
-  border-radius: 7px 7px 0 0; cursor: pointer; letter-spacing: 0.1em;
-  transition: color .15s, background .15s, border-color .15s;
-}
-.title-tab:hover { color: #ffe6a6; }
-.title-tab.active {
-  color: #1a140a; font-weight: 700;
-  background: linear-gradient(180deg, #ecc756, #c79a26);
-  border-color: #ecc756;
-}
-
-/* 뷰 컨테이너 / 전환 */
-.title-views { position: relative; z-index: 1; width: 100%; display: flex; justify-content: center; }
+/* 뷰 전환 (랭킹) */
 .title-view { display: none; width: 100%; }
 .title-view.active { display: flex; }
 
-/* 기록 뷰: 패널 3개 가로 정렬(좁으면 줄바꿈) */
-.view-records {
-  flex-wrap: wrap; justify-content: center; align-items: flex-start;
-  gap: clamp(10px, 1.6vmin, 18px);
-}
-#title-screen .view-records .hanji-panel { max-width: clamp(188px, 25vw, 246px); }
-
-/* 랭킹 뷰: 중앙 넓은 패널에 전체+오늘 스택 */
-.view-ranking { justify-content: center; }
-#title-screen .view-ranking #online-records.hanji-panel { max-width: clamp(300px, 56vw, 460px); width: 100%; }
-.rank-stack { display: flex; flex-direction: column; gap: clamp(10px, 1.6vmin, 16px); }
-.rank-group-head {
-  font-family: 'Gowun Batang', serif; font-size: clamp(12px, 1.9vmin, 15px);
-  color: #c9b78c; letter-spacing: 0.08em;
-  padding-bottom: 4px; margin-bottom: 4px;
-  border-bottom: 1px dashed rgba(216, 177, 58, 0.3);
-}
-/* 각 랭킹 리스트 고정 높이(균일) */
-#title-screen .rank-group .online-list { height: clamp(148px, 24vh, 198px); max-height: none; }
-
-@media (max-width: 720px) {
-  #title-screen .view-records .hanji-panel { max-width: none; flex: 1 1 100%; }
-  #title-screen .view-ranking #online-records.hanji-panel { max-width: none; }
+@media (max-width: 820px) {
+  .shrine-stage { grid-template-columns: 1fr; justify-items: center; gap: 14px; }
+  .altar { order: -1; }
+  .shrine-left, .shrine-right { align-items: stretch; width: min(420px, 94vw); }
+  #title-screen .hanji-panel { max-width: none; }
 }
 
 /* ====================================================================
@@ -1751,40 +1729,7 @@ html, body {
   .ranking-half:first-child { border-right: none; border-bottom: 2px solid rgba(216, 177, 58, 0.4); padding-top: clamp(52px, 9vh, 70px); }
 }
 
-/* 랭킹(풀스크린) 표시 중엔 네비·무대·푸터(모드/닉네임/게임 시작) 전부 숨김 — 오직 랭킹만. */
+/* 랭킹(풀스크린) 표시 중엔 내비·무대·푸터 전부 숨김 — 오직 랭킹만. */
 #title-screen.ranking-active .title-nav,
 #title-screen.ranking-active .shrine-stage,
 #title-screen.ranking-active .title-footer { display: none; }
-
-/* 상단 네비게이션 (랭킹) */
-.title-nav {
-  position: absolute; top: clamp(12px, 2.4vh, 22px); right: clamp(14px, 2.6vw, 28px);
-  z-index: 2; display: flex; gap: 8px;
-}
-.nav-btn {
-  font-family: 'Gowun Batang', serif; font-size: clamp(13px, 2vmin, 16px);
-  color: #f0cf86; background: rgba(20, 16, 12, 0.62);
-  border: 1px solid rgba(216, 177, 58, 0.4); border-radius: 6px;
-  padding: clamp(7px, 1.2vmin, 10px) clamp(14px, 2vw, 20px);
-  cursor: pointer; letter-spacing: 0.08em;
-  transition: color .15s, background .15s, border-color .15s;
-}
-.nav-btn:hover {
-  color: #1a140a; font-weight: 700;
-  background: linear-gradient(180deg, #ecc756, #c79a26); border-color: #ecc756;
-}
-
-/* 기록(메인) 뷰: 3열 그리드 (최고 기록 / 오늘의 도전 / 조작법) */
-.title-view.view-records.active {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(10px, 1.8vmin, 20px);
-  align-items: start;
-  width: 100%;
-  max-width: 900px;
-  margin: 0 auto;
-}
-#title-screen .view-records .hanji-panel { max-width: none; width: 100%; }
-@media (max-width: 720px) {
-  .title-view.view-records.active { grid-template-columns: 1fr; max-width: 460px; }
-}
