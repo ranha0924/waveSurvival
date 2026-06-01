@@ -252,8 +252,17 @@ const Audio = (() => {
     noise(0.1, 0.3, 600, 1);
   }
 
-  function reload() {
-    if (playSample('reload', 0.7)) return;
+  // Reload sound. The uploaded clip is ~2.4s, longer than every weapon's
+  // reload time, so it used to keep playing after the reload finished (you
+  // could fire mid-sound). Scale playback rate so the clip lasts exactly the
+  // weapon's reload time — the sound now ends right as the reload completes.
+  function reload(targetDuration) {
+    const buf = samples['reload'];
+    let rate = 1;
+    if (buf && targetDuration && targetDuration > 0) {
+      rate = Math.max(0.5, Math.min(3, buf.duration / targetDuration));
+    }
+    if (playSample('reload', 0.7, rate)) return;
     if (!ctx) return;
     tone(800, 0.04, 'square', 0.15);
     setTimeout(() => tone(600, 0.06, 'square', 0.15), 80);
