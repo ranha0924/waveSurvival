@@ -224,6 +224,23 @@ const UI = (() => {
     if (el) el.textContent = text || '';
   }
 
+  // ---------- 보스(구미호) 등장 컷씬 ----------
+  function showBossCutscene(round) {
+    const el = $('boss-cutscene');
+    if (!el) return;
+    const r = $('boss-cutscene-round');
+    if (r) r.textContent = round > 0 ? `${round}회차` : '';
+    el.classList.remove('hidden');
+    // Restart the entrance animation each time.
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+  function hideBossCutscene() {
+    const el = $('boss-cutscene');
+    if (el) { el.classList.add('hidden'); el.classList.remove('show'); }
+  }
+
   function getNickInput() {
     const el = $('nick-input');
     return el ? el.value : '';
@@ -673,6 +690,7 @@ const UI = (() => {
     renderGun, fireTalisman,
     showRecordBanner, updateTitleRecords, setHudBest,
     setLeaderboard, setLeaderboardStatus,
+    showBossCutscene, hideBossCutscene,
     getNickInput, setNickInput
   };
 })();

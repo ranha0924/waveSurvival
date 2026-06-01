@@ -278,7 +278,11 @@ const Player = (() => {
       // coords where 0 is the top of an unscaled body). hitFrac maps the
       // crosshair (which is offset from the world horizon by verticalOffset)
       // into 0..1 across the visible sprite — 0 = head top, 1 = feet.
-      const hitFrac = 1 - 1 / (2 * scale) - (verticalOffset * proj) / (H * scale);
+      // 강시 hop raises the sprite by hopOffset*spriteH*0.5 on screen, so the
+      // hit window shifts the same fraction up — keeps headshots aligned with
+      // the visually-bouncing forehead 부적.
+      const hopFrac = (e.hopOffset || 0) * 0.5;
+      const hitFrac = 1 - 1 / (2 * scale) - (verticalOffset * proj) / (H * scale) + hopFrac;
       if (e.type.isBoss) {
         // Boss is forgiving on vertical aim: any ray inside its cylinder
         // counts so long-range pitch error doesn't erase shots. But if a wall
@@ -359,6 +363,10 @@ const Player = (() => {
     else if (e.type.id === 'tank') Audio.hitArmor();
     else Audio.hitFlesh();
     spawnDamageNumber(particles, e.x, e.y, dmg, headshot);
+    // 강시 — a headshot lands on the forehead 부적 and freezes it for a beat.
+    if (e.type.id === 'jiangshi' && headshot && e.hp > 0) {
+      e.stunTimer = Math.max(e.stunTimer || 0, 1.2);
+    }
     // Boss phase trigger: once the boss drops below half HP, enrage it
     // (faster + bigger summons). One-shot — the flag prevents the next
     // damage tick from re-firing the transition effects.
