@@ -187,6 +187,8 @@
     // One-shot triggers per run for the "신기록" banner.
     recordFired: { score: false, wave: false },
     nick: '',
+    // 'free' (자유 굿판, random seed) or 'daily' (오늘의 굿판, today's seed).
+    mode: 'free',
     // 굿판 모드 — fired when player.comboCount crosses a multiple of 5.
     // `lastTriggerCombo` remembers the last streak value we already awarded
     // so a single kill doesn't re-fire while the count stays at 5/10/...
@@ -292,6 +294,21 @@
       Audio.uiClick();
       captureNick();
       startGame();
+    });
+    // Mode toggle — 자유 굿판 (random seed) vs 오늘의 굿판 (today's fixed seed).
+    const modeDescEl = document.getElementById('mode-desc');
+    const MODE_DESC = {
+      free:  '매판 랜덤 — 자유롭게 연습하고 개인 기록에 도전',
+      daily: '전 유저 동일 시드 — 일일 글로벌 랭킹에 등재'
+    };
+    document.querySelectorAll('#mode-select .mode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        Audio.uiClick();
+        game.mode = btn.dataset.mode === 'daily' ? 'daily' : 'free';
+        document.querySelectorAll('#mode-select .mode-btn').forEach((b) =>
+          b.classList.toggle('active', b === btn));
+        if (modeDescEl) modeDescEl.textContent = MODE_DESC[game.mode];
+      });
     });
     document.getElementById('restart-btn').addEventListener('click', () => {
       Audio.uiClick();
@@ -440,8 +457,11 @@
     const allTime = Records.load();
     if (anyBroken(bumpRecords(allTime, stats, nick))) Records.save(allTime);
 
-    const daily = Records.loadDaily();
-    if (anyBroken(bumpRecords(daily.records, stats, nick))) Records.saveDaily(daily);
+    // Only 오늘의 굿판 runs count toward the daily board (fair same-seed compare).
+    if (game.mode === 'daily') {
+      const daily = Records.loadDaily();
+      if (anyBroken(bumpRecords(daily.records, stats, nick))) Records.saveDaily(daily);
+    }
   }
 
   function startGame() {
@@ -476,9 +496,11 @@
     game.recordFired = { score: false, wave: false };
     UI.setHudBest(game.runBest);
 
-    // Reseed every run so the daily challenge is identical regardless of
-    // how many times you retry today.
-    Random.seedToday();
+    // Seed by mode: 오늘의 굿판 uses today's fixed seed (same for everyone,
+    // identical on every retry today); 자유 굿판 rolls a fresh random seed each
+    // run for free experimentation.
+    if (game.mode === 'daily') Random.seedToday();
+    else Random.seed((Math.random() * 0x7fffffff) | 0);
 
     UI.hideTitle();
     UI.hideGameOver();
@@ -1099,15 +1121,20 @@
     updated.totalRuns = (updated.totalRuns || 0) + 1;
     Records.save(updated);
 
-    const daily = Records.loadDaily();
-    bumpRecords(daily.records, stats, nick);
-    Records.saveDaily(daily);
+    // 오늘의 굿판 runs land on the daily board (local + online); 자유 굿판 runs
+    // only count toward the all-time / personal records.
+    const isDaily = game.mode === 'daily';
+    if (isDaily) {
+      const daily = Records.loadDaily();
+      bumpRecords(daily.records, stats, nick);
+      Records.saveDaily(daily);
+    }
 
     // Push the run to the shared online board (no-op when unconfigured /
     // offline), then refresh the cached title-screen ranking so it's current
     // the next time the player backs out to the menu.
     if (typeof Leaderboard !== 'undefined') {
-      Leaderboard.submitRun(stats, nick).then((ok) => { if (ok) refreshLeaderboard(); });
+      Leaderboard.submitRun(stats, nick, isDaily).then((ok) => { if (ok) refreshLeaderboard(); });
     }
 
     UI.showGameOver(resultStats, prev, broken, game.nick);
