@@ -77,6 +77,16 @@ const Enemies = (() => {
       ranged: false, radius: 0.22,
       color: '#9955cc', headColor: '#552288',
       eyeColor: '#ee99ff', bloodColor: [180, 60, 220]
+    },
+    // Elite. High HP + heavy melee; the forehead 부적 makes headshots extra
+    // rewarding. First appears Wave 9 (see buildWave).
+    jiangshi: {
+      id: 'jiangshi', name: '강시',
+      hp: 120, speed: 1.5, damage: 24, score: 400,
+      attackRange: 0.85, attackCooldown: 1.3,
+      ranged: false, radius: 0.4,
+      color: '#2a3358', headColor: '#5a7a4a',
+      eyeColor: '#ff2222', bloodColor: [80, 120, 70]
     }
   };
 
@@ -443,10 +453,20 @@ const Enemies = (() => {
     }
 
     const remaining = total - (isBossWave ? 1 : 0);
+    // 강시 (elite) joins the pool from Wave 9 onward.
+    const eliteOn = waveNum >= 9;
     for (let i = 0; i < remaining; i++) {
       const r = Random.next();
       let t;
-      if (r < 0.30) t = 'grunt';
+      if (eliteOn) {
+        if (r < 0.26) t = 'grunt';
+        else if (r < 0.44) t = 'rusher';
+        else if (r < 0.58) t = 'tank';
+        else if (r < 0.70) t = 'ranger';
+        else if (r < 0.81) t = 'bomber';
+        else if (r < 0.91) t = 'splitter';
+        else t = 'jiangshi';
+      } else if (r < 0.30) t = 'grunt';
       else if (r < 0.50) t = 'rusher';
       else if (r < 0.65) t = 'tank';
       else if (r < 0.78) t = 'ranger';
