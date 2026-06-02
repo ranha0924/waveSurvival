@@ -536,14 +536,21 @@
     game.wave.spawnTimer = 0;
     game.wave.spawnInterval = Math.max(0.2, 0.7 - game.wave.number * 0.02);
 
-    // Boss wave — play a 1.5s 구미호 등장 컷씬 before the fight. Gameplay is
-    // frozen in the loop while the timer runs; 풍물(사물놀이) layer fades in.
     if (game.wave.number % 5 === 0) {
       const round = game.wave.number / 5;
-      game.cutsceneTimer = 1.6;
-      UI.showBossCutscene(round);
+      game.cutsceneTimer = 6;
       Audio.gutpanLoopStart && Audio.gutpanLoopStart();
-      Audio.bossEnrage && Audio.bossEnrage();
+      BossCutscene.playBossCutscene({
+        image: 'assets/gumiho.webp',
+        name: '구미호',
+        subtitle: `${round}회차 — 천년묵은 요호`,
+        beginText: '굿이 시작된다',
+        onImpact() { Audio.bossEnrage && Audio.bossEnrage(); },
+        onEnd() {
+          game.cutsceneTimer = 0;
+          if (!game.gutpan.active) Audio.gutpanLoopStop();
+        }
+      });
     } else {
       UI.showWaveBanner(`WAVE ${game.wave.number}`);
       Audio.waveStart();
@@ -828,14 +835,8 @@
     game.lastTime = now;
 
     if (game.state === STATE.PLAYING && game.cutsceneTimer > 0) {
-      // Boss intro cutscene — freeze gameplay while the overlay plays; the
-      // frozen world keeps rendering underneath until the timer drains.
       game.cutsceneTimer -= dt;
-      if (game.cutsceneTimer <= 0) {
-        game.cutsceneTimer = 0;
-        UI.hideBossCutscene();
-        if (!game.gutpan.active) Audio.gutpanLoopStop();
-      }
+      if (game.cutsceneTimer <= 0) game.cutsceneTimer = 0;
     } else if (game.state === STATE.PLAYING) {
       // Auto-shoot if held + auto weapons
       const inputReady = game.pointerLocked || game.touchMode;

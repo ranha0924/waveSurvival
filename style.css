@@ -1205,65 +1205,323 @@ html, body {
   50%      { transform: scale(1.02); }
 }
 
-/* ---------- 보스(구미호) 등장 컷씬 ---------- */
-#boss-cutscene {
+/* ---------- 시네마틱 보스 등장 컷씬 (DOM overlay) ---------- */
+
+/* --- Root overlay --- */
+.bc {
   position: absolute;
   inset: 0;
   z-index: 60;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(6px, 1.6vmin, 14px);
-  background: radial-gradient(ellipse at center,
-              rgba(20, 0, 24, 0.72) 0%, rgba(0, 0, 0, 0.94) 75%);
+  overflow: hidden;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  background: rgba(0, 0, 0, 0);
+  transition: opacity 0.5s ease, background 0.8s ease;
 }
-#boss-cutscene.hidden { display: none; }
-#boss-cutscene.show { opacity: 1; }
-#boss-cutscene-img {
-  height: 62%;
-  max-height: 62vh;
+.bc.bc-phase1 {
+  opacity: 1;
+  background: rgba(8, 2, 4, 0.92);
+}
+.bc.bc-fadeout {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* --- Screen shake --- */
+@keyframes bcShake {
+  0%, 100% { transform: translate(0); }
+  10% { transform: translate(-6px, 3px); }
+  20% { transform: translate(5px, -4px); }
+  30% { transform: translate(-4px, 6px); }
+  40% { transform: translate(6px, -2px); }
+  50% { transform: translate(-3px, -5px); }
+  60% { transform: translate(4px, 4px); }
+  70% { transform: translate(-5px, -3px); }
+  80% { transform: translate(3px, 5px); }
+  90% { transform: translate(-2px, -4px); }
+}
+.bc.bc-shake { animation: bcShake 0.4s ease-out; }
+
+/* --- Vignette --- */
+.bc-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 60% at center,
+    transparent 20%, rgba(8, 2, 4, 0.6) 60%, rgba(8, 2, 4, 0.95) 100%);
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+.bc.bc-phase1 .bc-vignette { opacity: 1; }
+
+/* --- Incense smoke --- */
+.bc-smoke {
+  position: absolute;
+  bottom: 0;
+  width: 18%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+.bc-smoke-l { left: 2%; }
+.bc-smoke-r { right: 2%; }
+.bc.bc-phase1 .bc-smoke { opacity: 0.7; }
+
+.bc-smoke-wisp {
+  position: absolute;
+  bottom: -20%;
+  width: 100%;
+  height: 60%;
+  background: radial-gradient(ellipse at 50% 80%,
+    rgba(232, 220, 192, 0.18) 0%, transparent 70%);
+  filter: blur(20px);
+  animation: bcSmoke 4s ease-in-out infinite;
+}
+.bc-smoke-wisp:nth-child(2) {
+  animation-delay: -1.4s;
+  opacity: 0.6;
+  height: 50%;
+  bottom: -10%;
+}
+.bc-smoke-wisp:nth-child(3) {
+  animation-delay: -2.8s;
+  opacity: 0.4;
+  height: 45%;
+  bottom: -5%;
+}
+@keyframes bcSmoke {
+  0%   { transform: translateY(0) scaleX(1);   opacity: 0; }
+  20%  { opacity: 1; }
+  50%  { transform: translateY(-60vh) scaleX(1.4); opacity: 0.6; }
+  100% { transform: translateY(-110vh) scaleX(0.8); opacity: 0; }
+}
+
+/* --- Letterbox (cinema bars) --- */
+.bc-bar {
+  position: absolute;
+  left: 0; right: 0;
+  height: 0;
+  background: #000;
+  z-index: 2;
+  transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.bc-bar-top { top: 0; }
+.bc-bar-bot { bottom: 0; }
+.bc.bc-phase1 .bc-bar { height: 9%; }
+
+/* --- Boss image --- */
+.bc-boss-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+.bc-boss-img {
+  max-height: 70%;
+  max-width: 55%;
   width: auto;
+  object-fit: contain;
   image-rendering: pixelated;
-  filter: drop-shadow(0 0 24px rgba(200, 40, 220, 0.55));
-  transform: translateY(24px) scale(0.86);
+  filter: brightness(0) drop-shadow(0 0 40px rgba(0, 0, 0, 0.9));
+  transform: scale(0.7);
   opacity: 0;
+  transition: filter 2.8s ease, transform 2.8s cubic-bezier(0.2, 0, 0.2, 1), opacity 0.6s ease;
 }
-#boss-cutscene.show #boss-cutscene-img {
-  animation: bossRise 0.6s cubic-bezier(0.18, 0.9, 0.3, 1.2) forwards;
+.bc.bc-phase2 .bc-boss-img {
+  filter: brightness(1)
+    drop-shadow(0 0 30px rgba(193, 39, 45, 0.5))
+    drop-shadow(0 0 60px rgba(193, 39, 45, 0.25));
+  transform: scale(1);
+  opacity: 1;
 }
-@keyframes bossRise {
-  to { transform: translateY(0) scale(1); opacity: 1; }
+.bc.bc-phase3 .bc-boss-img {
+  transform: scale(1.18);
+  transition: transform 0.15s cubic-bezier(0, 0.6, 0.3, 1.6);
 }
-#boss-cutscene-name {
-  font-family: var(--font-display, serif);
-  font-size: clamp(40px, 11vmin, 96px);
+
+/* --- Talismans (부적) --- */
+.bc-talisman-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+.bc-talisman {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(30px, 5vmin, 56px);
+  padding: clamp(6px, 1.2vmin, 12px) clamp(3px, 0.6vmin, 6px);
+  background: linear-gradient(180deg, #e8dcc0 0%, #d4c9a8 100%);
+  border: 1px solid #c4a96a;
+  color: #c1272d;
+  font-family: 'Noto Serif KR', serif;
+  font-size: clamp(9px, 1.5vmin, 15px);
   font-weight: 900;
-  color: #ff3b5c;
-  letter-spacing: 0.12em;
-  text-shadow: 0 0 18px rgba(255, 0, 60, 0.7), 0 4px 10px rgba(0, 0, 0, 0.8);
-  transform: scale(0.8);
+  writing-mode: vertical-rl;
+  text-align: center;
+  line-height: 1.1;
+  box-shadow: 0 0 10px rgba(193, 39, 45, 0.4), inset 0 0 6px rgba(160, 120, 60, 0.3);
+  transform: translate(var(--tx), var(--ty)) rotate(var(--rot));
+  opacity: 0;
+  animation: bcTalismanFly 1.8s cubic-bezier(0.3, 0, 0.15, 1) var(--delay, 0s) forwards;
+}
+@keyframes bcTalismanFly {
+  0%   { opacity: 0.9; transform: translate(var(--tx), var(--ty)) rotate(var(--rot)); }
+  60%  { opacity: 1; }
+  80%  { opacity: 1; transform: translate(0, 0) rotate(0deg); filter: brightness(1); }
+  90%  { opacity: 0.8; transform: translate(0, 0) rotate(0deg) scale(1.1);
+         filter: brightness(3) saturate(0.3); box-shadow: 0 0 30px rgba(255, 120, 20, 0.9); }
+  100% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.3);
+         filter: brightness(5) saturate(0); box-shadow: 0 0 50px rgba(255, 200, 50, 0); }
+}
+
+/* --- Flash overlay (impact) --- */
+.bc-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+}
+.bc-flash.bc-flash-fire {
+  animation: bcFlash 0.35s ease-out forwards;
+}
+@keyframes bcFlash {
+  0%   { background: #fff; opacity: 0.95; }
+  30%  { background: #c1272d; opacity: 0.7; }
+  100% { background: #c1272d; opacity: 0; }
+}
+
+/* --- Name plate --- */
+.bc-nameplate {
+  position: absolute;
+  left: 50%;
+  bottom: 16%;
+  transform: translateX(-50%);
+  z-index: 6;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+}
+.bc.bc-phase4 .bc-nameplate {
+  animation: bcNameIn 0.6s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+}
+@keyframes bcNameIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.bc-name {
+  font-family: 'Noto Serif KR', serif;
+  font-size: clamp(42px, 11vmin, 100px);
+  font-weight: 900;
+  color: #e8dcc0;
+  letter-spacing: 0.35em;
+  filter: blur(8px);
+  white-space: nowrap;
+  text-shadow:
+    0 0 20px rgba(193, 39, 45, 0.8),
+    0 0 60px rgba(193, 39, 45, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.9);
+  transition: letter-spacing 0.8s cubic-bezier(0.2, 0, 0.2, 1),
+              filter 0.8s ease;
+}
+.bc.bc-phase4 .bc-name {
+  letter-spacing: 0.08em;
+  filter: blur(0);
+}
+
+.bc-subtitle {
+  font-family: 'Noto Serif KR', serif;
+  font-size: clamp(14px, 3vmin, 26px);
+  font-weight: 600;
+  color: #d4af37;
+  letter-spacing: 0.3em;
+  margin-top: clamp(4px, 1vmin, 10px);
+  opacity: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+.bc.bc-phase4 .bc-subtitle {
+  animation: bcSubIn 0.5s ease-out 0.3s forwards;
+}
+@keyframes bcSubIn {
+  from { opacity: 0; letter-spacing: 0.6em; }
+  to   { opacity: 1; letter-spacing: 0.3em; }
+}
+
+/* --- HP bar --- */
+.bc-hp-wrap {
+  position: relative;
+  width: clamp(180px, 40vmin, 360px);
+  height: clamp(8px, 1.6vmin, 14px);
+  margin: clamp(8px, 2vmin, 16px) auto 0;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 2px;
+  overflow: hidden;
   opacity: 0;
 }
-#boss-cutscene.show #boss-cutscene-name {
-  animation: bossName 0.5s ease-out 0.18s forwards;
+.bc.bc-phase4 .bc-hp-wrap {
+  animation: bcSubIn 0.4s ease-out 0.5s forwards;
 }
-@keyframes bossName {
-  to { transform: scale(1); opacity: 1; }
+.bc-hp-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #c1272d 0%, #e8453a 50%, #c1272d 100%);
+  box-shadow: 0 0 8px rgba(193, 39, 45, 0.6);
+  border-radius: 1px;
 }
-#boss-cutscene-round {
-  font-family: var(--font-display, serif);
-  font-size: clamp(18px, 4vmin, 34px);
-  color: #ffd84a;
-  letter-spacing: 0.2em;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+.bc.bc-phase4 .bc-hp-bar {
+  animation: bcHpFill 1s cubic-bezier(0.2, 0, 0.2, 1) 0.6s forwards;
+}
+@keyframes bcHpFill {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+.bc-hp-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Noto Serif KR', serif;
+  font-size: clamp(7px, 1.1vmin, 11px);
+  font-weight: 700;
+  color: rgba(232, 220, 192, 0.8);
+  letter-spacing: 0.15em;
+  text-shadow: 0 1px 3px #000;
+}
+
+/* --- Begin text --- */
+.bc-begin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 8;
+  font-family: 'Noto Serif KR', serif;
+  font-size: clamp(28px, 7vmin, 64px);
+  font-weight: 900;
+  color: #d4af37;
+  letter-spacing: 0.25em;
+  white-space: nowrap;
+  text-shadow:
+    0 0 20px rgba(212, 175, 55, 0.8),
+    0 0 60px rgba(212, 175, 55, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.9);
   opacity: 0;
+  pointer-events: none;
 }
-#boss-cutscene.show #boss-cutscene-round {
-  animation: bossName 0.5s ease-out 0.34s forwards;
+.bc.bc-phase5 .bc-begin {
+  animation: bcBegin 0.8s ease-out forwards;
+}
+@keyframes bcBegin {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(1.3); filter: blur(4px); }
+  40%  { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.05); }
 }
 
 /* ---------- 모드 선택 토글 (자유 굿판 / 오늘의 굿판) ---------- */
