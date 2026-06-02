@@ -5,9 +5,9 @@ const BossCutscene = (() => {
   const TALISMAN_TEXTS = ['敕令', '逐鬼', '神將', '急急如律令', '天地神明', '鎭壓百鬼', '太上老君'];
 
   const DEFAULT_PARTS = [
-    { x: 50, y: 88, scale: 3.8 },  // feet
-    { x: 70, y: 55, scale: 3.2 },  // tail / hand
-    { x: 42, y: 18, scale: 4.0 },  // eyes
+    { x: 50, y: 88, scale: 2.4 },  // feet
+    { x: 70, y: 55, scale: 2.0 },  // tail / hand
+    { x: 42, y: 18, scale: 2.5 },  // eyes
   ];
 
   function el(tag, cls, parent) {
