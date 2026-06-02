@@ -304,9 +304,9 @@
         subtitle: '1회차 — 천년묵은 요호',
         beginText: '굿이 시작된다',
         parts: [
-          { x: 50, y: 90, scale: 3.8 },
-          { x: 72, y: 55, scale: 3.2 },
-          { x: 45, y: 15, scale: 4.0 },
+          { x: 50, y: 90, scale: 2.4 },
+          { x: 72, y: 55, scale: 2.0 },
+          { x: 45, y: 15, scale: 2.5 },
         ],
         onImpact() { Audio.bossEnrage && Audio.bossEnrage(); },
         onEnd() {}
@@ -563,9 +563,9 @@
         subtitle: `${round}회차 — 천년묵은 요호`,
         beginText: '굿이 시작된다',
         parts: [
-          { x: 50, y: 90, scale: 3.8 },
-          { x: 72, y: 55, scale: 3.2 },
-          { x: 45, y: 15, scale: 4.0 },
+          { x: 50, y: 90, scale: 2.4 },
+          { x: 72, y: 55, scale: 2.0 },
+          { x: 45, y: 15, scale: 2.5 },
         ],
         onImpact() { Audio.bossEnrage && Audio.bossEnrage(); },
         onEnd() {
