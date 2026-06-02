@@ -545,6 +545,11 @@
         name: '구미호',
         subtitle: `${round}회차 — 천년묵은 요호`,
         beginText: '굿이 시작된다',
+        parts: [
+          { x: 50, y: 90, scale: 3.8 },
+          { x: 72, y: 55, scale: 3.2 },
+          { x: 45, y: 15, scale: 4.0 },
+        ],
         onImpact() { Audio.bossEnrage && Audio.bossEnrage(); },
         onEnd() {
           game.cutsceneTimer = 0;

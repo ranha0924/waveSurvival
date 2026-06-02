@@ -1,9 +1,14 @@
 // bossCutscene.js — Cinematic boss entrance overlay (DOM/CSS over Canvas)
-// Usage: playBossCutscene({ image, name, subtitle, beginText, onImpact, onEnd })
-// Total duration ≈ 5.2s
+// Usage: playBossCutscene({ image, name, subtitle, beginText, parts, onImpact, onEnd })
 
 const BossCutscene = (() => {
   const TALISMAN_TEXTS = ['敕令', '逐鬼', '神將', '急急如律令', '天地神明', '鎭壓百鬼', '太上老君'];
+
+  const DEFAULT_PARTS = [
+    { x: 50, y: 88, scale: 3.8 },  // feet
+    { x: 70, y: 55, scale: 3.2 },  // tail / hand
+    { x: 42, y: 18, scale: 4.0 },  // eyes
+  ];
 
   function el(tag, cls, parent) {
     const e = document.createElement(tag);
@@ -18,24 +23,23 @@ const BossCutscene = (() => {
       name = '구미호',
       subtitle = '천년묵은 요호',
       beginText = '굿이 시작된다',
+      parts = DEFAULT_PARTS,
       onImpact,
       onEnd
     } = opts;
 
-    // Remove any leftover cutscene
     const old = document.getElementById('boss-cin');
     if (old) old.remove();
 
-    // Root overlay
     const root = el('div');
     root.id = 'boss-cin';
     root.className = 'bc';
     document.getElementById('game-container').appendChild(root);
 
-    // Vignette layer
+    // Vignette
     el('div', 'bc-vignette', root);
 
-    // Incense smoke (left + right)
+    // Incense smoke
     const smokeL = el('div', 'bc-smoke bc-smoke-l', root);
     const smokeR = el('div', 'bc-smoke bc-smoke-r', root);
     for (let i = 0; i < 3; i++) {
@@ -47,14 +51,19 @@ const BossCutscene = (() => {
     el('div', 'bc-bar bc-bar-top', root);
     el('div', 'bc-bar bc-bar-bot', root);
 
-    // Boss image container
+    // Closeup viewport — shows cropped regions of the boss image
+    const cuViewport = el('div', 'bc-cu-viewport', root);
+    const cuImg = el('div', 'bc-cu-img', cuViewport);
+    cuImg.style.backgroundImage = `url('${image}')`;
+
+    // Talisman flash between cuts
+    const cuTalisman = el('div', 'bc-cu-talisman', root);
+
+    // Full body reveal container (hidden until impact)
     const bossWrap = el('div', 'bc-boss-wrap', root);
     const bossImg = el('img', 'bc-boss-img', bossWrap);
     bossImg.src = image;
     bossImg.alt = name;
-
-    // Talisman container
-    const talismanLayer = el('div', 'bc-talisman-layer', root);
 
     // Flash overlay
     const flash = el('div', 'bc-flash', root);
@@ -68,7 +77,7 @@ const BossCutscene = (() => {
 
     // HP bar
     const hpWrap = el('div', 'bc-hp-wrap', namePlate);
-    const hpBar = el('div', 'bc-hp-bar', hpWrap);
+    el('div', 'bc-hp-bar', hpWrap);
     const hpLabel = el('div', 'bc-hp-label', hpWrap);
     hpLabel.textContent = name;
 
@@ -76,82 +85,87 @@ const BossCutscene = (() => {
     const beginEl = el('div', 'bc-begin', root);
     beginEl.textContent = beginText;
 
-    // --- Animation timeline ---
     let disposed = false;
+    const timers = [];
+    function at(ms, fn) { timers.push(setTimeout(() => { if (!disposed) fn(); }, ms)); }
 
     function dispose() {
       if (disposed) return;
       disposed = true;
+      timers.forEach(clearTimeout);
       root.classList.add('bc-fadeout');
       setTimeout(() => root.remove(), 600);
     }
 
-    // Phase 1: Static — darken + vignette + smoke + letterbox (0ms)
-    requestAnimationFrame(() => {
-      root.classList.add('bc-phase1');
+    // ── Phase 1: Static (0ms) — darken + vignette + smoke + letterbox ──
+    requestAnimationFrame(() => root.classList.add('bc-phase1'));
+
+    // ── Phase 2: Closeup cuts (800ms–) ──
+    const cutDuration = 600;
+    const gapDuration = 150;
+    const cuStart = 800;
+
+    parts.forEach((part, i) => {
+      const cutStart = cuStart + i * (cutDuration + gapDuration);
+
+      // Black gap / talisman flash between cuts
+      if (i > 0) {
+        at(cutStart - gapDuration, () => {
+          cuViewport.classList.add('bc-cu-black');
+          const txt = TALISMAN_TEXTS[i % TALISMAN_TEXTS.length];
+          cuTalisman.textContent = txt;
+          cuTalisman.classList.remove('bc-cu-talisman-show');
+          void cuTalisman.offsetWidth;
+          cuTalisman.classList.add('bc-cu-talisman-show');
+        });
+      }
+
+      at(cutStart, () => {
+        cuViewport.classList.remove('bc-cu-black');
+        cuImg.style.backgroundPosition = `${part.x}% ${part.y}%`;
+        cuImg.style.backgroundSize = `${part.scale * 100}%`;
+        // Subtle drift animation
+        cuImg.classList.remove('bc-cu-drift');
+        void cuImg.offsetWidth;
+        cuImg.classList.add('bc-cu-drift');
+      });
     });
 
-    // Spawn talismans at ~800ms
-    setTimeout(() => {
-      if (disposed) return;
-      spawnTalismans(talismanLayer);
-    }, 800);
+    const closeupEnd = cuStart + parts.length * (cutDuration + gapDuration);
 
-    // Phase 2: Boss reveal (1000ms)
-    setTimeout(() => {
-      if (disposed) return;
-      root.classList.add('bc-phase2');
-    }, 1000);
+    // Final black gap before impact
+    at(closeupEnd - gapDuration, () => {
+      cuViewport.classList.add('bc-cu-black');
+    });
 
-    // Phase 3: Impact (3800ms)
-    setTimeout(() => {
-      if (disposed) return;
+    // ── Phase 3: Impact — flash + shake + full body reveal ──
+    at(closeupEnd + 100, () => {
+      cuViewport.style.display = 'none';
+      cuTalisman.style.display = 'none';
       root.classList.add('bc-phase3');
       flash.classList.add('bc-flash-fire');
-      if (onImpact) onImpact();
-      // Screen shake
       root.classList.add('bc-shake');
       setTimeout(() => root.classList.remove('bc-shake'), 400);
-    }, 3800);
+      if (onImpact) onImpact();
+    });
 
-    // Phase 4: Name reveal (4200ms)
-    setTimeout(() => {
-      if (disposed) return;
+    // ── Phase 4: Name reveal ──
+    at(closeupEnd + 500, () => {
       root.classList.add('bc-phase4');
-    }, 4200);
+    });
 
-    // Phase 5: Begin text + fade out (5000ms)
-    setTimeout(() => {
-      if (disposed) return;
+    // ── Phase 5: Begin text ──
+    at(closeupEnd + 1400, () => {
       root.classList.add('bc-phase5');
-    }, 5000);
+    });
 
-    // Final cleanup + onEnd (5800ms)
-    setTimeout(() => {
+    // ── Cleanup ──
+    at(closeupEnd + 2200, () => {
       dispose();
       if (onEnd) onEnd();
-    }, 5800);
+    });
 
     return { dispose };
-  }
-
-  function spawnTalismans(layer) {
-    const count = 8;
-    for (let i = 0; i < count; i++) {
-      const t = el('div', 'bc-talisman', layer);
-      // Random starting position around edges
-      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-      const dist = 60 + Math.random() * 30; // vw from center
-      const startX = Math.cos(angle) * dist;
-      const startY = Math.sin(angle) * dist;
-      t.style.setProperty('--tx', `${startX}vmin`);
-      t.style.setProperty('--ty', `${startY}vmin`);
-      t.style.setProperty('--rot', `${Math.random() * 360}deg`);
-      t.style.setProperty('--delay', `${i * 0.12}s`);
-      // Talisman content — vertical text
-      const txt = TALISMAN_TEXTS[i % TALISMAN_TEXTS.length];
-      t.textContent = txt;
-    }
   }
 
   return { playBossCutscene };

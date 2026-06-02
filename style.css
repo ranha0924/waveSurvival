@@ -1261,6 +1261,7 @@ html, body {
   height: 100%;
   opacity: 0;
   transition: opacity 1.2s ease;
+  z-index: 5;
 }
 .bc-smoke-l { left: 2%; }
 .bc-smoke-r { right: 2%; }
@@ -1301,14 +1302,74 @@ html, body {
   left: 0; right: 0;
   height: 0;
   background: #000;
-  z-index: 2;
+  z-index: 12;
   transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .bc-bar-top { top: 0; }
 .bc-bar-bot { bottom: 0; }
 .bc.bc-phase1 .bc-bar { height: 9%; }
 
-/* --- Boss image --- */
+/* --- Closeup viewport --- */
+.bc-cu-viewport {
+  position: absolute;
+  inset: 9% 0;
+  z-index: 3;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  background: #000;
+}
+.bc.bc-phase1 .bc-cu-viewport { opacity: 1; }
+.bc-cu-viewport.bc-cu-black .bc-cu-img { opacity: 0; }
+
+.bc-cu-img {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 350%;
+  background-position: 50% 50%;
+  image-rendering: pixelated;
+  filter: brightness(0.7) contrast(1.2) saturate(0.6);
+  opacity: 1;
+  transition: opacity 0.1s ease, background-position 0s, background-size 0s;
+}
+.bc-cu-img.bc-cu-drift {
+  animation: bcCuDrift 0.6s ease-out forwards;
+}
+@keyframes bcCuDrift {
+  from { transform: scale(1.08); filter: brightness(0.4) contrast(1.3) saturate(0.4); }
+  to   { transform: scale(1.0);  filter: brightness(0.7) contrast(1.2) saturate(0.6); }
+}
+
+/* --- Talisman flash between cuts --- */
+.bc-cu-talisman {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+  font-family: 'Noto Serif KR', serif;
+  font-size: clamp(32px, 8vmin, 72px);
+  font-weight: 900;
+  color: #c1272d;
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  text-shadow:
+    0 0 16px rgba(193, 39, 45, 0.8),
+    0 0 40px rgba(193, 39, 45, 0.4);
+  opacity: 0;
+  pointer-events: none;
+}
+.bc-cu-talisman.bc-cu-talisman-show {
+  animation: bcTalismanFlash 0.15s ease-out forwards;
+}
+@keyframes bcTalismanFlash {
+  0%   { opacity: 0.9; transform: translate(-50%, -50%) scale(1.4); filter: blur(2px); }
+  60%  { opacity: 0.7; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+  100% { opacity: 0; }
+}
+
+/* --- Full body boss image (hidden until impact) --- */
 .bc-boss-wrap {
   position: absolute;
   inset: 0;
@@ -1316,65 +1377,35 @@ html, body {
   align-items: center;
   justify-content: center;
   z-index: 3;
+  opacity: 0;
 }
 .bc-boss-img {
-  max-height: 70%;
+  max-height: 72%;
   max-width: 55%;
   width: auto;
   object-fit: contain;
   image-rendering: pixelated;
-  filter: brightness(0) drop-shadow(0 0 40px rgba(0, 0, 0, 0.9));
-  transform: scale(0.7);
-  opacity: 0;
-  transition: filter 2.8s ease, transform 2.8s cubic-bezier(0.2, 0, 0.2, 1), opacity 0.6s ease;
+  transform: scale(1.4);
+  filter: drop-shadow(0 0 30px rgba(193, 39, 45, 0.5))
+          drop-shadow(0 0 60px rgba(193, 39, 45, 0.25));
 }
-.bc.bc-phase2 .bc-boss-img {
-  filter: brightness(1)
-    drop-shadow(0 0 30px rgba(193, 39, 45, 0.5))
-    drop-shadow(0 0 60px rgba(193, 39, 45, 0.25));
-  transform: scale(1);
+.bc.bc-phase3 .bc-boss-wrap {
   opacity: 1;
+  animation: bcBossReveal 0.5s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+}
+@keyframes bcBossReveal {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  100% { opacity: 1; }
 }
 .bc.bc-phase3 .bc-boss-img {
-  transform: scale(1.18);
-  transition: transform 0.15s cubic-bezier(0, 0.6, 0.3, 1.6);
+  animation: bcBossPunch 0.5s cubic-bezier(0, 0.6, 0.3, 1) forwards;
 }
-
-/* --- Talismans (부적) --- */
-.bc-talisman-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  pointer-events: none;
-}
-.bc-talisman {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: clamp(30px, 5vmin, 56px);
-  padding: clamp(6px, 1.2vmin, 12px) clamp(3px, 0.6vmin, 6px);
-  background: linear-gradient(180deg, #e8dcc0 0%, #d4c9a8 100%);
-  border: 1px solid #c4a96a;
-  color: #c1272d;
-  font-family: 'Noto Serif KR', serif;
-  font-size: clamp(9px, 1.5vmin, 15px);
-  font-weight: 900;
-  writing-mode: vertical-rl;
-  text-align: center;
-  line-height: 1.1;
-  box-shadow: 0 0 10px rgba(193, 39, 45, 0.4), inset 0 0 6px rgba(160, 120, 60, 0.3);
-  transform: translate(var(--tx), var(--ty)) rotate(var(--rot));
-  opacity: 0;
-  animation: bcTalismanFly 1.8s cubic-bezier(0.3, 0, 0.15, 1) var(--delay, 0s) forwards;
-}
-@keyframes bcTalismanFly {
-  0%   { opacity: 0.9; transform: translate(var(--tx), var(--ty)) rotate(var(--rot)); }
-  60%  { opacity: 1; }
-  80%  { opacity: 1; transform: translate(0, 0) rotate(0deg); filter: brightness(1); }
-  90%  { opacity: 0.8; transform: translate(0, 0) rotate(0deg) scale(1.1);
-         filter: brightness(3) saturate(0.3); box-shadow: 0 0 30px rgba(255, 120, 20, 0.9); }
-  100% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.3);
-         filter: brightness(5) saturate(0); box-shadow: 0 0 50px rgba(255, 200, 50, 0); }
+@keyframes bcBossPunch {
+  0%   { transform: scale(1.6); }
+  50%  { transform: scale(1.15); }
+  70%  { transform: scale(1.22); }
+  100% { transform: scale(1); }
 }
 
 /* --- Flash overlay (impact) --- */
