@@ -1548,7 +1548,7 @@ html, body {
   color: #ffe7ad; border: 2px solid var(--gold);
   box-shadow: 0 4px 0 #480c0c, 0 0 22px rgba(220,70,34,0.32);
   font-family: 'Gowun Batang', 'Noto Serif KR', serif;
-  letter-spacing: 0.16em; padding-left: clamp(34px,5vw,48px);
+  letter-spacing: 0.16em;
 }
 #start-btn.ignite:hover {
   transform: translateY(-2px);
