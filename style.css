@@ -1211,7 +1211,7 @@ html, body {
 .bc {
   position: absolute;
   inset: 0;
-  z-index: 60;
+  z-index: 110;
   overflow: hidden;
   pointer-events: none;
   opacity: 0;
