@@ -295,6 +295,23 @@
       captureNick();
       startGame();
     });
+    document.getElementById('preview-cutscene-btn').addEventListener('click', () => {
+      Audio.resume();
+      Audio.uiClick();
+      BossCutscene.playBossCutscene({
+        image: 'assets/gumiho.webp',
+        name: '구미호',
+        subtitle: '1회차 — 천년묵은 요호',
+        beginText: '굿이 시작된다',
+        parts: [
+          { x: 50, y: 90, scale: 3.8 },
+          { x: 72, y: 55, scale: 3.2 },
+          { x: 45, y: 15, scale: 4.0 },
+        ],
+        onImpact() { Audio.bossEnrage && Audio.bossEnrage(); },
+        onEnd() {}
+      });
+    });
     // Mode toggle — 자유 굿판 (random seed) vs 오늘의 굿판 (today's fixed seed).
     const modeDescEl = document.getElementById('mode-desc');
     const MODE_DESC = {
