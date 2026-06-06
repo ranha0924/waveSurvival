@@ -1,5 +1,12 @@
 // bossCutscene.js — Cinematic boss entrance overlay (DOM/CSS over Canvas)
 // Usage: playBossCutscene({ image, name, subtitle, beginText, parts, onImpact, onEnd })
+//
+// Direction references real AAA boss intros:
+//  · Sekiro    — calligraphy brush-wipe reveal of the boss name
+//  · Elden Ring — rising embers + ornate, end-capped boss HP bar
+//  · Persona 5 / anime — radial speed-line burst on the impact frame
+//  · Hollow Knight — flourish lines extending from the title + epithet
+//  · Dark Souls — silhouette that ignites into a full-colour reveal
 
 const BossCutscene = (() => {
   const TALISMAN_TEXTS = ['敕令', '逐鬼', '神將', '急急如律令', '天地神明', '鎭壓百鬼', '太上老君'];
@@ -36,8 +43,20 @@ const BossCutscene = (() => {
     root.className = 'bc';
     document.getElementById('game-container').appendChild(root);
 
-    // Vignette
+    // Vignette + ink-wash backdrop
     el('div', 'bc-vignette', root);
+    el('div', 'bc-ink', root);
+
+    // Rising embers (Elden Ring) — sparks drifting up through the dark
+    const embers = el('div', 'bc-embers', root);
+    for (let i = 0; i < 14; i++) {
+      const e = el('div', 'bc-ember', embers);
+      e.style.left = (Math.random() * 100) + '%';
+      e.style.setProperty('--d', (3 + Math.random() * 3).toFixed(2) + 's');
+      e.style.setProperty('--dl', (-Math.random() * 4).toFixed(2) + 's');
+      e.style.setProperty('--sx', (Math.random() * 40 - 20).toFixed(0) + 'px');
+      e.style.setProperty('--sz', (0.5 + Math.random() * 1.2).toFixed(2));
+    }
 
     // Incense smoke
     const smokeL = el('div', 'bc-smoke bc-smoke-l', root);
@@ -55,30 +74,47 @@ const BossCutscene = (() => {
     const cuViewport = el('div', 'bc-cu-viewport', root);
     const cuImg = el('div', 'bc-cu-img', cuViewport);
     cuImg.style.backgroundImage = `url('${image}')`;
+    el('div', 'bc-cu-scan', cuViewport); // scanline/film grain over the cut
 
     // Talisman flash between cuts
     const cuTalisman = el('div', 'bc-cu-talisman', root);
 
+    // Radial speed lines (anime / Persona impact burst)
+    el('div', 'bc-speedlines', root);
+
     // Full body reveal container (hidden until impact)
     const bossWrap = el('div', 'bc-boss-wrap', root);
+    const bossGlow = el('div', 'bc-boss-glow', bossWrap);
     const bossImg = el('img', 'bc-boss-img', bossWrap);
     bossImg.src = image;
     bossImg.alt = name;
 
+    // Red ink brush stroke that swipes across at the reveal
+    el('div', 'bc-brush', root);
+
     // Flash overlay
     const flash = el('div', 'bc-flash', root);
 
-    // Name plate
+    // Name plate (Sekiro-style brush reveal + Hollow Knight flourishes)
     const namePlate = el('div', 'bc-nameplate', root);
-    const nameEl = el('div', 'bc-name', namePlate);
+    const flourish = el('div', 'bc-flourish', namePlate);
+    el('span', 'bc-flourish-line bc-flourish-l', flourish);
+    el('span', 'bc-flourish-dot', flourish);
+    el('span', 'bc-flourish-line bc-flourish-r', flourish);
+
+    const nameRow = el('div', 'bc-name-row', namePlate);
+    const nameEl = el('div', 'bc-name', nameRow);
     nameEl.textContent = name;
     const subEl = el('div', 'bc-subtitle', namePlate);
     subEl.textContent = subtitle;
 
-    // HP bar
+    // HP bar with ornate end-caps (Elden Ring)
     const hpWrap = el('div', 'bc-hp-wrap', namePlate);
-    el('div', 'bc-hp-bar', hpWrap);
-    const hpLabel = el('div', 'bc-hp-label', hpWrap);
+    el('div', 'bc-hp-cap bc-hp-cap-l', hpWrap);
+    el('div', 'bc-hp-cap bc-hp-cap-r', hpWrap);
+    const hpTrack = el('div', 'bc-hp-track', hpWrap);
+    el('div', 'bc-hp-bar', hpTrack);
+    const hpLabel = el('div', 'bc-hp-label', hpTrack);
     hpLabel.textContent = name;
 
     // Begin text
@@ -97,13 +133,13 @@ const BossCutscene = (() => {
       setTimeout(() => root.remove(), 600);
     }
 
-    // ── Phase 1: Static (0ms) — darken + vignette + smoke + letterbox ──
+    // ── Phase 1: Static (0ms) — darken + vignette + embers + smoke + letterbox ──
     requestAnimationFrame(() => root.classList.add('bc-phase1'));
 
-    // ── Phase 2: Closeup cuts (800ms–) ──
-    const cutDuration = 600;
-    const gapDuration = 150;
-    const cuStart = 800;
+    // ── Phase 2: Closeup cuts ── (tension build, anime-style hard cuts)
+    const cutDuration = 520;
+    const gapDuration = 130;
+    const cuStart = 600;
 
     parts.forEach((part, i) => {
       const cutStart = cuStart + i * (cutDuration + gapDuration);
@@ -138,29 +174,34 @@ const BossCutscene = (() => {
       cuViewport.classList.add('bc-cu-black');
     });
 
-    // ── Phase 3: Impact — flash + shake + full body reveal ──
+    // ── Phase 3: Impact — flash + shake + speed lines + silhouette punch-in ──
     at(closeupEnd + 100, () => {
       cuViewport.style.display = 'none';
       cuTalisman.style.display = 'none';
-      root.classList.add('bc-phase3');
+      root.classList.add('bc-phase3');     // silhouette + speed lines + brush
       flash.classList.add('bc-flash-fire');
       root.classList.add('bc-shake');
-      setTimeout(() => root.classList.remove('bc-shake'), 400);
+      setTimeout(() => root.classList.remove('bc-shake'), 420);
       if (onImpact) onImpact();
     });
 
-    // ── Phase 4: Name reveal ──
-    at(closeupEnd + 500, () => {
+    // ── Phase 3b: Ignite — silhouette burns into full colour ──
+    at(closeupEnd + 520, () => {
+      root.classList.add('bc-lit');
+    });
+
+    // ── Phase 4: Name reveal — brush-wipe + flourishes + HP fill ──
+    at(closeupEnd + 720, () => {
       root.classList.add('bc-phase4');
     });
 
-    // ── Phase 5: Begin text ──
-    at(closeupEnd + 1400, () => {
+    // ── Phase 5: Begin text stinger ──
+    at(closeupEnd + 1700, () => {
       root.classList.add('bc-phase5');
     });
 
     // ── Cleanup ──
-    at(closeupEnd + 2200, () => {
+    at(closeupEnd + 2500, () => {
       dispose();
       if (onEnd) onEnd();
     });
