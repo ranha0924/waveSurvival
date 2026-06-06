@@ -211,7 +211,7 @@ const Enemies = (() => {
     // Bomber: detonate when in melee range. No score awarded (the player
     // didn't earn the kill — they ate the explosion). Returns early so the
     // rest of the AI doesn't run on a corpse.
-    if (e.type.explodeOnContact && dist < e.type.attackRange + 0.4 && hasLOS) {
+    if (e.type.explodeOnContact && dist < e.type.attackRange + 0.4 && hasLOS && target.hp > 0) {
       detonateBomber(e, target, enemies, particles);
       return;
     }
@@ -224,7 +224,7 @@ const Enemies = (() => {
         // player target above and got passed to fireProjectile, so the bolt was
         // aimed at a number (preferredDist) instead of the player → NaN velocity
         // and projectiles that spawned dead-on-arrival.
-        const preferredDist = e.type.preferredDist;
+        const preferredDist = e.type.preferredDist || 4.5;
         if (Math.abs(dist - preferredDist) > 0.4) {
           const dir = dist > preferredDist ? 1 : -1;
           moveX = (dx / dist) * dir;

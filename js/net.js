@@ -15,6 +15,20 @@ const Net = (() => {
     (handlers[type] || (handlers[type] = [])).push(fn);
   }
 
+  function off(type, fn) {
+    const list = handlers[type];
+    if (!list) return;
+    const i = list.indexOf(fn);
+    if (i >= 0) list.splice(i, 1);
+  }
+
+  // Drop every registered handler. Called before re-wiring on a fresh join so
+  // leave→join in the same session can't stack duplicate listeners (each socket
+  // message would otherwise be processed N times → double addRemote / startGame).
+  function reset() {
+    for (const k in handlers) delete handlers[k];
+  }
+
   function emit(type, msg) {
     const list = handlers[type];
     if (list) for (const fn of list) fn(msg);
@@ -79,7 +93,7 @@ const Net = (() => {
   }
 
   return {
-    connect, send, on, close,
+    connect, send, on, off, reset, close,
     isConnected: () => connected,
     getLatency: () => Math.round(latency)
   };
