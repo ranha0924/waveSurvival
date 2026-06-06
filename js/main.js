@@ -540,6 +540,19 @@
       if (game.state === STATE.PLAYING && !game.touchMode) UI.showLockPrompt();
     });
 
+    // Clicking the "클릭해서 게임 재개" prompt must (re)acquire pointer lock. The
+    // prompt overlay sits above the canvas, so the canvas mousedown handler
+    // never sees the click — handle it here. Co-op relies on this: the game
+    // starts from a network 'welcome' event with no user gesture, so the initial
+    // auto-lock is rejected and this click is what actually engages it.
+    const lockPromptEl = document.getElementById('lock-prompt');
+    if (lockPromptEl) {
+      lockPromptEl.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || game.touchMode) return;
+        if (game.state === STATE.PLAYING) requestPointerLock();
+      });
+    }
+
     // Save any new bests when the page is about to close or backgrounded so
     // long runs don't lose progress if the player navigates away without
     // dying first.
