@@ -129,8 +129,10 @@ const MP = (() => {
   function wireHandlers() {
     Net.on('peer_join', (m) => {
       addRemote(m.id, m.name);
-      // Late joiner while we're already playing (host): drop them straight in.
-      if (isHost() && gameStarted) Net.send({ t: 'ev', k: 'start_game', to: m.id });
+      // No mid-game drop-in: if we're the host and already playing, tell the
+      // newcomer the game is in progress (they wait in the lobby) instead of
+      // pulling them into the running session.
+      if (isHost() && gameStarted) Net.send({ t: 'ev', k: 'in_progress', to: m.id });
       refreshLobby();
     });
     Net.on('peer_leave', (m) => { remotes.delete(m.id); refreshLobby(); });
@@ -380,13 +382,18 @@ const MP = (() => {
         break;
 
       case 'start_game':
-        // Host pressed start (broadcast), or we're a late joiner being dropped
-        // into a game in progress (targeted via `to`). Begin once.
+        // Host pressed start (broadcast to the lobby). Begin once.
         if (m.to && m.to !== state.selfId) break;
         if (!gameStarted) {
           gameStarted = true;
           if (hooks.startGame) hooks.startGame();
         }
+        break;
+
+      case 'in_progress':
+        // We joined a room whose game is already running — no mid-game drop-in.
+        // Stay in the lobby with a clear notice; leave and retry after it ends.
+        if (m.to === state.selfId) setStatus('게임이 진행 중입니다 — 끝난 뒤 다시 시도하세요');
         break;
 
       case 'gameover':
