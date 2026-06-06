@@ -59,12 +59,27 @@ npx serve .          # 또는 python3 -m http.server 8080
 
 ## 배포 (서버 호스팅)
 
-`server/`는 어디든 올릴 수 있는 표준 Node 앱입니다.
+> ⚠️ **정적 호스트(Vercel·GitHub Pages 등)는 릴레이를 못 돌립니다.** 게임 자체는
+> 정적 호스트에 두되, 협동용 WebSocket 릴레이(`server/`)는 **상시 실행 + WebSocket을
+> 지원하는** 호스트에 따로 올려야 합니다. (Vercel 서버리스는 지속 WS 연결 불가 →
+> `wss://<게임도메인>:8787`로 붙으면 무조건 실패합니다.)
 
-- **Render / Railway / Fly.io 무료 티어** 권장: 레포의 `server/` 디렉터리를
-  배포, start 커맨드 `node index.js`, 포트는 `PORT` 환경변수 자동 주입.
-- 배포 후 게임의 로비 "서버 주소"에 `wss://<your-app>.onrender.com` 입력
-  (HTTPS 페이지에서는 반드시 `wss://`).
+`server/`는 표준 Node 앱(`ws` 의존성 하나)입니다.
+
+- **Render 무료 티어 (권장, 블루프린트 제공)**: 레포 루트의 `render.yaml`이
+  `server/`를 web service로 배포합니다. Render → New → Blueprint → 이 레포 선택.
+  배포되면 `https://<app>.onrender.com` 주소가 나옵니다.
+  - 무료 플랜은 ~15분 유휴 후 잠들어, 잠든 뒤 **첫 연결이 30~60초** 걸릴 수 있습니다.
+- **Railway / Fly.io**도 동일하게 가능(`node index.js`, `PORT` 자동 주입).
+
+배포한 릴레이를 게임에 연결하는 법(둘 중 하나):
+1. 로비의 **"서버 주소"** 칸에 `wss://<app>.onrender.com` 입력 → 한 번 입력하면
+   `localStorage`에 저장되어 다음부터 자동 채워집니다.
+2. `index.html`의 `window.COOP_RELAY_URL`에 `'wss://<app>.onrender.com'`을 하드코딩
+   → 모든 플레이어의 로비 기본값이 됩니다.
+
+> HTTPS 페이지에서는 반드시 `wss://`. `ws://`를 넣어도 https 페이지면 자동으로
+> `wss://`로 올려서 시도합니다(mixed-content 차단 방지).
 
 ## M2에서 추가된 것 (다중 타깃 + 게스트 피격/관전/부활)
 

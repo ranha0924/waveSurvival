@@ -1,0 +1,27 @@
+# Render blueprint for the Wave Survival co-op relay (WebSocket server).
+#
+# This deploys ONLY the server/ directory — the game itself is a static site you
+# can keep hosting on Vercel / GitHub Pages. Render's free web service supports
+# WebSocket connections (Vercel's serverless does not), which is why the relay
+# lives here.
+#
+# Deploy:
+#   1. Push this repo to GitHub.
+#   2. On Render → New → Blueprint → pick this repo. Render reads render.yaml.
+#   3. After it goes live you get a URL like https://wavesurvival-relay.onrender.com
+#   4. In the game, open 협동 and enter the wss:// form of that URL:
+#        wss://wavesurvival-relay.onrender.com
+#      (or hardcode it in index.html via window.COOP_RELAY_URL).
+#
+# Note: the free plan sleeps after ~15 min idle, so the FIRST connection after a
+# lull can take 30–60s to wake the server. Upgrade the plan to keep it warm.
+services:
+  - type: web
+    name: wavesurvival-relay
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /health
+    autoDeploy: true
