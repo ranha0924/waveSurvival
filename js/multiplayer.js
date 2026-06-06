@@ -179,8 +179,10 @@ const MP = (() => {
         g.y += (g.ty - g.y) * kEnemies;
         if (g.hitFlash > 0) g.hitFlash -= dt;
       }
-      // Rebuild the array the renderer / local hitscan iterate over.
-      game.enemies = [...ghostEnemies.values()];
+      // Refill the array the renderer / local hitscan iterate over, reusing it
+      // (no per-frame array allocation).
+      game.enemies.length = 0;
+      for (const g of ghostEnemies.values()) game.enemies.push(g);
     }
   }
 
@@ -423,13 +425,26 @@ const MP = (() => {
   // own player plus every guest still alive. Guests are tagged isRemote so
   // enemy.damagePlayer routes their damage over the network. A guest whose HP
   // has hit 0 (downed / spectating) is excluded, so enemies stop chasing it.
+  //
+  // Called per-enemy every frame on the host, so the result array and the guest
+  // proxy objects are pooled (no per-call allocation). The returned array is
+  // reused — callers must consume it before the next getAllPlayers() call (they
+  // all iterate it synchronously, so that holds).
+  const _allPlayers = [];
+  const _proxyPool = [];
   function getAllPlayers() {
-    const list = [];
-    if (game && game.player && game.player.hp > 0 && !game.player.downed) list.push(game.player);
+    _allPlayers.length = 0;
+    if (game && game.player && game.player.hp > 0 && !game.player.downed) _allPlayers.push(game.player);
+    let i = 0;
     for (const r of remotes.values()) {
-      if (r.hp > 0) list.push({ id: r.id, x: r.x, y: r.y, hp: r.hp, isRemote: true });
+      if (r.hp <= 0) continue;
+      let p = _proxyPool[i];
+      if (!p) { p = { id: 0, x: 0, y: 0, hp: 0, isRemote: true }; _proxyPool[i] = p; }
+      p.id = r.id; p.x = r.x; p.y = r.y; p.hp = r.hp;
+      _allPlayers.push(p);
+      i++;
     }
-    return list;
+    return _allPlayers;
   }
 
   // Host → a specific guest: "you took dmg from an attack at (sx,sy) with the

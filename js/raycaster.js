@@ -52,19 +52,26 @@ const Raycaster = (() => {
     }
   }
 
-  function resize() {
+  // Dynamic render-resolution multiplier (0.55..1.0). The main loop nudges this
+  // down when the frame rate sags and back up when there's headroom, so the
+  // per-pixel raycaster cost auto-tunes to the machine. CSS always upscales the
+  // canvas to fill the viewport, so lowering it just softens the image.
+  let qualityScale = 1;
+
+  function resize() { applyCanvasSize(); }
+
+  function applyCanvasSize() {
     const winW = window.innerWidth;
     const winH = window.innerHeight;
     const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
     // Always fill the viewport — no letterboxing. Cap internal pixel size for
-    // performance; mobile renders at a lower internal resolution and CSS
-    // upscales it.
+    // performance; mobile renders lower and CSS upscales it.
     const maxW = isTouch ? 960 : 1280;
     const maxH = isTouch ? 540 : 800;
-    const scale = Math.min(1, maxW / winW, maxH / winH);
-    canvas.width = Math.max(1, Math.floor(winW * scale));
-    canvas.height = Math.max(1, Math.floor(winH * scale));
+    const fit = Math.min(1, maxW / winW, maxH / winH);
+    canvas.width = Math.max(1, Math.floor(winW * fit * qualityScale));
+    canvas.height = Math.max(1, Math.floor(winH * fit * qualityScale));
     canvas.style.width = winW + 'px';
     canvas.style.height = winH + 'px';
 
@@ -76,6 +83,17 @@ const Raycaster = (() => {
     floorBuf = null;
     if (ctx) ctx.imageSmoothingEnabled = false;
   }
+
+  // Set the dynamic resolution multiplier. Returns true if it actually changed
+  // (so the caller knows a resize happened). Clamped + hysteresis-friendly.
+  function setQuality(q) {
+    q = Math.max(0.55, Math.min(1, q));
+    if (Math.abs(q - qualityScale) < 0.02) return false;
+    qualityScale = q;
+    applyCanvasSize();
+    return true;
+  }
+  function getQuality() { return qualityScale; }
 
   // ---------- Frame orchestration ----------
   function render(player, enemies, particles, horizonOffset, theme) {
@@ -95,11 +113,23 @@ const Raycaster = (() => {
   // sprites overdraw farther ones, then dispatch to its type-specific draw.
   // Trees are static decoration from Environment — added to the same pool
   // so they z-sort against enemies/pickups/particles correctly.
+  // Reused across frames so the hot sprite-collection path allocates nothing
+  // (up to ~500 particles + enemies + trees every frame was churning the GC and
+  // causing stutter). `spritePool` holds reusable entry objects; `activeSprites`
+  // is a reused array of references to the in-use subset, cleared each frame.
+  const spritePool = [];
+  const activeSprites = [];
+
   function drawSprites(player, enemies, particles, horizonOffset, theme) {
-    const sprites = [];
+    activeSprites.length = 0;
+    let n = 0;
     const push = (x, y, type, ref) => {
+      let s = spritePool[n];
+      if (!s) { s = { dist: 0, type: 0, ref: null }; spritePool[n] = s; }
       const dx = x - player.x, dy = y - player.y;
-      sprites.push({ dist: dx * dx + dy * dy, type, ref });
+      s.dist = dx * dx + dy * dy; s.type = type; s.ref = ref;
+      activeSprites.push(s);
+      n++;
     };
     for (const e of enemies) {
       if (e.alive) push(e.x, e.y, 'enemy', e);
@@ -116,7 +146,7 @@ const Raycaster = (() => {
         const dx = t.x - player.x, dy = t.y - player.y;
         const d2 = dx * dx + dy * dy;
         if (d2 > maxTreeD2) continue;
-        sprites.push({ dist: d2, type: 'tree', ref: t });
+        push(t.x, t.y, 'tree', t);
       }
     }
     if (typeof Environment !== 'undefined' && Environment.getFlags) {
@@ -130,9 +160,9 @@ const Raycaster = (() => {
     if (typeof MP !== 'undefined' && MP.active) {
       for (const rp of MP.getRemotePlayers()) push(rp.x, rp.y, 'rplayer', rp);
     }
-    sprites.sort((a, b) => b.dist - a.dist);
+    activeSprites.sort((a, b) => b.dist - a.dist);
 
-    for (const s of sprites) {
+    for (const s of activeSprites) {
       if (s.type === 'enemy') drawEnemySprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'pickup') drawPickupSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'tree') drawTreeSprite(player, s.ref, horizonOffset, theme);
@@ -1399,5 +1429,5 @@ const Raycaster = (() => {
 
   function getDimensions() { return { W, H }; }
 
-  return { init, render, getDimensions };
+  return { init, render, getDimensions, setQuality, getQuality };
 })();
