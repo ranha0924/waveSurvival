@@ -173,4 +173,4 @@ Sprites.register('splitterChild', 'assets/dokkaebibul.webp', { scale: 0.5 });
 // Co-op ally avatar (the 무당 player character). Drawn for OTHER players' tokens
 // in multiplayer (the local player is first-person). Accepts player.webp OR
 // player.png; until one is added the renderer falls back to the cloak figure.
-Sprites.register('__player', 'assets/player.webp', { scale: 1.0, fallback: 'assets/player.png' });
+Sprites.register('__player', 'assets/player.webp', { scale: 0.72, fallback: 'assets/player.png' });
