@@ -330,7 +330,7 @@
   function resumeGame() {
     game.state = STATE.PLAYING;
     game.lastTime = performance.now();
-    if (game.touchMode) Mobile.showControls();
+    if (game.touchMode && !game.usingMouse) Mobile.showControls();
   }
 
   function setupUIButtons() {
@@ -599,6 +599,9 @@
       // touch devices fire touchstart (preventDefault'd in mobile.js, which
       // suppresses synthetic mouse events) — so this also engages the mouse path
       // on a hybrid touchscreen+mouse laptop (touchMode on, but a mouse in use).
+      // First mouse use on a touch-capable device → drop the on-screen touch UI;
+      // it won't re-show (every showControls is gated on !usingMouse).
+      if (game.touchMode && !game.usingMouse) Mobile.hideControls();
       game.usingMouse = true;
       if (game.state === STATE.PLAYING) {
         if (!game.pointerLocked) {
@@ -755,7 +758,7 @@
     if (!(typeof MP !== 'undefined' && MP.active && MP.isGuest())) {
       startNextWave();
     }
-    if (game.touchMode) Mobile.showControls();
+    if (game.touchMode && !game.usingMouse) Mobile.showControls();
     requestPointerLock();
   }
 
@@ -950,7 +953,7 @@
           } else {
             startNextWave();
             game.state = STATE.PLAYING;
-            if (game.touchMode) Mobile.showControls();
+            if (game.touchMode && !game.usingMouse) Mobile.showControls();
             requestPointerLock();
           }
         });
@@ -999,7 +1002,7 @@
     UI.hideUpgradeMenu();
     hideCoopWait();
     game.state = STATE.PLAYING;
-    if (game.touchMode) Mobile.showControls();
+    if (game.touchMode && !game.usingMouse) Mobile.showControls();
     requestPointerLock();
   }
 
@@ -1009,7 +1012,7 @@
     hideCoopWait();
     startNextWave();
     game.state = STATE.PLAYING;
-    if (game.touchMode) Mobile.showControls();
+    if (game.touchMode && !game.usingMouse) Mobile.showControls();
     requestPointerLock();
   }
 
