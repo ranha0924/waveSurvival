@@ -807,8 +807,13 @@
         UI.showUpgradeMenu(game.player, game.wave.number, () => {
           UI.hideUpgradeMenu();
           if (coopHost) {
+            // Show the wait screen BEFORE notifying: if this pick was the last
+            // one, notifyPicked() synchronously runs proceedNextWave →
+            // coopHostStartNextWave, which hides the wait screen and starts the
+            // wave. Showing it afterwards would leave a stale overlay covering
+            // the resumed game (the "stuck on the wait screen" bug).
+            showCoopWait();
             MP.notifyPicked();   // records host's pick; advances when all in
-            showCoopWait();      // freeze on a clean wait screen until everyone picks
           } else {
             startNextWave();
             game.state = STATE.PLAYING;
@@ -844,8 +849,8 @@
     setTimeout(() => {
       UI.showUpgradeMenu(game.player, wave, () => {
         UI.hideUpgradeMenu();
-        MP.notifyPicked();   // → host
         showCoopWait();      // frozen wait screen until the host signals wave_start
+        MP.notifyPicked();   // → host
       });
     }, 400);
   }
