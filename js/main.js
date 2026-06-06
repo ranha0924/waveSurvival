@@ -1169,7 +1169,13 @@
   }
 
   function loop(now) {
-    const dt = Math.min(0.05, (now - (game.lastTime || now)) / 1000);
+    // Wrap the whole frame: a single thrown exception would otherwise skip the
+    // requestAnimationFrame below and permanently freeze the game. On error we
+    // log it (so it's diagnosable in the console) and still schedule next frame.
+    try {
+    let dt = (now - (game.lastTime || now)) / 1000;
+    if (!isFinite(dt) || dt < 0) dt = 0;
+    if (dt > 0.05) dt = 0.05;             // clamp big gaps (tab switch) + NaN guard
     game.lastTime = now;
     adaptQuality(dt);
 
@@ -1252,6 +1258,11 @@
     if (game.state === STATE.PLAYING || game.state === STATE.UPGRADE || game.state === STATE.PAUSED) {
       UI.updateHud(game.player, game.wave, game.score);
       UI.drawMinimap(game.player, game.enemies);
+    }
+    } catch (err) {
+      if (typeof console !== 'undefined' && console.error) {
+        console.error('[loop] frame error (continuing):', err);
+      }
     }
 
     requestAnimationFrame(loop);
