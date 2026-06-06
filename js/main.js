@@ -1168,17 +1168,31 @@
     }
   }
 
+  // Throttled per-phase error log (≤1/s each) so a recurring frame error is
+  // visible in the console without spamming it.
+  const _loopErrAt = {};
+  function loopError(phase, err) {
+    const t = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+    if (!_loopErrAt[phase] || t - _loopErrAt[phase] > 1000) {
+      _loopErrAt[phase] = t;
+      if (typeof console !== 'undefined' && console.error) console.error('[loop:' + phase + ']', err);
+    }
+  }
+
   function loop(now) {
-    // Wrap the whole frame: a single thrown exception would otherwise skip the
-    // requestAnimationFrame below and permanently freeze the game. On error we
-    // log it (so it's diagnosable in the console) and still schedule next frame.
-    try {
+    // dt first, guarded against NaN / negative / huge tab-switch gaps so a bad
+    // timestamp can't poison positions into NaN (which renders as a freeze).
     let dt = (now - (game.lastTime || now)) / 1000;
     if (!isFinite(dt) || dt < 0) dt = 0;
-    if (dt > 0.05) dt = 0.05;             // clamp big gaps (tab switch) + NaN guard
+    if (dt > 0.05) dt = 0.05;
     game.lastTime = now;
-    adaptQuality(dt);
+    try { adaptQuality(dt); } catch (err) { loopError('adapt', err); }
 
+    // Update and render are wrapped SEPARATELY: a thrown exception would
+    // otherwise skip requestAnimationFrame and freeze the game forever. Keeping
+    // render in its own try means a logic error never blanks the screen, and the
+    // throttled log tells us which phase failed.
+    try {
     if (game.state === STATE.PLAYING && game.cutsceneTimer > 0) {
       game.cutsceneTimer -= dt;
       if (game.cutsceneTimer <= 0) game.cutsceneTimer = 0;
@@ -1251,19 +1265,15 @@
       // Broadcast our player state (host also emits the world snapshot).
       if (mpActive) MP.endFrame(dt);
     }
+    } catch (err) { loopError('update', err); }
 
-    // Render
-    render();
-
-    if (game.state === STATE.PLAYING || game.state === STATE.UPGRADE || game.state === STATE.PAUSED) {
-      UI.updateHud(game.player, game.wave, game.score);
-      UI.drawMinimap(game.player, game.enemies);
-    }
-    } catch (err) {
-      if (typeof console !== 'undefined' && console.error) {
-        console.error('[loop] frame error (continuing):', err);
+    try {
+      render();
+      if (game.state === STATE.PLAYING || game.state === STATE.UPGRADE || game.state === STATE.PAUSED) {
+        UI.updateHud(game.player, game.wave, game.score);
+        UI.drawMinimap(game.player, game.enemies);
       }
-    }
+    } catch (err) { loopError('render', err); }
 
     requestAnimationFrame(loop);
   }
