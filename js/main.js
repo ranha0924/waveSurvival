@@ -204,10 +204,6 @@
     talismanParticles: []
   };
 
-  // Monotonic id source for enemies, used by co-op to track them across the
-  // host's world snapshots.
-  let nextNetId = 1;
-
   // ---------- Init / UI wiring ----------
   function init() {
     Audio.init();
@@ -261,6 +257,8 @@
         exitUpgrade: () => coopExitUpgrade(),
         // Host: all players have picked (or timed out) — start the next wave.
         hostStartNextWave: () => coopHostStartNextWave(),
+        // Guest: host hit a boss wave — play the cutscene in sync.
+        playCutscene: (round) => playBossCutscene(round),
         // Whole team wiped — end the run on every client.
         gameOverFromNet: () => { if (game.state !== STATE.GAMEOVER) gameOver(); }
       });
@@ -396,7 +394,11 @@
       Audio.uiClick();
       UI.hidePause();
       UI.hideHud();
+      hideCoopWait();
       if (game.touchMode) Mobile.hideControls();
+      // Leaving to the menu drops out of the co-op room so teammates aren't left
+      // waiting on us (e.g. at the next upgrade) and we don't linger in aggro.
+      if (typeof MP !== 'undefined' && MP.active) MP.leave();
       UI.updateTitleRecords(Records.load(), Records.loadDaily());
       refreshLeaderboard();
       UI.showTitle();
@@ -648,8 +650,6 @@
 
     Environment.init();
 
-    // Fresh enemy id sequence each run (host side).
-    nextNetId = 1;
     // In co-op only the host drives wave spawning; guests receive enemies and
     // wave/score state from the host's world snapshots.
     if (!(typeof MP !== 'undefined' && MP.active && MP.isGuest())) {
@@ -657,6 +657,30 @@
     }
     if (game.touchMode) Mobile.showControls();
     requestPointerLock();
+  }
+
+  // Play the 구미호 boss cutscene (pauses the round for ~6s). Shared by the host
+  // (in startNextWave) and guests (via the co-op 'cutscene' event) so everyone
+  // sees it together.
+  function playBossCutscene(round) {
+    game.cutsceneTimer = 6;
+    Audio.gutpanLoopStart && Audio.gutpanLoopStart();
+    BossCutscene.playBossCutscene({
+      image: 'assets/gumiho.webp',
+      name: '구미호',
+      subtitle: `${round}회차 — 천년묵은 요호`,
+      beginText: '굿이 시작된다',
+      parts: [
+        { x: 50, y: 90, scale: 2.4 },
+        { x: 72, y: 55, scale: 2.0 },
+        { x: 45, y: 15, scale: 2.5 },
+      ],
+      onImpact() { Audio.bossEnrage && Audio.bossEnrage(); },
+      onEnd() {
+        game.cutsceneTimer = 0;
+        if (!game.gutpan.active) Audio.gutpanLoopStop();
+      }
+    });
   }
 
   function startNextWave() {
@@ -675,24 +699,13 @@
 
     if (game.wave.number % 5 === 0) {
       const round = game.wave.number / 5;
-      game.cutsceneTimer = 6;
-      Audio.gutpanLoopStart && Audio.gutpanLoopStart();
-      BossCutscene.playBossCutscene({
-        image: 'assets/gumiho.webp',
-        name: '구미호',
-        subtitle: `${round}회차 — 천년묵은 요호`,
-        beginText: '굿이 시작된다',
-        parts: [
-          { x: 50, y: 90, scale: 2.4 },
-          { x: 72, y: 55, scale: 2.0 },
-          { x: 45, y: 15, scale: 2.5 },
-        ],
-        onImpact() { Audio.bossEnrage && Audio.bossEnrage(); },
-        onEnd() {
-          game.cutsceneTimer = 0;
-          if (!game.gutpan.active) Audio.gutpanLoopStop();
-        }
-      });
+      playBossCutscene(round);
+      // Co-op: the host stops broadcasting world during its own cutscene, so
+      // tell guests to play the same cutscene (and pause) or they'd just stare
+      // at a frozen world for 6s.
+      if (typeof MP !== 'undefined' && MP.active && MP.isHost() && MP.broadcastCutscene) {
+        MP.broadcastCutscene(round);
+      }
     } else {
       UI.showWaveBanner(`WAVE ${game.wave.number}`);
       Audio.waveStart();
@@ -751,9 +764,6 @@
     // Ensure the chosen point can actually fit this enemy's body
     const pos = findValidSpawn(bestPt.x, bestPt.y, radius);
     const e = Enemies.create(next.type, pos.x, pos.y, next.scale || 1);
-    // Stable id so co-op guests can track / report hits against this enemy
-    // across world snapshots.
-    e.netId = nextNetId++;
     game.enemies.push(e);
     game.wave.spawnTimer = game.wave.spawnInterval;
   }

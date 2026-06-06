@@ -143,10 +143,16 @@ const Enemies = (() => {
 
 
   // ---------- Factory ----------
+  // Monotonic id assigned to EVERY enemy (regular spawns, boss summons, splitter
+  // children). Co-op guests track enemies by this across world snapshots, so it
+  // must be set here — not only in main's spawn path — or summoned minions would
+  // be invisible to guests.
+  let netIdCounter = 1;
   function create(type, x, y, scale = 1) {
     const def = types[type];
     return {
       x, y,
+      netId: netIdCounter++,
       type: def,
       hp: def.hp * scale,
       maxHp: def.hp * scale,

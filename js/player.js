@@ -167,8 +167,10 @@ const Player = (() => {
     const pitchLerp = Math.min(1, dt * 10);
     p.smoothedPitch += (p.pitch - p.smoothedPitch) * pitchLerp;
 
-    // Auto heal
-    if (p.autoHeal && p.hp < p.maxHp) {
+    // Auto heal — never while downed, or the regen would lift HP above 0 and
+    // (in co-op) make enemies re-aggro a spectating player who should stay out
+    // until the wave revives them.
+    if (p.autoHeal && p.hp < p.maxHp && !p.downed) {
       p.autoHealTimer -= dt;
       if (p.autoHealTimer <= 0) {
         p.hp = Math.min(p.maxHp, p.hp + 1);
