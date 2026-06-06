@@ -143,52 +143,75 @@ const Raycaster = (() => {
     }
   }
 
-  // Co-op ally billboard. No player sprite assets exist yet, so this draws a
-  // simple shaded figure (cloak body + head) tinted by the ally's stable
-  // colour, with a floating name tag and an HP pip. Bottom-anchored and wall-
-  // clipped like enemies. Replace with a real sprite later via Sprites.get.
+  // Co-op ally billboard. Uses a registered player sprite when available
+  // (assets/player.webp via Sprites), else a procedural cloak+head figure. Both
+  // paths are wall-clipped; a floating name tag + HP pip sit above the head.
+  const PLAYER_SPRITE_ID = '__player';
   function drawRemotePlayer(player, rp, horizonOffset, theme) {
     const proj = projectSprite(player, rp.x, rp.y);
     if (!proj) return;
     // Downed ally (HP 0, spectating): render faded so the team can see who's
     // out without it reading as a live target.
     const ghost = rp.hp <= 0;
+    const alpha = ghost ? 0.4 : 1;
     ctx.save();
-    if (ghost) ctx.globalAlpha = 0.4;
     const horizon = H / 2 + horizonOffset;
     const baseH = H / proj.dist;
-    const spriteH = Math.floor(baseH * 0.95);
-    const spriteW = Math.floor(spriteH * 0.5);
-    const drawStartX = proj.screenX - Math.floor(spriteW / 2);
     const groundedBottom = horizon + baseH / 2;
-    const drawStartY = Math.floor(groundedBottom - spriteH);
-    const x0 = Math.max(0, drawStartX);
-    const x1 = Math.min(W, drawStartX + spriteW);
-    const fog = Math.min(1, proj.dist / theme.fogDist);
-    const light = Math.max(0.55, 1 - fog * 0.6);
 
-    const bodyTopY = drawStartY + spriteH * 0.32;
-    const headTop = drawStartY;
-    const headBottom = drawStartY + spriteH * 0.32;
-    for (let x = x0; x < x1; x++) {
-      const localX = (x - drawStartX) / spriteW;
-      const fromCenter = Math.abs(localX - 0.5) * 2;
-      if (fromCenter > 0.95) continue;
-      let bodyBottom = drawStartY + spriteH;
-      if (zBuffer[x] < proj.dist) bodyBottom = Math.min(bodyBottom, wallTopY[x]);
-      if (proj.dist > shortDist[x]) bodyBottom = Math.min(bodyBottom, horizon);
-      if (fromCenter < 0.8 && bodyBottom > bodyTopY) {
-        ctx.fillStyle = shadeHsl(rp.color.body, light);
-        ctx.fillRect(x, bodyTopY, 1, bodyBottom - bodyTopY);
+    // Prefer a registered player sprite. The image billboard blitter clips each
+    // column against the wall z-buffer, so the sprite (head included) is hidden
+    // behind walls correctly — fixing the "head pokes through walls" bug the
+    // procedural figure had.
+    const spr = (typeof Sprites !== 'undefined') ? Sprites.get(PLAYER_SPRITE_ID) : null;
+    let spriteW, drawStartX, drawStartY;
+    if (spr) {
+      const scale = spr.scale || 1;
+      const aspect = spr.w / spr.h;
+      const spriteH = Math.floor(baseH * scale);
+      spriteW = Math.floor(spriteH * aspect);
+      drawStartX = proj.screenX - Math.floor(spriteW / 2);
+      drawStartY = Math.floor(groundedBottom - spriteH);
+      blitBillboard(spr.canvas, drawStartX, drawStartY, spriteW, spriteH, proj.dist, alpha, false);
+    } else {
+      // Procedural fallback (no sprite asset yet) — cloak body + head, now with
+      // the SAME wall clipping applied to the head as the body.
+      const spriteH = Math.floor(baseH * 0.95);
+      spriteW = Math.floor(spriteH * 0.5);
+      drawStartX = proj.screenX - Math.floor(spriteW / 2);
+      drawStartY = Math.floor(groundedBottom - spriteH);
+      const x0 = Math.max(0, drawStartX);
+      const x1 = Math.min(W, drawStartX + spriteW);
+      const fog = Math.min(1, proj.dist / theme.fogDist);
+      const light = Math.max(0.55, 1 - fog * 0.6);
+      const bodyTopY = drawStartY + spriteH * 0.32;
+      const headTop = drawStartY;
+      const headBottom = drawStartY + spriteH * 0.32;
+      if (ghost) ctx.globalAlpha = alpha;
+      for (let x = x0; x < x1; x++) {
+        const localX = (x - drawStartX) / spriteW;
+        const fromCenter = Math.abs(localX - 0.5) * 2;
+        if (fromCenter > 0.95) continue;
+        // A nearer wall in this column hides everything from its top edge down.
+        const cap = (zBuffer[x] < proj.dist) ? wallTopY[x] : Infinity;
+        let bodyBottom = Math.min(drawStartY + spriteH, cap);
+        if (proj.dist > shortDist[x]) bodyBottom = Math.min(bodyBottom, horizon);
+        const headBot = Math.min(headBottom, cap);
+        if (fromCenter < 0.8 && bodyBottom > bodyTopY) {
+          ctx.fillStyle = shadeHsl(rp.color.body, light);
+          ctx.fillRect(x, bodyTopY, 1, bodyBottom - bodyTopY);
+        }
+        if (fromCenter < 0.45 && headBot > headTop) {
+          ctx.fillStyle = shadeHsl(rp.color.head, light);
+          ctx.fillRect(x, headTop, 1, headBot - headTop);
+        }
       }
-      if (fromCenter < 0.45 && headBottom > headTop) {
-        ctx.fillStyle = shadeHsl(rp.color.head, light);
-        ctx.fillRect(x, headTop, 1, headBottom - headTop);
-      }
+      ctx.globalAlpha = 1;
     }
 
     const cx = Math.floor(proj.screenX);
     if (cx < 0 || cx >= W || zBuffer[cx] < proj.dist) { ctx.restore(); return; }
+    if (ghost) ctx.globalAlpha = alpha;
     // Name tag + HP pip above the head, only when reasonably close.
     if (proj.dist < 22) {
       const tagY = Math.max(10, drawStartY - 6);
