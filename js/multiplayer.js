@@ -29,6 +29,7 @@ const MP = (() => {
     active: false,
     role: null,              // 'host' | 'guest'
     selfId: null,
+    hostId: null,            // id of the room host (server-reported, immutable)
     room: '',
     seed: 1,
     status: ''
@@ -96,6 +97,7 @@ const MP = (() => {
       const onWelcome = (msg) => {
         state.active = true;
         state.selfId = msg.id;
+        state.hostId = msg.host;
         state.room = msg.room;
         state.seed = msg.seed | 0;
         state.role = msg.isHost ? 'host' : 'guest';
@@ -349,8 +351,19 @@ const MP = (() => {
     if (el2) el2.textContent = s;
   }
 
+  // Events that are authoritative — only the host may originate them. The relay
+  // stamps `from` server-side (unspoofable), so we drop any of these that come
+  // from a non-host room member. Without this, any guest in the room could send
+  // e.g. a 'hurt' to instantly kill a teammate, or drive everyone's wave/cutscene
+  // state. ('picked' is guest→host; 'gameover' is allowed from anyone so a downed
+  // client can self-report a team wipe.)
+  const HOST_ONLY_EVENTS = new Set(['hurt', 'kill', 'wave_clear', 'wave_start', 'cutscene', 'in_progress', 'start_game']);
+
   // ---------- Event dispatch (one-shot 'ev' messages) ----------
   function onEvent(m) {
+    // Reject spoofed host-authoritative events from non-host members. Fail open
+    // only if we somehow don't know the host id yet (never blocks legit play).
+    if (HOST_ONLY_EVENTS.has(m.k) && state.hostId && m.from && m.from !== state.hostId) return;
     switch (m.k) {
       case 'hurt':
         if (m.to === state.selfId && game && game.player && game.player.hp > 0) {

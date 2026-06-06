@@ -81,18 +81,33 @@ const server = http.createServer((req, res) => {
   res.end();
 });
 
-const wss = new WebSocketServer({ server });
+// maxPayload caps a single frame so a client can't send a multi-MB message that
+// we'd then fan out to the whole room (amplification DoS). Snapshots are a few
+// KB at most; 64 KB is comfortable headroom.
+const wss = new WebSocketServer({ server, maxPayload: 64 * 1024 });
+
+// Per-socket flood guard. A normal client sends ~25 (guest) / ~65 (host) msgs a
+// second; anything past this rolling-second cap is a flood, so we close the
+// socket. Cheap to track and bounds the relay's fan-out work.
+const MSG_PER_SEC = 200;
 
 wss.on('connection', (ws) => {
   ws._id = 'p' + (nextId++);
   ws._room = null;
   ws._name = '익명';
   ws._alive = true;
+  ws._msgCount = 0;
+  ws._msgWindow = Date.now();
   ws.on('pong', () => { ws._alive = true; });
 
   send(ws, { t: 'hello', id: ws._id });
 
   ws.on('message', (raw) => {
+    // Flood guard: count messages per rolling second, drop the socket past cap.
+    const now = Date.now();
+    if (now - ws._msgWindow >= 1000) { ws._msgWindow = now; ws._msgCount = 0; }
+    if (++ws._msgCount > MSG_PER_SEC) { try { ws.close(1008, 'rate'); } catch (e) {} return; }
+
     let msg;
     try { msg = JSON.parse(raw); } catch (e) { return; }
     if (!msg || typeof msg.t !== 'string') return;
@@ -133,8 +148,20 @@ wss.on('connection', (ws) => {
       // server stays dumb: 'pstate' (player movement), 'world' (host's
       // authoritative snapshot), 'hit' (guest damage report), 'ev' (one-shot
       // events) all flow through here.
+      case 'world': {
+        // The authoritative world snapshot may ONLY come from the room host —
+        // otherwise any guest could broadcast a forged world to the others.
+        const room = rooms.get(ws._room);
+        if (!room || ws._id !== room.host) return;
+        msg.from = ws._id;
+        broadcast(room, msg, ws._id);
+        break;
+      }
+
+      // Player state, hit reports, and one-shot events relay to the rest of the
+      // room. `from` is stamped server-side so it can't be spoofed; the client
+      // uses it to reject host-only events that don't originate from the host.
       case 'pstate':
-      case 'world':
       case 'hit':
       case 'ev': {
         const room = rooms.get(ws._room);
