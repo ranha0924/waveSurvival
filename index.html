@@ -152,15 +152,15 @@
         <div class="title-view view-ranking">
           <button type="button" class="ranking-back" data-view="records">← 돌아가기</button>
           <span id="online-status" class="online-status ranking-status"></span>
-          <div class="ranking-split">
-            <section class="ranking-half">
-              <div class="rank-half-head">전체</div>
-              <ol id="online-alltime" class="online-list"></ol>
-            </section>
-            <section class="ranking-half">
-              <div class="rank-half-head">오늘의 도전</div>
-              <ol id="online-daily" class="online-list"></ol>
-            </section>
+          <div class="ranking-board">
+            <div class="ranking-tabs" id="ranking-tabs">
+              <button type="button" class="rank-tab active" data-board="alltime">전체</button>
+              <button type="button" class="rank-tab" data-board="daily">오늘</button>
+              <button type="button" class="rank-tab" data-board="coop2">2인 협동</button>
+              <button type="button" class="rank-tab" data-board="coop3">3인 협동</button>
+              <button type="button" class="rank-tab" data-board="coop4">4인 협동</button>
+            </div>
+            <ol id="online-board" class="online-list"></ol>
           </div>
         </div>
       </div>
