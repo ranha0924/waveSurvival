@@ -353,7 +353,37 @@ const Player = (() => {
     }
   }
 
-  function damageEnemy(p, e, dmg, headshot, particles, enemies, scoreCallback) {
+  // Advance an attacker's kill streak + per-run kill stats. Shared by the local
+  // damage path and (in co-op) the host crediting a guest, and the guest
+  // crediting itself off a host 'kill' event, so combo / 굿판 attribution is
+  // computed the same way everywhere.
+  function registerKill(a, headshot, isBoss) {
+    const t = performance.now() / 1000;
+    if (t - a.lastKillTime < (3.0 + (a.comboTimeoutBonus || 0))) a.comboCount += 1;
+    else a.comboCount = 1;
+    a.lastKillTime = t;
+    if (a.comboCount > a.maxComboReached) a.maxComboReached = a.comboCount;
+    a.kills = (a.kills || 0) + 1;
+    if (headshot) a.headshots = (a.headshots || 0) + 1;
+    if (isBoss) a.bossKills = (a.bossKills || 0) + 1;
+  }
+
+  // `attacker` defaults to `p`. In co-op the host applies a guest's reported hit
+  // with attacker = a transient carrying THAT guest's combo / 굿판 state, so the
+  // kill's combo+score multiplier is attributed to the guest, not the host. The
+  // authoritative enemy mutation + death side-effects still use `p` (the host's
+  // own player) for position-dependent logic (splitter avoidance, etc.).
+  function damageEnemy(p, e, dmg, headshot, particles, enemies, scoreCallback, attacker) {
+    // Co-op guest: enemies are host-authoritative. Report the hit (with our
+    // combo / 굿판 state so the host scores it as ours) and show local feedback,
+    // but don't mutate the enemy — the host applies damage and the next world
+    // snapshot reflects the new HP / death.
+    if (typeof MP !== 'undefined' && MP.active && MP.isGuest()) {
+      MP.reportHit(e, dmg, headshot, p.comboCount, !!p.gutpanActive);
+      spawnDamageNumber(particles, e.x, e.y, dmg, headshot);
+      return;
+    }
+    attacker = attacker || p;
     e.hp -= dmg;
     e.hitFlash = 0.1;
     // Pick the hit sound by enemy class so heavy/armored targets feel
@@ -379,30 +409,22 @@ const Player = (() => {
       e.alive = false;
       if (e.type.isBoss) Audio.bossDeath();
       else Audio.enemyDeath();
-      // Score — combo now counts raw streak length (1, 2, ...) and only
-      // resets after the 3s timeout. Score multiplier caps at ×3 via
-      // comboMultFor; the unclamped count is what 굿판 모드 watches for ≥5.
-      const t = performance.now() / 1000;
-      if (t - p.lastKillTime < (3.0 + p.comboTimeoutBonus)) {
-        p.comboCount = p.comboCount + 1;
-      } else {
-        p.comboCount = 1;
-      }
-      p.lastKillTime = t;
-      if (p.comboCount > p.maxComboReached) p.maxComboReached = p.comboCount;
-      const comboMult = comboMultFor(p.comboCount);
+      // Score + combo are attributed to `attacker` (the host's own player in
+      // single-player / host-local kills; a guest's transient proxy when the
+      // host applies that guest's hit). Combo counts raw streak length and
+      // resets after the 3s timeout; the multiplier caps at ×3 via comboMultFor,
+      // while the unclamped count is what 굿판 모드 watches for ≥5.
+      registerKill(attacker, headshot, !!e.type.isBoss);
+      const comboMult = comboMultFor(attacker.comboCount);
       const headMult = headshot ? 2 : 1;
-      const gutpanMult = p.gutpanActive ? GUTPAN_SCORE_MULT : 1;
+      const gutpanMult = attacker.gutpanActive ? GUTPAN_SCORE_MULT : 1;
       const score = Math.floor(e.type.score * comboMult * headMult * gutpanMult);
       scoreCallback(score, e);
-      p.kills++;
-      if (headshot) p.headshots++;
-      if (e.type.isBoss) p.bossKills++;
       // 혼(魂) 흡수 — heal a tiny amount per kill while the card is owned.
       // Boss kills give a larger chunk so the card stays meaningful on
       // long boss fights, not just trash waves.
-      if (p.soulSiphon) {
-        p.hp = Math.min(p.maxHp, p.hp + (e.type.isBoss ? 25 : 5));
+      if (attacker.soulSiphon) {
+        attacker.hp = Math.min(attacker.maxHp, attacker.hp + (e.type.isBoss ? 25 : 5));
       }
       // Two-layer death burst (airborne spray + lingering ground stains).
       // Boss / headshot variants are handled inside the helper.
@@ -627,6 +649,9 @@ const Player = (() => {
   return {
     create, update, turn, shoot, startReload, switchWeapon, cycleWeapon, takeDamage, getWeapon,
     spawnExplosion, spawnDeathBurst,
+    // Exposed so co-op host can apply a guest's reported hit through the same
+    // damage / scoring path the local player uses.
+    damageEnemy, registerKill,
     // Exposed so UI and enemy.awardChainKill use the same multiplier table.
     comboMultFor,
     GUTPAN_DAMAGE_MULT, GUTPAN_FIRE_MULT, GUTPAN_SCORE_MULT

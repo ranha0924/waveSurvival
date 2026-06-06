@@ -1,0 +1,8 @@
+# Node dependencies for the co-op relay server
+server/node_modules/
+node_modules/
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+*.swp

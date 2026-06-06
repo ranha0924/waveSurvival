@@ -125,6 +125,11 @@ const Raycaster = (() => {
     if (typeof Environment !== 'undefined' && Environment.getProps) {
       for (const p of Environment.getProps()) push(p.x, p.y, 'prop', p);
     }
+    // Co-op allies — billboarded into the same depth-sorted pool so they clip
+    // against walls and occlude correctly versus enemies / props.
+    if (typeof MP !== 'undefined' && MP.active) {
+      for (const rp of MP.getRemotePlayers()) push(rp.x, rp.y, 'rplayer', rp);
+    }
     sprites.sort((a, b) => b.dist - a.dist);
 
     for (const s of sprites) {
@@ -133,8 +138,86 @@ const Raycaster = (() => {
       else if (s.type === 'tree') drawTreeSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'flag') drawFlagSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'prop') drawPropSprite(player, s.ref, horizonOffset, theme);
+      else if (s.type === 'rplayer') drawRemotePlayer(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
     }
+  }
+
+  // Co-op ally billboard. No player sprite assets exist yet, so this draws a
+  // simple shaded figure (cloak body + head) tinted by the ally's stable
+  // colour, with a floating name tag and an HP pip. Bottom-anchored and wall-
+  // clipped like enemies. Replace with a real sprite later via Sprites.get.
+  function drawRemotePlayer(player, rp, horizonOffset, theme) {
+    const proj = projectSprite(player, rp.x, rp.y);
+    if (!proj) return;
+    // Downed ally (HP 0, spectating): render faded so the team can see who's
+    // out without it reading as a live target.
+    const ghost = rp.hp <= 0;
+    ctx.save();
+    if (ghost) ctx.globalAlpha = 0.4;
+    const horizon = H / 2 + horizonOffset;
+    const baseH = H / proj.dist;
+    const spriteH = Math.floor(baseH * 0.95);
+    const spriteW = Math.floor(spriteH * 0.5);
+    const drawStartX = proj.screenX - Math.floor(spriteW / 2);
+    const groundedBottom = horizon + baseH / 2;
+    const drawStartY = Math.floor(groundedBottom - spriteH);
+    const x0 = Math.max(0, drawStartX);
+    const x1 = Math.min(W, drawStartX + spriteW);
+    const fog = Math.min(1, proj.dist / theme.fogDist);
+    const light = Math.max(0.55, 1 - fog * 0.6);
+
+    const bodyTopY = drawStartY + spriteH * 0.32;
+    const headTop = drawStartY;
+    const headBottom = drawStartY + spriteH * 0.32;
+    for (let x = x0; x < x1; x++) {
+      const localX = (x - drawStartX) / spriteW;
+      const fromCenter = Math.abs(localX - 0.5) * 2;
+      if (fromCenter > 0.95) continue;
+      let bodyBottom = drawStartY + spriteH;
+      if (zBuffer[x] < proj.dist) bodyBottom = Math.min(bodyBottom, wallTopY[x]);
+      if (proj.dist > shortDist[x]) bodyBottom = Math.min(bodyBottom, horizon);
+      if (fromCenter < 0.8 && bodyBottom > bodyTopY) {
+        ctx.fillStyle = shadeHsl(rp.color.body, light);
+        ctx.fillRect(x, bodyTopY, 1, bodyBottom - bodyTopY);
+      }
+      if (fromCenter < 0.45 && headBottom > headTop) {
+        ctx.fillStyle = shadeHsl(rp.color.head, light);
+        ctx.fillRect(x, headTop, 1, headBottom - headTop);
+      }
+    }
+
+    const cx = Math.floor(proj.screenX);
+    if (cx < 0 || cx >= W || zBuffer[cx] < proj.dist) { ctx.restore(); return; }
+    // Name tag + HP pip above the head, only when reasonably close.
+    if (proj.dist < 22) {
+      const tagY = Math.max(10, drawStartY - 6);
+      ctx.font = `bold ${Math.max(9, Math.floor(60 / proj.dist))}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillText(rp.name, cx + 1, tagY + 1);
+      ctx.fillStyle = '#e8e0c8';
+      ctx.fillText(rp.name, cx, tagY);
+      const barW = Math.max(16, spriteW * 0.7);
+      const barH = 3;
+      const barX = cx - barW / 2;
+      const barY = tagY + 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = '#5bd16a';
+      ctx.fillRect(barX, barY, barW * Math.max(0, Math.min(1, rp.hp / 100)), barH);
+    }
+    ctx.restore();
+  }
+
+  // Dim an `hsl(h,s%,l%)` string toward black by `light` (0..1). Cheap enough
+  // for the handful of ally billboards per frame.
+  function shadeHsl(hsl, light) {
+    const m = /hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/.exec(hsl);
+    if (!m) return hsl;
+    const l = Math.max(0, Math.min(100, parseInt(m[3], 10) * light));
+    return `hsl(${m[1]},${m[2]}%,${l.toFixed(0)}%)`;
   }
 
   // Shared billboard blitter. The classic raycaster path blits one 1px column
