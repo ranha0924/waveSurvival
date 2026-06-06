@@ -2219,7 +2219,8 @@ html, body {
 .ranking-board {
   height: 100%; width: 100%;
   display: flex; flex-direction: column;
-  padding: clamp(52px, 9vh, 80px) clamp(16px, 4vw, 64px) clamp(16px, 3vh, 30px);
+  /* Minimal side padding so the list spans the full width (no big L/R margins). */
+  padding: clamp(52px, 9vh, 80px) clamp(8px, 1.4vw, 16px) clamp(16px, 3vh, 30px);
 }
 .ranking-tabs {
   flex: none; display: flex; flex-wrap: wrap; justify-content: center;
@@ -2244,7 +2245,7 @@ html, body {
 /* 리스트가 남은 높이를 가득 채움 (flex 안에서 스크롤되도록 min-height:0) */
 .ranking-board .online-list {
   flex: 1 1 auto; height: auto; max-height: none; min-height: 0;
-  max-width: 720px; width: 100%; margin: 0 auto;
+  width: 100%;   /* full width — no centered max-width gutter */
 }
 .ranking-board .online-list li { font-size: clamp(14px, 2.2vmin, 18px); }
 
