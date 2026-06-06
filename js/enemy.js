@@ -142,6 +142,17 @@ const Enemies = (() => {
   }
 
 
+  // Hard ceiling on simultaneously-alive enemies. Without it, a long boss fight
+  // (boss summons every few seconds) or a flood of spawns piles up hundreds of
+  // enemies; the O(n²) separation + per-sprite rendering then explodes and the
+  // game hard-freezes. Spawns/summons/splits past this wait until something dies.
+  const MAX_ALIVE = 48;
+  function aliveCount(arr) {
+    let c = 0;
+    for (const e of arr) if (e.alive) c++;
+    return c;
+  }
+
   // ---------- Factory ----------
   // Monotonic id assigned to EVERY enemy (regular spawns, boss summons, splitter
   // children). Co-op guests track enemies by this across world snapshots, so it
@@ -359,7 +370,9 @@ const Enemies = (() => {
 
   // ---------- Boss adds + chain kill bookkeeping ----------
   function summonAdds(boss, enemies) {
-    const count = boss.phase2 ? 4 : 2;
+    // Respect the global cap so a long boss fight can't flood the field and
+    // freeze the game.
+    let count = Math.min(boss.phase2 ? 4 : 2, MAX_ALIVE - aliveCount(enemies));
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = 1.2;
@@ -441,7 +454,8 @@ const Enemies = (() => {
   function spawnSplitChildren(parent, enemies, player) {
     const childType = parent.type.splitsInto;
     if (!childType || !types[childType]) return;
-    const count = parent.type.splitCount || 2;
+    const count = Math.min(parent.type.splitCount || 2, MAX_ALIVE - aliveCount(enemies));
+    if (count <= 0) return;
     const childRadius = types[childType].radius;
     const playerSafeDist = (player ? player.radius : 0.25) + childRadius + 0.1;
     const psd2 = playerSafeDist * playerSafeDist;
@@ -562,5 +576,5 @@ const Enemies = (() => {
     return out;
   }
 
-  return { types, create, update, updateProjectiles, buildWave, onKilled };
+  return { types, create, update, updateProjectiles, buildWave, onKilled, aliveCount, MAX_ALIVE };
 })();
