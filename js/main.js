@@ -1050,9 +1050,32 @@
     }
   }
 
+  // Adaptive render resolution — smooths frame time and nudges Raycaster
+  // quality down when the GPU/CPU can't keep up, back up when there's headroom.
+  let perfDtEMA = 1 / 60;
+  let perfFrameCount = 0;
+  let renderQuality = 1;
+
+  function adaptQuality(dt) {
+    perfDtEMA = perfDtEMA * 0.9 + dt * 0.1;
+    if (++perfFrameCount < 45) return;     // re-evaluate ~every 0.75s
+    perfFrameCount = 0;
+    if (game.state !== STATE.PLAYING) return;   // don't resize-flash during menus
+    if (typeof Raycaster === 'undefined' || !Raycaster.setQuality) return;
+    const fps = 1 / perfDtEMA;
+    if (fps < 48 && renderQuality > 0.55) {
+      renderQuality = Math.max(0.55, renderQuality - (fps < 32 ? 0.2 : 0.1));
+      Raycaster.setQuality(renderQuality);
+    } else if (fps > 80 && renderQuality < 1) {
+      renderQuality = Math.min(1, renderQuality + 0.1);
+      Raycaster.setQuality(renderQuality);
+    }
+  }
+
   function loop(now) {
     const dt = Math.min(0.05, (now - (game.lastTime || now)) / 1000);
     game.lastTime = now;
+    adaptQuality(dt);
 
     if (game.state === STATE.PLAYING && game.cutsceneTimer > 0) {
       game.cutsceneTimer -= dt;
