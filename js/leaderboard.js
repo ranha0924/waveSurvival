@@ -110,6 +110,40 @@ const Leaderboard = (() => {
     }
   }
 
+  // ---------- Co-op boards (one per player count) ----------
+  // Separate collections per count so each is a single orderBy('score') query
+  // with NO composite index — same constraint as the all-time/daily boards.
+  const COOP = { 2: 'coop2', 3: 'coop3', 4: 'coop4' };
+
+  // A co-op run is a team result; every participant submits their own row
+  // (their nick + the shared team score/wave) so each player ranks on the board
+  // for the size they played. Co-op runs do NOT touch the solo all-time/daily
+  // boards — team scores aren't comparable to a solo run.
+  async function submitCoop(stats, nick, players) {
+    const ok = await init();
+    if (!ok || !db) return false;
+    const coll = COOP[players];
+    if (!coll) return false;
+    try {
+      const row = clean(stats, nick);
+      if (row.score <= 0 && row.wave <= 0) return false;
+      await fs.addDoc(fs.collection(db, coll), { ...row, players, ts: fs.serverTimestamp() });
+      return true;
+    } catch (e) {
+      console.warn('[Leaderboard] 협동 기록 전송 실패', e);
+      return false;
+    }
+  }
+
+  async function topCoop(players) {
+    const ok = await init();
+    if (!ok || !db) return null;
+    const coll = COOP[players];
+    if (!coll) return null;
+    try { return await queryTop(fs.collection(db, coll)); }
+    catch (e) { console.warn('[Leaderboard] 협동 랭킹 조회 실패', e); return null; }
+  }
+
   async function queryTop(collRef) {
     const q = fs.query(collRef, fs.orderBy('score', 'desc'), fs.limit(TOP_N));
     const snap = await fs.getDocs(q);
@@ -134,5 +168,5 @@ const Leaderboard = (() => {
     catch (e) { console.warn('[Leaderboard] 오늘 랭킹 조회 실패', e); return null; }
   }
 
-  return { init, configured, submitRun, topAllTime, topDaily, today };
+  return { init, configured, submitRun, submitCoop, topAllTime, topDaily, topCoop, today };
 })();

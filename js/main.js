@@ -305,26 +305,45 @@
     }
   }
 
-  // Pull the shared Firestore leaderboard and paint it onto the title screen.
-  // Safe to call when the board is unconfigured/offline — it just shows the
-  // appropriate status and the local records keep covering personal bests.
-  function refreshLeaderboard() {
+  // ---------- Online ranking (tabbed: 전체 / 오늘 / 2·3·4인 협동) ----------
+  // Boards load lazily on tab open and cache for the session so flipping tabs is
+  // instant and we don't re-query Firestore each time. The cache is cleared on
+  // a fresh run (refreshLeaderboard) so a just-submitted score shows up.
+  const boardCache = {};
+  let activeBoard = 'alltime';
+
+  function fetchBoard(key) {
+    if (key === 'alltime') return Leaderboard.topAllTime();
+    if (key === 'daily') return Leaderboard.topDaily();
+    if (key.startsWith('coop')) return Leaderboard.topCoop(parseInt(key.slice(4), 10));
+    return Promise.resolve(null);
+  }
+
+  // Load + render the given board. Uses the cache unless `force`.
+  function loadBoard(key, force) {
     if (typeof Leaderboard === 'undefined') return;
-    if (!Leaderboard.configured()) {
-      UI.setLeaderboardStatus('미설정');
-      UI.setLeaderboard(null, null);
+    if (!Leaderboard.configured()) { UI.setLeaderboardStatus('미설정'); UI.setBoard(null); return; }
+    if (!force && key in boardCache) {
+      UI.setBoard(boardCache[key]);
+      UI.setLeaderboardStatus(boardCache[key] == null ? '오프라인' : '');
       return;
     }
     UI.setLeaderboardStatus('불러오는 중…');
-    Promise.all([Leaderboard.topAllTime(), Leaderboard.topDaily()])
-      .then(([allTime, daily]) => {
-        UI.setLeaderboard(allTime, daily);
-        UI.setLeaderboardStatus(allTime == null ? '오프라인' : '');
+    fetchBoard(key)
+      .then((rows) => {
+        boardCache[key] = rows;
+        if (activeBoard === key) { UI.setBoard(rows); UI.setLeaderboardStatus(rows == null ? '오프라인' : ''); }
       })
       .catch(() => {
-        UI.setLeaderboard(null, null);
-        UI.setLeaderboardStatus('오프라인');
+        boardCache[key] = null;
+        if (activeBoard === key) { UI.setBoard(null); UI.setLeaderboardStatus('오프라인'); }
       });
+  }
+
+  // Invalidate the cache (a run just finished) and reload whatever's on screen.
+  function refreshLeaderboard() {
+    for (const k in boardCache) delete boardCache[k];
+    loadBoard(activeBoard, true);
   }
 
   function resumeGame() {
@@ -388,6 +407,19 @@
           v.classList.toggle('active', v.classList.contains('view-' + view)));
         const ts = document.getElementById('title-screen');
         if (ts) ts.classList.toggle('ranking-active', isRanking);
+        // Load the selected board the first time the ranking screen is opened.
+        if (isRanking) loadBoard(activeBoard);
+      });
+    });
+
+    // Ranking board tabs (전체 / 오늘 / 2·3·4인 협동).
+    document.querySelectorAll('#ranking-tabs .rank-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        Audio.uiClick();
+        activeBoard = tab.dataset.board;
+        document.querySelectorAll('#ranking-tabs .rank-tab').forEach((t) =>
+          t.classList.toggle('active', t === tab));
+        loadBoard(activeBoard);
       });
     });
     document.getElementById('restart-btn').addEventListener('click', () => {
@@ -706,6 +738,10 @@
   }
 
   function startGame() {
+    // Lock in the co-op size at kickoff (2–4) so the run lands on the right
+    // co-op board even if a teammate drops mid-game. 1 == solo.
+    game.coopPlayers = (typeof MP !== 'undefined' && MP.active && MP.getPlayerCount)
+      ? Math.max(2, Math.min(4, MP.getPlayerCount())) : 1;
     game.player = Player.create();
     game.enemies = [];
     game.projectiles = [];
@@ -1558,9 +1594,14 @@
 
     // Push the run to the shared online board (no-op when unconfigured /
     // offline), then refresh the cached title-screen ranking so it's current
-    // the next time the player backs out to the menu.
+    // the next time the player backs out to the menu. Co-op runs go to the
+    // per-size co-op board (2/3/4인); solo runs to the all-time (+daily) board.
     if (typeof Leaderboard !== 'undefined') {
-      Leaderboard.submitRun(stats, nick, isDaily).then((ok) => { if (ok) refreshLeaderboard(); });
+      const coopRun = (typeof MP !== 'undefined' && MP.active && game.coopPlayers >= 2);
+      const submit = coopRun
+        ? Leaderboard.submitCoop(stats, nick, game.coopPlayers)
+        : Leaderboard.submitRun(stats, nick, isDaily);
+      submit.then((ok) => { if (ok) refreshLeaderboard(); });
     }
 
     UI.showGameOver(resultStats, prev, broken, game.nick);

@@ -217,9 +217,9 @@ const UI = (() => {
       '</li>'
     ).join('');
   }
-  function setLeaderboard(allTime, daily) {
-    renderOnlineList($('online-alltime'), allTime);
-    renderOnlineList($('online-daily'), daily);
+  // Render the currently-selected board (tabbed: 전체 / 오늘 / 2·3·4인 협동).
+  function setBoard(rows) {
+    renderOnlineList($('online-board'), rows);
   }
   function setLeaderboardStatus(text) {
     const el = $('online-status');
@@ -683,7 +683,7 @@ const UI = (() => {
     showUpgradeMenu, hideUpgradeMenu,
     renderGun, fireTalisman,
     showRecordBanner, updateTitleRecords, setHudBest,
-    setLeaderboard, setLeaderboardStatus,
+    setBoard, setLeaderboardStatus,
     showBossCutscene, hideBossCutscene,
     getNickInput, setNickInput
   };

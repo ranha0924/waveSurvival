@@ -2215,33 +2215,38 @@ html, body {
   position: absolute; top: clamp(12px, 2vh, 20px); right: clamp(14px, 2vw, 24px); z-index: 3;
   font-size: clamp(11px, 1.8vmin, 14px); color: #9a8e74;
 }
-/* 화면을 반으로 가르는 분할 */
-.ranking-split { display: flex; height: 100%; width: 100%; }
-.ranking-half {
-  flex: 1 1 50%; min-width: 0; height: 100%;
+/* 탭 + 단일 리스트 레이아웃 */
+.ranking-board {
+  height: 100%; width: 100%;
   display: flex; flex-direction: column;
-  padding: clamp(52px, 9vh, 80px) clamp(16px, 3.2vw, 44px) clamp(16px, 3vh, 30px);
+  padding: clamp(52px, 9vh, 80px) clamp(16px, 4vw, 64px) clamp(16px, 3vh, 30px);
 }
-.ranking-half:first-child { border-right: 2px solid rgba(216, 177, 58, 0.4); }
-.rank-half-head {
-  flex: none; text-align: center;
-  font-family: 'Gowun Batang', 'Noto Serif KR', serif;
-  font-size: clamp(20px, 4vmin, 34px); font-weight: 700;
-  color: #f0cf86; letter-spacing: 0.12em;
-  padding-bottom: clamp(8px, 1.4vh, 14px); margin-bottom: clamp(8px, 1.4vh, 14px);
+.ranking-tabs {
+  flex: none; display: flex; flex-wrap: wrap; justify-content: center;
+  gap: clamp(6px, 1vw, 10px);
+  padding-bottom: clamp(10px, 1.6vh, 16px); margin-bottom: clamp(10px, 1.6vh, 16px);
   border-bottom: 1px solid rgba(196, 32, 43, 0.7);
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
 }
-/* 리스트가 각 반쪽의 남은 높이를 가득 채움 (flex 안에서 스크롤되도록 min-height:0) */
-.ranking-half .online-list { flex: 1 1 auto; height: auto; max-height: none; min-height: 0; }
-.ranking-half .online-list li { font-size: clamp(14px, 2.2vmin, 18px); }
-
-@media (max-width: 700px) {
-  /* 좁은 화면은 위/아래로 반 갈라 표시 */
-  .ranking-split { flex-direction: column; }
-  .ranking-half { height: 50%; padding-top: clamp(16px, 3vh, 26px); }
-  .ranking-half:first-child { border-right: none; border-bottom: 2px solid rgba(216, 177, 58, 0.4); padding-top: clamp(52px, 9vh, 70px); }
+.rank-tab {
+  font-family: 'Gowun Batang', 'Noto Serif KR', serif;
+  font-size: clamp(13px, 2.2vmin, 18px); font-weight: 700; letter-spacing: 0.06em;
+  color: #b9a982; background: rgba(20, 16, 12, 0.6);
+  border: 1px solid rgba(216, 177, 58, 0.35); border-radius: 7px;
+  padding: clamp(6px, 1.2vmin, 10px) clamp(11px, 1.8vw, 18px);
+  cursor: pointer; white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
 }
+.rank-tab:hover { background: rgba(216, 177, 58, 0.16); color: #fff2cc; }
+.rank-tab.active {
+  color: #1a120a; background: #e6c25c; border-color: #f0cf86;
+  box-shadow: 0 0 12px rgba(230, 194, 92, 0.4);
+}
+/* 리스트가 남은 높이를 가득 채움 (flex 안에서 스크롤되도록 min-height:0) */
+.ranking-board .online-list {
+  flex: 1 1 auto; height: auto; max-height: none; min-height: 0;
+  max-width: 720px; width: 100%; margin: 0 auto;
+}
+.ranking-board .online-list li { font-size: clamp(14px, 2.2vmin, 18px); }
 
 /* 랭킹(풀스크린) 표시 중엔 내비·무대·푸터 전부 숨김 — 오직 랭킹만. */
 #title-screen.ranking-active .title-nav,
