@@ -595,7 +595,11 @@
 
     game.canvas.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
-      if (game.touchMode) return; // touch input owns the canvas on mobile
+      // A real mouse clicked. `mousedown` only fires for an actual mouse — pure
+      // touch devices fire touchstart (preventDefault'd in mobile.js, which
+      // suppresses synthetic mouse events) — so this also engages the mouse path
+      // on a hybrid touchscreen+mouse laptop (touchMode on, but a mouse in use).
+      game.usingMouse = true;
       if (game.state === STATE.PLAYING) {
         if (!game.pointerLocked) {
           requestPointerLock();
@@ -605,7 +609,7 @@
       }
     });
     window.addEventListener('mouseup', (e) => {
-      if (e.button === 0 && !game.touchMode) game.mouseDown = false;
+      if (e.button === 0) game.mouseDown = false;
     });
 
     document.addEventListener('pointerlockchange', () => {
@@ -644,7 +648,11 @@
   }
 
   function requestPointerLock() {
-    if (game.touchMode) {
+    // Pure-touch device with no mouse in use: pointer lock is meaningless, the
+    // touch resume path gets us back into play. A hybrid touchscreen+mouse
+    // device that has seen a real mouse click (usingMouse) falls through and
+    // locks so the mouse can drive look/aim.
+    if (game.touchMode && !game.usingMouse) {
       if (game.state === STATE.PAUSED) resumeGame();
       return;
     }
@@ -661,8 +669,7 @@
       // "click to play" prompt — clicking it re-requests the lock WITH a gesture.
       if (p && typeof p.catch === 'function') {
         p.catch(() => {
-          if (game.state === STATE.PLAYING && !game.touchMode &&
-              typeof UI !== 'undefined' && UI.showLockPrompt) {
+          if (game.state === STATE.PLAYING && typeof UI !== 'undefined' && UI.showLockPrompt) {
             UI.showLockPrompt();
           }
         });
@@ -1313,6 +1320,15 @@
       if (game.state === STATE.PLAYING || game.state === STATE.UPGRADE || game.state === STATE.PAUSED) {
         UI.updateHud(game.player, game.wave, game.score);
         UI.drawMinimap(game.player, game.enemies);
+      }
+      // Keep the "click to play" prompt up whenever we're playing but the mouse
+      // isn't captured. A co-op GUEST starts from a network event (no user
+      // gesture), so the auto-lock is rejected and — unlike losing lock mid-game
+      // — there's no event to surface the prompt; the guest would be left with a
+      // dead mouse and no hint. This guarantees a clickable target to (re)lock.
+      if (game.state === STATE.PLAYING && !game.pointerLocked &&
+          (!game.touchMode || game.usingMouse) && UI.showLockPrompt) {
+        UI.showLockPrompt();
       }
     } catch (err) { loopError('render', err); }
 
