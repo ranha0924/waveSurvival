@@ -17,6 +17,10 @@
 const MP = (() => {
   const SEND_PSTATE_HZ = 25;
   const SEND_WORLD_HZ = 20;
+  // Extra world-units a guest allows beyond an attack's range when validating
+  // incoming damage, to cover its own slightly-stale view of the attacker. Big
+  // enough not to reject legit close hits, small enough to drop "far" ones.
+  const HURT_LAG_MARGIN = 1.5;
 
   let game = null;            // reference to main.js game object
   let hooks = {};            // { startGame, applyGuestHit, onScore }
@@ -305,6 +309,15 @@ const MP = (() => {
     switch (m.k) {
       case 'hurt':
         if (m.to === state.selfId && game && game.player && game.player.hp > 0) {
+          // Reject hits that are far from us on our own (authoritative-for-self)
+          // position — the attack source was current on the host but our
+          // position there is lagged, so an enemy we've run away from shouldn't
+          // land. Margin covers our own slightly-stale view of the enemy.
+          if (m.sx != null) {
+            const dx = game.player.x - m.sx, dy = game.player.y - m.sy;
+            const maxD = (m.r || 1) + HURT_LAG_MARGIN;
+            if (dx * dx + dy * dy > maxD * maxD) break;   // too far → ignore
+          }
           Player.takeDamage(game.player, m.dmg);
           if (typeof UI !== 'undefined' && UI.flashHit) UI.flashHit();
         }
@@ -419,10 +432,15 @@ const MP = (() => {
     return list;
   }
 
-  // Host → a specific guest: "you took dmg". Relayed as a targeted event; only
-  // the addressed client applies it (see the 'ev' handler).
-  function damageRemotePlayer(id, dmg) {
-    Net.send({ t: 'ev', k: 'hurt', to: id, dmg: Math.round(dmg) });
+  // Host → a specific guest: "you took dmg from an attack at (sx,sy) with the
+  // given range". The guest validates against its OWN current position before
+  // applying, rejecting hits that are far away on its screen — the host only
+  // knows the guest's lagged position, so this stops "an enemy across the map
+  // hit me" false positives. Only the addressed client applies it.
+  function damageRemotePlayer(id, dmg, sx, sy, range) {
+    const m = { t: 'ev', k: 'hurt', to: id, dmg: Math.round(dmg) };
+    if (sx != null) { m.sx = round2(sx); m.sy = round2(sy); m.r = round2(range || 1); }
+    Net.send(m);
   }
 
   // Host → a specific guest: "your reported hit just killed an enemy" so the

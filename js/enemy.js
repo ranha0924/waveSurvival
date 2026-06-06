@@ -96,11 +96,15 @@ const Enemies = (() => {
   //
   // Co-op: when the chosen target is a remote ally (a guest, seen from the
   // host's authoritative sim), route the damage to that client over the network
-  // instead of mutating a local player object. The guest applies it to its own
-  // HP and echoes the new value back via pstate.
-  function damagePlayer(player, dmg) {
+  // instead of mutating a local player object. We also pass the attack's source
+  // position + range so the guest can reject hits that look far away on ITS
+  // screen — the host only knows the guest's lagged position, so without this a
+  // guest that has run away still "gets hit" by an enemy it left behind.
+  function damagePlayer(player, dmg, srcX, srcY, range) {
     if (player && player.isRemote) {
-      if (typeof MP !== 'undefined' && MP.damageRemotePlayer) MP.damageRemotePlayer(player.id, dmg);
+      if (typeof MP !== 'undefined' && MP.damageRemotePlayer) {
+        MP.damageRemotePlayer(player.id, dmg, srcX, srcY, range);
+      }
       return;
     }
     Player.takeDamage(player, dmg);
@@ -218,7 +222,7 @@ const Enemies = (() => {
         }
         // Attack only with LoS so they don't hit you through walls
         if (dist < e.type.attackRange && hasLOS && e.attackTimer <= 0) {
-          damagePlayer(target, e.type.damage * e.damageMult);
+          damagePlayer(target, e.type.damage * e.damageMult, e.x, e.y, e.type.attackRange);
           e.attackTimer = e.type.attackCooldown;
         }
       }
@@ -334,7 +338,9 @@ const Enemies = (() => {
       for (const pl of targetablePlayers(player)) {
         const dx = pl.x - p.x, dy = pl.y - p.y;
         if (dx * dx + dy * dy < 0.16) {
-          damagePlayer(pl, p.damage);
+          // Source = the projectile's own position; range is the small hit
+          // radius so a guest validates against where the bolt actually is.
+          damagePlayer(pl, p.damage, p.x, p.y, 0.5);
           projectiles.splice(i, 1);
           consumed = true;
           break;
@@ -399,7 +405,7 @@ const Enemies = (() => {
     // it — bombers should punish a clustered team.
     for (const pl of targetablePlayers(player)) {
       const dx = pl.x - e.x, dy = pl.y - e.y;
-      if (dx * dx + dy * dy < r2) damagePlayer(pl, dmg);
+      if (dx * dx + dy * dy < r2) damagePlayer(pl, dmg, e.x, e.y, r);
     }
     // Chain damage other enemies. We deal raw HP only — secondary deaths
     // don't trigger their own onDeath effects, otherwise a tight clump of
