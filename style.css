@@ -2024,3 +2024,46 @@ html, body {
 #title-screen.ranking-active .title-nav,
 #title-screen.ranking-active .shrine-stage,
 #title-screen.ranking-active .title-footer { display: none; }
+
+/* ── 협동 로비 (Co-op lobby) ───────────────────────────────────────────── */
+#coop-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(420px, 86vw);
+  margin-top: 14px;
+}
+#coop-form label {
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: #d8b13a;
+  opacity: 0.9;
+}
+#coop-form input {
+  padding: 10px 12px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid rgba(216, 177, 58, 0.45);
+  background: rgba(20, 14, 8, 0.85);
+  color: #f1e6cf;
+  outline: none;
+}
+#coop-form input:focus { border-color: #d8b13a; }
+#coop-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+#coop-actions .big-btn { flex: 1; }
+#coop-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c9b49a;
+  opacity: 0.8;
+}
+.mp-status {
+  min-height: 18px;
+  font-size: 13px;
+  color: #7fd18b;
+  text-align: center;
+}

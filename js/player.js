@@ -354,6 +354,15 @@ const Player = (() => {
   }
 
   function damageEnemy(p, e, dmg, headshot, particles, enemies, scoreCallback) {
+    // Co-op guest: enemies are host-authoritative. Report the hit to the host
+    // and show local feedback (damage number — hit particles are spawned by the
+    // caller), but don't mutate the enemy. The host applies the damage and the
+    // next world snapshot reflects the new HP / death.
+    if (typeof MP !== 'undefined' && MP.active && MP.isGuest()) {
+      MP.reportHit(e, dmg, headshot);
+      spawnDamageNumber(particles, e.x, e.y, dmg, headshot);
+      return;
+    }
     e.hp -= dmg;
     e.hitFlash = 0.1;
     // Pick the hit sound by enemy class so heavy/armored targets feel
@@ -627,6 +636,9 @@ const Player = (() => {
   return {
     create, update, turn, shoot, startReload, switchWeapon, cycleWeapon, takeDamage, getWeapon,
     spawnExplosion, spawnDeathBurst,
+    // Exposed so co-op host can apply a guest's reported hit through the same
+    // damage / scoring path the local player uses.
+    damageEnemy,
     // Exposed so UI and enemy.awardChainKill use the same multiplier table.
     comboMultFor,
     GUTPAN_DAMAGE_MULT, GUTPAN_FIRE_MULT, GUTPAN_SCORE_MULT

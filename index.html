@@ -82,6 +82,7 @@
         <!-- 네비게이션 -->
         <nav class="title-nav">
           <button type="button" class="nav-btn" data-view="ranking">🏆 랭킹</button>
+          <button type="button" class="nav-btn" id="coop-btn">👥 협동</button>
           <button type="button" class="nav-btn" id="preview-cutscene-btn">🎬 컷씬 미리보기</button>
         </nav>
 
@@ -208,6 +209,24 @@
       <button id="restart-btn" class="big-btn">다시 도전</button>
     </div>
 
+    <!-- Co-op lobby -->
+    <div id="coop-screen" class="overlay hidden">
+      <h2>협동 굿판</h2>
+      <p class="subtitle">같은 방 코드로 입장하면 함께 생존합니다 (최대 4명)</p>
+      <div id="coop-form">
+        <label for="coop-url">서버 주소</label>
+        <input id="coop-url" type="text" placeholder="ws://localhost:8787" autocomplete="off" />
+        <label for="coop-room">방 코드</label>
+        <input id="coop-room" type="text" maxlength="6" placeholder="예: GUT1" autocomplete="off" />
+        <div id="coop-actions">
+          <button id="coop-join" class="big-btn">입장</button>
+          <button id="coop-close" class="big-btn secondary">닫기</button>
+        </div>
+        <div id="coop-hint">먼저 입장한 사람이 방장(시뮬 호스트)이 됩니다. 같은 방 코드를 친구에게 알려주세요.</div>
+        <div id="mp-status" class="mp-status"></div>
+      </div>
+    </div>
+
     <!-- Click to lock prompt -->
     <div id="lock-prompt" class="overlay hidden">
       <p>클릭해서 게임 재개</p>
@@ -241,6 +260,8 @@
   <script src="js/bossCutscene.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/mobile.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/multiplayer.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

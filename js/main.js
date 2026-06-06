@@ -204,6 +204,10 @@
     talismanParticles: []
   };
 
+  // Monotonic id source for enemies, used by co-op to track them across the
+  // host's world snapshots.
+  let nextNetId = 1;
+
   // ---------- Init / UI wiring ----------
   function init() {
     Audio.init();
@@ -224,6 +228,21 @@
 
     setupInput();
     setupUIButtons();
+
+    // Co-op wiring. MP stays dormant (MP.active === false) until the player
+    // hosts / joins a room from the lobby, so single-player is unaffected.
+    if (typeof MP !== 'undefined') {
+      MP.init(game, {
+        startGame,
+        // Host applies a guest's reported hit through the normal damage path so
+        // combo / score / death side-effects all fire once, authoritatively.
+        applyGuestHit: (netId, dmg, headshot) => {
+          const e = game.enemies.find((en) => en.netId === netId && en.alive);
+          if (e) Player.damageEnemy(game.player, e, dmg, headshot, game.particles, game.enemies, onScore);
+        }
+      });
+      setupCoopButtons();
+    }
 
     game.touchMode = Mobile.init({
       onShoot: (down) => { game.mouseDown = down; },
@@ -367,6 +386,42 @@
     game.nick = Records.sanitizeNick(raw);
     Records.saveNick(game.nick);
     UI.setNickInput(game.nick);
+  }
+
+  // ---------- Co-op lobby ----------
+  // Wire the 협동 overlay: connect to a relay server, join a room by code, and
+  // hand off to startGame() once the server confirms our host/guest role. The
+  // first player into a room becomes the host (authoritative simulation); the
+  // rest join as guests.
+  function setupCoopButtons() {
+    const openBtn = document.getElementById('coop-btn');
+    const overlay = document.getElementById('coop-screen');
+    if (!openBtn || !overlay) return;
+    const closeBtn = document.getElementById('coop-close');
+    const joinBtn = document.getElementById('coop-join');
+    const urlInput = document.getElementById('coop-url');
+    const roomInput = document.getElementById('coop-room');
+
+    // Default to a relay on the same host so local testing "just works"; a
+    // deployed game points this at its Render/Railway URL (wss://…).
+    const defaultUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') +
+                       (location.hostname || 'localhost') + ':8787';
+    if (urlInput && !urlInput.value) urlInput.value = defaultUrl;
+
+    openBtn.addEventListener('click', () => { Audio.uiClick(); overlay.classList.remove('hidden'); });
+    if (closeBtn) closeBtn.addEventListener('click', () => { Audio.uiClick(); overlay.classList.add('hidden'); });
+
+    joinBtn.addEventListener('click', () => {
+      Audio.resume();
+      Audio.uiClick();
+      captureNick();
+      const url = (urlInput.value || defaultUrl).trim();
+      const room = ((roomInput.value || 'LOBBY').trim().toUpperCase()) || 'LOBBY';
+      game.mode = 'free';   // co-op runs on the free (non-daily) ruleset
+      MP.joinRoom(url, room, game.nick)
+        .then(() => { overlay.classList.add('hidden'); })
+        .catch(() => { /* MP.setStatus already surfaced the failure */ });
+    });
   }
 
   // ---------- Input ----------
@@ -540,7 +595,13 @@
 
     Environment.init();
 
-    startNextWave();
+    // Fresh enemy id sequence each run (host side).
+    nextNetId = 1;
+    // In co-op only the host drives wave spawning; guests receive enemies and
+    // wave/score state from the host's world snapshots.
+    if (!(typeof MP !== 'undefined' && MP.active && MP.isGuest())) {
+      startNextWave();
+    }
     if (game.touchMode) Mobile.showControls();
     requestPointerLock();
   }
@@ -631,6 +692,9 @@
     // Ensure the chosen point can actually fit this enemy's body
     const pos = findValidSpawn(bestPt.x, bestPt.y, radius);
     const e = Enemies.create(next.type, pos.x, pos.y, next.scale || 1);
+    // Stable id so co-op guests can track / report hits against this enemy
+    // across world snapshots.
+    e.netId = nextNetId++;
     game.enemies.push(e);
     game.wave.spawnTimer = game.wave.spawnInterval;
   }
@@ -860,6 +924,15 @@
       game.cutsceneTimer -= dt;
       if (game.cutsceneTimer <= 0) game.cutsceneTimer = 0;
     } else if (game.state === STATE.PLAYING) {
+      const mpActive = (typeof MP !== 'undefined' && MP.active);
+      // In co-op a guest renders the host's authoritative enemies/waves rather
+      // than simulating them. The host runs the full sim as in single-player.
+      const coopGuest = mpActive && MP.isGuest();
+
+      // Apply inbound network state first: ease remote players toward their
+      // latest position, and (guest) rebuild game.enemies from the host snapshot.
+      if (mpActive) MP.beginFrame(dt);
+
       // Auto-shoot if held + auto weapons
       const inputReady = game.pointerLocked || game.touchMode;
       if (game.mouseDown && inputReady) {
@@ -871,12 +944,14 @@
       const move = game.touchMode ? Mobile.getMove() : null;
       Player.update(game.player, dt, { keys: game.keys, move });
 
-      // Update enemies
-      for (const e of game.enemies) {
-        Enemies.update(e, dt, game.player, game.projectiles, game.particles, game.enemies);
+      // Enemy AI / projectiles — host-authoritative, skipped on guests.
+      if (!coopGuest) {
+        for (const e of game.enemies) {
+          Enemies.update(e, dt, game.player, game.projectiles, game.particles, game.enemies);
+        }
+        Enemies.updateProjectiles(game.projectiles, dt, game.player, game.particles);
       }
 
-      Enemies.updateProjectiles(game.projectiles, dt, game.player, game.particles);
       updateParticles(dt);
       if (typeof Pickups !== 'undefined') Pickups.update(dt, game.player, game.particles);
       Environment.update(dt, game.wave.number, game.particles);
@@ -884,15 +959,18 @@
       // 굿판 모드 — combo-driven trigger + timer + visual driver.
       updateGutpan(dt);
 
-      // Spawn next enemy from queue
-      spawnFromQueue(dt);
+      // Wave spawning + completion are the host's job; guests follow snapshots.
+      if (!coopGuest) spawnFromQueue(dt);
 
       // Death check
       if (game.player.hp <= 0) {
         gameOver();
       }
 
-      checkWaveComplete();
+      if (!coopGuest) checkWaveComplete();
+
+      // Broadcast our player state (host also emits the world snapshot).
+      if (mpActive) MP.endFrame(dt);
     }
 
     // Render
