@@ -219,14 +219,18 @@ const Enemies = (() => {
     let moveX = 0, moveY = 0;
     if (dist > 0.001) {
       if (e.type.ranged) {
-        // Ranged: maintain preferred distance from player
-        const target = e.type.preferredDist;
-        if (Math.abs(dist - target) > 0.4) {
-          const dir = dist > target ? 1 : -1;
+        // Ranged: maintain preferred distance from player. NOTE: keep this in
+        // its own variable — it used to be named `target`, which shadowed the
+        // player target above and got passed to fireProjectile, so the bolt was
+        // aimed at a number (preferredDist) instead of the player → NaN velocity
+        // and projectiles that spawned dead-on-arrival.
+        const preferredDist = e.type.preferredDist;
+        if (Math.abs(dist - preferredDist) > 0.4) {
+          const dir = dist > preferredDist ? 1 : -1;
           moveX = (dx / dist) * dir;
           moveY = (dy / dist) * dir;
         }
-        // Attack only when LoS and in range
+        // Attack only when LoS and in range — fired AT the player target.
         if (hasLOS && dist < e.type.attackRange && e.attackTimer <= 0) {
           fireProjectile(e, target, projectiles);
           e.attackTimer = e.type.attackCooldown;

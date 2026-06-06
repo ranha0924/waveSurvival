@@ -466,7 +466,7 @@ const MP = (() => {
     if (hooks.hostStartNextWave) hooks.hostStartNextWave();
   }
 
-  // ---------- Team-wipe (host) ----------
+  // ---------- Team-wipe ----------
   // True only when the host is down AND every connected guest is down too, so a
   // lone surviving guest keeps the run alive.
   function allDowned() {
@@ -475,6 +475,17 @@ const MP = (() => {
     if (!hostDown) return false;
     for (const r of remotes.values()) if (r.hp > 0) return false;
     return true;
+  }
+
+  // Does ANY teammate still have HP? Both host and guests broadcast HP 0 the
+  // moment they go down (see endFrame), so this reads true while at least one
+  // ally is up and false once the whole rest of the team is down. Lets a downed
+  // client detect a team-wipe on its own — the run no longer hinges solely on
+  // the host's per-snapshot HP view, which could miss the wipe if a downed
+  // player's last HP report lagged.
+  function hasLivingAlly() {
+    for (const r of remotes.values()) if (r.hp > 0) return true;
+    return false;
   }
 
   function broadcastGameOver() {
@@ -541,7 +552,7 @@ const MP = (() => {
   return {
     init, joinRoom, leave, beginFrame, endFrame, reportHit, getRemotePlayers,
     getSpectateTarget, getAllPlayers, damageRemotePlayer, creditGuestKill,
-    broadcastCutscene, beginUpgradeSync, notifyPicked, allDowned, broadcastGameOver,
+    broadcastCutscene, beginUpgradeSync, notifyPicked, allDowned, hasLivingAlly, broadcastGameOver,
     startCoopGame, getPlayerCount,
     isHost, isGuest,
     get active() { return state.active; },
