@@ -842,7 +842,13 @@
   // player picks independently (own build); we tell the host when done and wait
   // for the host's wave_start to resume.
   function coopEnterUpgrade(wave) {
-    if (game.state !== STATE.PLAYING) return;
+    if (game.state !== STATE.PLAYING) {
+      // We're not in the active run (on the game-over / title screen, e.g. the
+      // other player retried alone). Auto-skip the upgrade by reporting a pick
+      // so the host's wait-for-all doesn't block on us.
+      if (typeof MP !== 'undefined' && MP.active && MP.notifyPicked) MP.notifyPicked();
+      return;
+    }
     game.state = STATE.UPGRADE;
     if (!game.touchMode) document.exitPointerLock();
     if (game.touchMode) Mobile.hideControls();
@@ -1050,24 +1056,27 @@
     }
   }
 
-  // Adaptive render resolution — smooths frame time and nudges Raycaster
-  // quality down when the GPU/CPU can't keep up, back up when there's headroom.
+  // Adaptive render resolution. The GC/allocation fixes removed most stutter,
+  // so this stays conservative: it only steps down for genuinely low frame
+  // rates and never below 0.85 (≈full-res look). Keeps the host close to the
+  // guest's resolution instead of dropping it hard.
+  const QUALITY_FLOOR = 0.85;
   let perfDtEMA = 1 / 60;
   let perfFrameCount = 0;
   let renderQuality = 1;
 
   function adaptQuality(dt) {
     perfDtEMA = perfDtEMA * 0.9 + dt * 0.1;
-    if (++perfFrameCount < 45) return;     // re-evaluate ~every 0.75s
+    if (++perfFrameCount < 60) return;     // re-evaluate ~every second
     perfFrameCount = 0;
     if (game.state !== STATE.PLAYING) return;   // don't resize-flash during menus
     if (typeof Raycaster === 'undefined' || !Raycaster.setQuality) return;
     const fps = 1 / perfDtEMA;
-    if (fps < 48 && renderQuality > 0.55) {
-      renderQuality = Math.max(0.55, renderQuality - (fps < 32 ? 0.2 : 0.1));
+    if (fps < 38 && renderQuality > QUALITY_FLOOR) {
+      renderQuality = Math.max(QUALITY_FLOOR, renderQuality - 0.05);
       Raycaster.setQuality(renderQuality);
-    } else if (fps > 80 && renderQuality < 1) {
-      renderQuality = Math.min(1, renderQuality + 0.1);
+    } else if (fps > 56 && renderQuality < 1) {
+      renderQuality = Math.min(1, renderQuality + 0.05);
       Raycaster.setQuality(renderQuality);
     }
   }
@@ -1097,26 +1106,11 @@
         Player.shoot(game.player, game.enemies, game.particles, onScore);
       }
 
-      // Update player input mapping
+      // Update player input mapping. A downed (spectating) player can still walk
+      // around freely and look — they just can't shoot until they respawn.
       mapKeysToInput();
       const move = game.touchMode ? Mobile.getMove() : null;
-      if (mpActive && game.player.downed) {
-        // Spectator: ride a living teammate's camera instead of free-looking
-        // from our own corpse, so a downed player watches the action.
-        const mate = MP.getSpectateTarget();
-        if (mate) {
-          game.player.x = mate.x;
-          game.player.y = mate.y;
-          game.player.angle = mate.angle;
-          game.player.pitch = 0;
-          game.player.bobOffset = 0;
-          game.spectateName = mate.name;
-        }
-        // (skip Player.update — no self-movement while spectating)
-      } else {
-        game.spectateName = null;
-        Player.update(game.player, dt, { keys: game.keys, move });
-      }
+      Player.update(game.player, dt, { keys: game.keys, move });
 
       // Enemy AI / projectiles — host-authoritative, skipped on guests.
       if (!coopGuest) {
@@ -1218,23 +1212,6 @@
     // banner / talisman particles stay screen-locked even when the camera
     // is shaking from recoil.
     renderGutpan(ctx);
-
-    // Spectator label — we're downed and riding a teammate's camera.
-    if (game.spectateName) {
-      const W = game.canvas.width;
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.font = '700 20px "Noto Serif KR", sans-serif';
-      ctx.shadowColor = 'rgba(0,0,0,0.85)';
-      ctx.shadowBlur = 6;
-      ctx.fillStyle = 'rgba(255, 90, 90, 0.95)';
-      ctx.fillText('● 관전 중', W / 2, 14);
-      ctx.font = '500 14px "Noto Serif KR", sans-serif';
-      ctx.fillStyle = 'rgba(240, 230, 210, 0.9)';
-      ctx.fillText(`${game.spectateName} 시점 · 다음 웨이브에 부활`, W / 2, 40);
-      ctx.restore();
-    }
   }
 
   // ---------- 굿판 모드 render ----------
