@@ -2302,3 +2302,58 @@ html, body {
   animation: coop-wait-spin 0.9s linear infinite;
 }
 @keyframes coop-wait-spin { to { transform: rotate(360deg); } }
+
+/* ── 협동 대기 로비 ─────────────────────────────────────────────────────── */
+#coop-lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(420px, 86vw);
+  margin-top: 14px;
+}
+#coop-lobby .coop-lobby-room {
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  color: #c9b49a;
+}
+#coop-lobby .coop-lobby-room span {
+  color: #d8b13a;
+  font-weight: 700;
+  font-size: 18px;
+}
+#coop-lobby .coop-lobby-count {
+  font-size: 22px;
+  font-weight: 800;
+  color: #f1e6cf;
+}
+#coop-lobby .coop-lobby-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#coop-lobby .coop-lobby-list li {
+  background: rgba(20, 14, 8, 0.7);
+  border: 1px solid rgba(216, 177, 58, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #e8dcc2;
+  font-size: 15px;
+  text-align: center;
+}
+#coop-lobby .coop-lobby-wait {
+  font-size: 14px;
+  color: #7fd18b;
+  opacity: 0.9;
+  text-align: center;
+}
+#coop-lobby .big-btn { width: 100%; }
+#coop-lobby .big-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}

@@ -229,7 +229,12 @@
     // hosts / joins a room from the lobby, so single-player is unaffected.
     if (typeof MP !== 'undefined') {
       MP.init(game, {
-        startGame,
+        // The actual game start (host pressed start in the lobby, or we got the
+        // start signal as a guest / late joiner). Hide the lobby and play.
+        startGame: coopStartGame,
+        // Joined a room — show the waiting lobby (game waits for 2+ players).
+        onLobby: (info) => coopShowLobby(info),
+        onRoster: (info) => coopUpdateLobby(info),
         // Host applies a guest's reported hit authoritatively. The enemy + team
         // score are mutated via the host's player (`game.player`), but combo /
         // 굿판 attribution uses a transient carrying THAT guest's combo+굿판 so
@@ -333,6 +338,11 @@
       Audio.resume();
       Audio.uiClick();
       captureNick();
+      // The big "게임 시작" button is solo play. Drop any lingering co-op session
+      // first, otherwise a stale MP.active from a previous room would make this
+      // single-player run behave like co-op (e.g. the "wait for others" screen
+      // after picking an upgrade).
+      if (typeof MP !== 'undefined' && MP.active) MP.leave();
       startGame();
     });
     document.getElementById('preview-cutscene-btn').addEventListener('click', () => {
@@ -442,7 +452,11 @@
       if (!urlInput.value) urlInput.value = savedUrl || fallbackUrl;
     }
 
-    openBtn.addEventListener('click', () => { Audio.uiClick(); overlay.classList.remove('hidden'); });
+    openBtn.addEventListener('click', () => {
+      Audio.uiClick();
+      coopShowForm();              // always reopen on the join form
+      overlay.classList.remove('hidden');
+    });
     if (closeBtn) closeBtn.addEventListener('click', () => { Audio.uiClick(); overlay.classList.add('hidden'); });
 
     joinBtn.addEventListener('click', () => {
@@ -459,10 +473,73 @@
       try { localStorage.setItem(RELAY_LS_KEY, url); } catch (e) {}
       const room = ((roomInput.value || 'LOBBY').trim().toUpperCase()) || 'LOBBY';
       game.mode = 'free';   // co-op runs on the free (non-daily) ruleset
-      MP.joinRoom(url, room, game.nick)
-        .then(() => { overlay.classList.add('hidden'); })
-        .catch(() => { /* MP.setStatus already surfaced the failure */ });
+      // On success we move to the waiting lobby (shown by the onLobby hook), NOT
+      // straight into the game — co-op needs 2+ players.
+      MP.joinRoom(url, room, game.nick).catch(() => { /* status shows the failure */ });
     });
+
+    const startBtn = document.getElementById('coop-start');
+    if (startBtn) startBtn.addEventListener('click', () => { Audio.uiClick(); MP.startCoopGame(); });
+    const leaveBtn = document.getElementById('coop-leave');
+    if (leaveBtn) leaveBtn.addEventListener('click', () => {
+      Audio.uiClick();
+      if (MP.active) MP.leave();
+      coopShowForm();
+    });
+  }
+
+  // Show the join form view of the co-op overlay (vs the waiting lobby view).
+  function coopShowForm() {
+    const form = document.getElementById('coop-form');
+    const lobby = document.getElementById('coop-lobby');
+    if (form) form.classList.remove('hidden');
+    if (lobby) lobby.classList.add('hidden');
+  }
+
+  // Switch the co-op overlay to the waiting-lobby view after joining a room.
+  function coopShowLobby(info) {
+    const overlay = document.getElementById('coop-screen');
+    const form = document.getElementById('coop-form');
+    const lobby = document.getElementById('coop-lobby');
+    if (overlay) overlay.classList.remove('hidden');
+    if (form) form.classList.add('hidden');
+    if (lobby) lobby.classList.remove('hidden');
+    const code = document.getElementById('coop-lobby-code');
+    if (code) code.textContent = (info && info.room) || '';
+    coopUpdateLobby(info || { isHost: MP.isHost(), count: MP.getPlayerCount() });
+  }
+
+  // Refresh the lobby roster / count / start button as players come and go.
+  function coopUpdateLobby(info) {
+    const count = info ? info.count : MP.getPlayerCount();
+    const countEl = document.getElementById('coop-lobby-count');
+    if (countEl) countEl.textContent = `${count} / 4 명`;
+    const listEl = document.getElementById('coop-lobby-list');
+    if (listEl && info && info.players) {
+      listEl.innerHTML = '';
+      for (const p of info.players) {
+        const li = document.createElement('li');
+        li.textContent = (p.me ? '★ ' : '') + p.name + (p.id === undefined ? '' : '');
+        listEl.appendChild(li);
+      }
+    }
+    const startBtn = document.getElementById('coop-start');
+    const waitEl = document.getElementById('coop-lobby-wait');
+    const isHost = info ? info.isHost : MP.isHost();
+    if (startBtn) {
+      startBtn.classList.toggle('hidden', !isHost);
+      startBtn.disabled = count < 2;
+      startBtn.textContent = count < 2 ? '게임 시작 (2명 이상 필요)' : `게임 시작 (${count}명)`;
+    }
+    if (waitEl) waitEl.classList.toggle('hidden', isHost);
+  }
+
+  // Co-op game actually begins: hide the lobby overlay, then start.
+  function coopStartGame() {
+    const overlay = document.getElementById('coop-screen');
+    if (overlay) overlay.classList.add('hidden');
+    coopShowForm();   // reset for next time
+    startGame();
   }
 
   // ---------- Input ----------

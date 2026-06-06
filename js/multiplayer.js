@@ -44,6 +44,11 @@ const MP = (() => {
   let pstateAccum = 0;
   let worldAccum = 0;
 
+  // True once the co-op run has actually begun (host pressed start, or we got
+  // the start signal). Used to gate the waiting lobby and to drop late joiners
+  // straight into a game already in progress.
+  let gameStarted = false;
+
   // Upgrade-sync (host): which players have chosen a card this intermission,
   // and a fallback timer so a slow / AFK player can't stall the run forever.
   const pickedSet = new Set();
@@ -96,9 +101,13 @@ const MP = (() => {
         for (const p of (msg.players || [])) {
           if (p.id !== state.selfId) addRemote(p.id, p.name);
         }
+        gameStarted = false;
         setStatus(`방 ${msg.room} · ${state.role === 'host' ? '방장' : '참가'} · ${remotes.size + 1}명`);
         resolve(msg);
-        if (hooks.startGame) hooks.startGame();
+        // Don't start the game on join — co-op needs at least 2 players. Show a
+        // waiting lobby; the host starts it (or a late joiner drops into a game
+        // already in progress, handled in peer_join).
+        if (hooks.onLobby) hooks.onLobby({ room: msg.room, isHost: isHost(), count: remotes.size + 1 });
       };
       Net.on('welcome', onWelcome);
       Net.on('room_full', () => { setStatus('방이 가득 찼습니다'); reject(new Error('room_full')); });
@@ -112,13 +121,19 @@ const MP = (() => {
     remotes.clear();
     ghostEnemies.clear();
     pickedSet.clear();
+    gameStarted = false;
     if (upgradeTimer) { clearTimeout(upgradeTimer); upgradeTimer = null; }
     setStatus('연결 종료');
   }
 
   function wireHandlers() {
-    Net.on('peer_join', (m) => { addRemote(m.id, m.name); });
-    Net.on('peer_leave', (m) => { remotes.delete(m.id); });
+    Net.on('peer_join', (m) => {
+      addRemote(m.id, m.name);
+      // Late joiner while we're already playing (host): drop them straight in.
+      if (isHost() && gameStarted) Net.send({ t: 'ev', k: 'start_game', to: m.id });
+      refreshLobby();
+    });
+    Net.on('peer_leave', (m) => { remotes.delete(m.id); refreshLobby(); });
     Net.on('roster', (m) => {
       const ids = new Set((m.players || []).map((p) => p.id));
       for (const p of (m.players || [])) {
@@ -126,6 +141,7 @@ const MP = (() => {
       }
       for (const id of [...remotes.keys()]) if (!ids.has(id)) remotes.delete(id);
       setStatus(`방 ${state.room} · ${state.role === 'host' ? '방장' : '참가'} · ${remotes.size + 1}명`);
+      refreshLobby();
     });
     Net.on('pstate', (m) => applyRemoteState(m));
     Net.on('world', (m) => { if (isGuest()) applyWorld(m); });
@@ -308,6 +324,8 @@ const MP = (() => {
     state.status = s;
     const el = document.getElementById('mp-status');
     if (el) el.textContent = s;
+    const el2 = document.getElementById('mp-status2');   // lobby status line
+    if (el2) el2.textContent = s;
   }
 
   // ---------- Event dispatch (one-shot 'ev' messages) ----------
@@ -361,11 +379,46 @@ const MP = (() => {
         if (isGuest() && hooks.playCutscene) hooks.playCutscene(m.round);
         break;
 
+      case 'start_game':
+        // Host pressed start (broadcast), or we're a late joiner being dropped
+        // into a game in progress (targeted via `to`). Begin once.
+        if (m.to && m.to !== state.selfId) break;
+        if (!gameStarted) {
+          gameStarted = true;
+          if (hooks.startGame) hooks.startGame();
+        }
+        break;
+
       case 'gameover':
         // Whole team wiped — everyone ends together.
         if (hooks.gameOverFromNet) hooks.gameOverFromNet();
         break;
     }
+  }
+
+  // ---------- Lobby / start ----------
+  function getPlayerCount() { return remotes.size + 1; }
+
+  function refreshLobby() {
+    if (hooks.onRoster) {
+      hooks.onRoster({
+        isHost: isHost(),
+        count: getPlayerCount(),
+        started: gameStarted,
+        players: [{ id: state.selfId, name: '나', me: true },
+                  ...[...remotes.values()].map((r) => ({ id: r.id, name: r.name }))]
+      });
+    }
+  }
+
+  // Host presses start in the lobby (only enabled at 2+). Tell everyone to begin
+  // and start locally.
+  function startCoopGame() {
+    if (!isHost() || gameStarted) return;
+    if (getPlayerCount() < 2) return;   // enforce the 2-player minimum
+    gameStarted = true;
+    Net.send({ t: 'ev', k: 'start_game' });
+    if (hooks.startGame) hooks.startGame();
   }
 
   // ---------- Co-op upgrade sync (host-authoritative pacing) ----------
@@ -482,6 +535,7 @@ const MP = (() => {
     init, joinRoom, leave, beginFrame, endFrame, reportHit, getRemotePlayers,
     getSpectateTarget, getAllPlayers, damageRemotePlayer, creditGuestKill,
     broadcastCutscene, beginUpgradeSync, notifyPicked, allDowned, broadcastGameOver,
+    startCoopGame, getPlayerCount,
     isHost, isGuest,
     get active() { return state.active; },
     get role() { return state.role; },

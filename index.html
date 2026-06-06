@@ -236,6 +236,17 @@
         <div id="coop-hint">먼저 입장한 사람이 방장(시뮬 호스트)이 됩니다. 같은 방 코드를 친구에게 알려주세요.</div>
         <div id="mp-status" class="mp-status"></div>
       </div>
+
+      <!-- Waiting room — shown after joining; the game only starts with 2+ -->
+      <div id="coop-lobby" class="hidden">
+        <div class="coop-lobby-room">방 코드 <span id="coop-lobby-code"></span></div>
+        <div id="coop-lobby-count" class="coop-lobby-count">1 / 4 명</div>
+        <ul id="coop-lobby-list" class="coop-lobby-list"></ul>
+        <button id="coop-start" class="big-btn" disabled>게임 시작 (2명 이상)</button>
+        <div id="coop-lobby-wait" class="coop-lobby-wait hidden">방장이 시작하기를 기다리는 중…</div>
+        <button id="coop-leave" class="big-btn secondary">나가기</button>
+        <div id="mp-status2" class="mp-status"></div>
+      </div>
     </div>
 
     <!-- Co-op: waiting for other players to pick their upgrade -->
