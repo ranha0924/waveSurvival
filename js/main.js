@@ -820,6 +820,9 @@
 
   function spawnFromQueue(dt) {
     if (game.wave.queue.length === 0) return;
+    // Hold spawns at the global enemy cap so the field can't balloon into a
+    // freeze; the queued enemy waits (timer not advanced) until something dies.
+    if (Enemies.aliveCount && Enemies.aliveCount(game.enemies) >= Enemies.MAX_ALIVE) return;
     game.wave.spawnTimer -= dt;
     if (game.wave.spawnTimer > 0) return;
 
