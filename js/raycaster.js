@@ -1320,12 +1320,16 @@ const Raycaster = (() => {
         const eyeOffsetX = spriteW * 0.1;
         const ex1 = proj.screenX - eyeOffsetX;
         const ex2 = proj.screenX + eyeOffsetX;
+        // Clamp the z-buffer lookup to the column range — a close enemy near a
+        // screen edge can push ex1/ex2 out of [0,W) (OOB read returns undefined).
+        const i1 = Math.max(0, Math.min(W - 1, Math.floor(ex1)));
+        const i2 = Math.max(0, Math.min(W - 1, Math.floor(ex2)));
         const eyeColor = def.eyeColor || '#ff2222';
         ctx.fillStyle = eyeColor;
-        if (zBuffer[Math.floor(ex1)] > proj.dist) {
+        if (zBuffer[i1] > proj.dist) {
           ctx.fillRect(ex1 - eyeSize / 2, eyeY, eyeSize, eyeSize);
         }
-        if (zBuffer[Math.floor(ex2)] > proj.dist) {
+        if (zBuffer[i2] > proj.dist) {
           ctx.fillRect(ex2 - eyeSize / 2, eyeY, eyeSize, eyeSize);
         }
       }
@@ -1344,7 +1348,8 @@ const Raycaster = (() => {
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
         ctx.fillRect(barX, barY, barW, barH);
         ctx.fillStyle = '#ff3344';
-        ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), barH);
+        const frac = e.maxHp > 0 ? Math.max(0, Math.min(1, e.hp / e.maxHp)) : 0;
+        ctx.fillRect(barX, barY, barW * frac, barH);
       }
     }
   }

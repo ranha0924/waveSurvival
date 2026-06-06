@@ -39,7 +39,8 @@ const Leaderboard = (() => {
   let initPromise = null;
 
   function configured() {
-    return !!firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf('PASTE') !== 0;
+    const key = firebaseConfig.apiKey;
+    return !!key && !key.startsWith('PASTE') && !key.includes('YOUR_');
   }
 
   // Lazy one-time init. Returns true once Firestore is ready, false if the

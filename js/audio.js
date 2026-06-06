@@ -430,6 +430,10 @@ const Audio = (() => {
 
   function samulScheduler() {
     if (!ctx || !samulActive) return;
+    // If the tab was backgrounded, setInterval throttled while currentTime kept
+    // advancing — without this clamp the catch-up loop would schedule a burst of
+    // overdue beats all at once on resume.
+    if (samulNextTime < ctx.currentTime) samulNextTime = ctx.currentTime;
     while (samulNextTime < ctx.currentTime + 0.12) {
       samulScheduleStep(samulStep, samulNextTime);
       samulNextTime += SAMUL_STEP_DUR;

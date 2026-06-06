@@ -162,7 +162,7 @@ const Environment = (() => {
     const gx = Math.floor(x), gy = Math.floor(y);
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
-        const t = treeGrid.get((gx + dx) * 1000 + (gy + dy));
+        const t = treeGrid.get((gx + dx) + ',' + (gy + dy));
         if (!t) continue;
         const ex = x - t.x, ey = y - t.y;
         if (ex * ex + ey * ey < TREE_RADIUS * TREE_RADIUS) return true;
@@ -373,7 +373,7 @@ const Environment = (() => {
     }
     // Spatial index for trunk collision (one tree per tile after jitter).
     treeGrid = new Map();
-    for (const t of trees) treeGrid.set(Math.floor(t.x) * 1000 + Math.floor(t.y), t);
+    for (const t of trees) treeGrid.set(Math.floor(t.x) + ',' + Math.floor(t.y), t);
   }
 
   // ---------- 오방기 (5-colour shaman flag pole) ----------
@@ -478,7 +478,7 @@ const Environment = (() => {
     const gx = Math.floor(x), gy = Math.floor(y);
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
-        const p = propGrid.get((gx + dx) * 1000 + (gy + dy));
+        const p = propGrid.get((gx + dx) + ',' + (gy + dy));
         if (!p) continue;
         const r = PROP_RADIUS[p.type] || 0.30;
         const ex = x - p.x, ey = y - p.y;
@@ -741,7 +741,7 @@ const Environment = (() => {
     }
     // Spatial index keyed by tile so movement collision is O(1) per query.
     propGrid = new Map();
-    for (const p of props) propGrid.set(Math.floor(p.x) * 1000 + Math.floor(p.y), p);
+    for (const p of props) propGrid.set(Math.floor(p.x) + ',' + Math.floor(p.y), p);
   }
 
   function init() {

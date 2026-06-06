@@ -348,7 +348,8 @@
     document.getElementById('preview-cutscene-btn').addEventListener('click', () => {
       Audio.resume();
       Audio.uiClick();
-      BossCutscene.playBossCutscene({
+      dismissBossCutscene();
+      game.bossCin = BossCutscene.playBossCutscene({
         image: 'assets/gumiho.webp',
         name: '구미호',
         subtitle: '1회차 — 천년묵은 요호',
@@ -359,7 +360,7 @@
           { x: 45, y: 15, scale: 2.5 },
         ],
         onImpact() { Audio.bossEnrage && Audio.bossEnrage(); },
-        onEnd() {}
+        onEnd() { game.bossCin = null; }
       });
     });
     // Mode toggle — 자유 굿판 (random seed) vs 오늘의 굿판 (today's fixed seed).
@@ -697,7 +698,7 @@
     game.gutpan.tintIntensity = 0;
     game.talismanParticles.length = 0;
     game.cutsceneTimer = 0;
-    UI.hideBossCutscene && UI.hideBossCutscene();
+    dismissBossCutscene();
     // Clear any stale input state from previous run / menu interaction
     game.keys = {};
     game.mouseDown = false;
@@ -736,13 +737,21 @@
     requestPointerLock();
   }
 
+  // Tear down any in-flight boss cutscene (DOM overlay + its setTimeout chain).
+  // The cutscene runs ~6s; if the run ends or restarts mid-cutscene the handle
+  // must be disposed or the overlay + dead timers leak onto the next screen.
+  function dismissBossCutscene() {
+    if (game.bossCin) { game.bossCin.dispose(); game.bossCin = null; }
+  }
+
   // Play the 구미호 boss cutscene (pauses the round for ~6s). Shared by the host
   // (in startNextWave) and guests (via the co-op 'cutscene' event) so everyone
   // sees it together.
   function playBossCutscene(round) {
     game.cutsceneTimer = 6;
+    dismissBossCutscene();
     Audio.gutpanLoopStart && Audio.gutpanLoopStart();
-    BossCutscene.playBossCutscene({
+    game.bossCin = BossCutscene.playBossCutscene({
       image: 'assets/gumiho.webp',
       name: '구미호',
       subtitle: `${round}회차 — 천년묵은 요호`,
@@ -755,6 +764,7 @@
       onImpact() { Audio.bossEnrage && Audio.bossEnrage(); },
       onEnd() {
         game.cutsceneTimer = 0;
+        game.bossCin = null;     // it removed itself; drop our handle
         if (!game.gutpan.active) Audio.gutpanLoopStop();
       }
     });
@@ -827,6 +837,8 @@
     if (game.wave.spawnTimer > 0) return;
 
     const spawnPoints = GameMap.getSpawnPoints();
+    // No spawn gates on this map → bail rather than crash on spawnPoints[0].
+    if (!spawnPoints || spawnPoints.length === 0) return;
     const next = game.wave.queue.shift();
     const radius = (Enemies.types[next.type] && Enemies.types[next.type].radius) || 0.4;
 
@@ -854,6 +866,11 @@
     Audio.gutpanLoopStop && Audio.gutpanLoopStop();
     if (!game.touchMode) document.exitPointerLock();
     if (game.touchMode) Mobile.hideControls();
+    // Drop held inputs so a key/button pressed at the moment of pausing (whose
+    // keyup/touchend lands on the overlay, not the canvas) doesn't stay stuck
+    // and auto-move / auto-fire the instant the run resumes.
+    game.keys = {};
+    game.mouseDown = false;
     UI.showPause();
   }
 
@@ -894,6 +911,10 @@
       if (coopHost) MP.beginUpgradeSync(game.wave.number);
 
       setTimeout(() => {
+        // The run may have ended or been quit during the 800ms beat (co-op
+        // team-wipe, quit-to-title). Don't pop the upgrade menu over a
+        // game-over / title screen.
+        if (game.state !== STATE.UPGRADE) return;
         UI.showUpgradeMenu(game.player, game.wave.number, () => {
           UI.hideUpgradeMenu();
           if (coopHost) {
@@ -1331,8 +1352,10 @@
   // flag so the effect eases in/out instead of snap-cutting.
   function renderGutpan(ctx) {
     const g = game.gutpan;
-    if (g.tintIntensity <= 0.01 && g.talismanParticles && g.talismanParticles.length === 0
-        && game.talismanParticles.length === 0) return;
+    // Nothing to draw: tint faded out AND no falling talismans left. (The array
+    // lives on `game`, not `game.gutpan` — the old `g.talismanParticles` check
+    // was always undefined, so this early-out never fired.)
+    if (g.tintIntensity <= 0.01 && game.talismanParticles.length === 0) return;
 
     const W = game.canvas.width;
     const H = game.canvas.height;
@@ -1460,6 +1483,8 @@
   // ---------- Game over ----------
   function gameOver() {
     game.state = STATE.GAMEOVER;
+    game.cutsceneTimer = 0;
+    dismissBossCutscene();       // don't leave a boss intro hanging over the result screen
     if (!game.touchMode) document.exitPointerLock();
     if (game.touchMode) Mobile.hideControls();
     Audio.gutpanLoopStop && Audio.gutpanLoopStop();

@@ -11,7 +11,8 @@ const UI = (() => {
 
   // ---------- Init / HUD show ----------
   function init() {
-    minimapCtx = $('minimap').getContext('2d');
+    const m = $('minimap');
+    if (m) minimapCtx = m.getContext('2d');
   }
 
   function showHud() { $('hud').classList.remove('hidden'); }
@@ -79,6 +80,7 @@ const UI = (() => {
   // ---------- Minimap ----------
   function drawMinimap(player, enemies) {
     const c = minimapCtx;
+    if (!c) return;
     const size = 200;
     // Scale so the whole map fits even at 42+ tiles.
     const tileSize = size / Math.max(GameMap.W, GameMap.H);
@@ -451,6 +453,10 @@ const UI = (() => {
       picks.push(pool[idx]);
     }
 
+    // Guard against two near-simultaneous taps (mobile multi-touch / fast
+    // double-click) both firing before the menu hides — which would apply two
+    // cards in one intermission.
+    let picked = false;
     for (const u of picks) {
       const card = document.createElement('div');
       card.className = `upgrade-card ${u.cat}`;
@@ -460,6 +466,8 @@ const UI = (() => {
         <div class="desc">${u.desc}</div>
       `;
       card.addEventListener('click', () => {
+        if (picked) return;
+        picked = true;
         Audio.uiClick();
         u.apply(player);
         onSelect();

@@ -144,6 +144,14 @@ const Mobile = (() => {
     move.fwd = 0; move.right = 0; move.magnitude = 0;
     if (thumbEl) thumbEl.style.transform = 'translate(0,0)';
     joy.touchId = null;
+    // Release held action buttons too — once the panel is hidden their touchend
+    // never arrives, so fire/run would stay stuck on (e.g. pausing mid-fire).
+    if (cb) {
+      if (cb.onShoot) cb.onShoot(false);
+      if (cb.onRun) cb.onRun(false);
+    }
+    document.querySelectorAll('#mobile-controls .pressed')
+      .forEach((el) => el.classList.remove('pressed'));
   }
 
   return { init, isActive: () => active, getMove: () => move, showControls, hideControls };

@@ -82,6 +82,9 @@ const MP = (() => {
   function joinRoom(url, room, name) {
     return new Promise((resolve, reject) => {
       setStatus('연결 중…');
+      // Drop any handlers from a previous session before re-wiring, so a
+      // leave→join cycle can't stack duplicate listeners (Net.on only pushes).
+      Net.reset();
       wireHandlers();
       Net.connect(url)
         .then(() => {
@@ -116,12 +119,16 @@ const MP = (() => {
 
   function leave() {
     Net.close();
+    Net.reset();                 // drop all socket handlers (no leak on rejoin)
     state.active = false;
     state.role = null;
     remotes.clear();
     ghostEnemies.clear();
     pickedSet.clear();
     gameStarted = false;
+    upgradeWave = 0;
+    pstateAccum = 0;
+    worldAccum = 0;
     if (upgradeTimer) { clearTimeout(upgradeTimer); upgradeTimer = null; }
     setStatus('연결 종료');
   }
@@ -256,7 +263,10 @@ const MP = (() => {
   // ---------- Guest: apply snapshot ----------
   function applyWorld(m) {
     const seen = new Set();
-    for (const ne of m.enemies) {
+    for (const ne of (m.enemies || [])) {
+      // Skip malformed entries — a relayed snapshot with a bad coordinate would
+      // otherwise seed a ghost at NaN and corrupt its eased render position.
+      if (!ne || !Number.isFinite(ne.x) || !Number.isFinite(ne.y)) continue;
       seen.add(ne.id);
       let g = ghostEnemies.get(ne.id);
       const type = (typeof Enemies !== 'undefined' && Enemies.types[ne.t]) || null;
@@ -278,7 +288,9 @@ const MP = (() => {
     // Anything the host no longer reports is dead / despawned.
     for (const id of [...ghostEnemies.keys()]) if (!seen.has(id)) ghostEnemies.delete(id);
 
-    game.projectiles = (m.proj || []).map((p) => ({ x: p.x, y: p.y }));
+    game.projectiles = (m.proj || [])
+      .filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y))
+      .map((p) => ({ x: p.x, y: p.y }));
 
     // Revive a downed guest when the host advances to a new wave. We compare
     // against the wave the player went down on (set in main.js), so a guest
@@ -295,9 +307,16 @@ const MP = (() => {
   }
 
   function applyRemoteState(m) {
+    // Ignore state for players we don't know about. We used to addRemote() here,
+    // which let a late pstate from a peer that already left resurrect a phantom
+    // remote. Roster / peer_join are the only sources that add players.
     const r = remotes.get(m.from);
-    if (!r) { addRemote(m.from, '익명'); return; }
-    r.tx = m.x; r.ty = m.y; r.tangle = m.a; r.hp = m.hp;
+    if (!r) return;
+    // Reject non-finite fields — a single NaN propagates through the position
+    // easing in beginFrame and permanently corrupts this ally's render.
+    if (!Number.isFinite(m.x) || !Number.isFinite(m.y) || !Number.isFinite(m.a)) return;
+    r.tx = m.x; r.ty = m.y; r.tangle = m.a;
+    if (Number.isFinite(m.hp)) r.hp = m.hp;
     if (r.x == null) { r.x = m.x; r.y = m.y; r.angle = m.a; }
   }
 
