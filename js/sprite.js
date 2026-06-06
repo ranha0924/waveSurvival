@@ -29,7 +29,17 @@ const Sprites = (() => {
       entry.h = img.height;
       entry.ready = true;
     };
-    img.onerror = () => { /* leave entry.ready false → fallback rendering */ };
+    // opts.fallback: a second URL to try if the first fails to load (e.g. a
+    // .png when a .webp isn't present), so the asset works whichever format the
+    // user dropped in. Falls through to procedural rendering if both fail.
+    let triedFallback = false;
+    img.onerror = () => {
+      if (!triedFallback && opts && opts.fallback) {
+        triedFallback = true;
+        img.src = opts.fallback;
+      }
+      /* else leave entry.ready false → fallback rendering */
+    };
     img.src = source;
   }
 
@@ -159,3 +169,8 @@ Sprites.register('splitter', 'assets/dokkaebibul.webp', { scale: 0.8 });
 // Splitter children re-use the 도깨비불 flame at a smaller scale so they read
 // as little broken-off wisps of the parent fire.
 Sprites.register('splitterChild', 'assets/dokkaebibul.webp', { scale: 0.5 });
+
+// Co-op ally avatar (the 무당 player character). Drawn for OTHER players' tokens
+// in multiplayer (the local player is first-person). Accepts player.webp OR
+// player.png; until one is added the renderer falls back to the cloak figure.
+Sprites.register('__player', 'assets/player.webp', { scale: 1.0, fallback: 'assets/player.png' });
