@@ -1864,7 +1864,7 @@ html, body {
   filter: blur(10px);
   animation: glowPulse 6s ease-in-out infinite;
 }
-.candle { position: absolute; bottom: 21%; width: 14px; }
+.candle { position: absolute; bottom: 11%; width: 14px; }
 .candle-l { left: 7%; }
 .candle-r { right: 7%; }
 .candle .stick {
