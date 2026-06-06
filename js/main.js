@@ -651,7 +651,22 @@
     game.canvas.requestPointerLock = game.canvas.requestPointerLock ||
                                      game.canvas.mozRequestPointerLock;
     if (game.canvas.requestPointerLock) {
-      game.canvas.requestPointerLock();
+      let p;
+      try { p = game.canvas.requestPointerLock(); } catch (e) { p = null; }
+      // Modern browsers return a Promise. A rejected lock (no user gesture — the
+      // case for a co-op GUEST whose game starts from a network event, or a
+      // context that disallows lock) does NOT reliably fire the legacy
+      // 'pointerlockerror' event, so the prompt would never appear and the guest
+      // would be stuck with a dead mouse. Catch the rejection and surface the
+      // "click to play" prompt — clicking it re-requests the lock WITH a gesture.
+      if (p && typeof p.catch === 'function') {
+        p.catch(() => {
+          if (game.state === STATE.PLAYING && !game.touchMode &&
+              typeof UI !== 'undefined' && UI.showLockPrompt) {
+            UI.showLockPrompt();
+          }
+        });
+      }
     }
     if (game.state === STATE.PAUSED) {
       game.state = STATE.PLAYING;
