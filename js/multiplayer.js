@@ -161,11 +161,12 @@ const MP = (() => {
   // top of the playing tick before local simulation.
   function beginFrame(dt) {
     if (!state.active) return;
-    // Allies stay smooth; enemies converge faster so a guest's crosshair lines
-    // up with where the host actually has them (reduces "hit a ghost that's
-    // really elsewhere" mismatch).
-    const kPlayers = Math.min(1, dt * 16);
-    const kEnemies = Math.min(1, dt * 26);
+    // Frame-rate-INDEPENDENT smoothing (exponential time constant). The old
+    // dt*k form snapped almost instantly on low-FPS clients, which read as
+    // enemies "teleporting forward" when a snapshot landed. A fixed ~90ms time
+    // constant eases the same way at any frame rate.
+    const kPlayers = 1 - Math.exp(-dt / 0.10);
+    const kEnemies = 1 - Math.exp(-dt / 0.09);
     for (const r of remotes.values()) {
       if (r.tx != null) {
         r.x += (r.tx - r.x) * kPlayers;
@@ -193,7 +194,10 @@ const MP = (() => {
     if (pstateAccum >= 1 / SEND_PSTATE_HZ) {
       pstateAccum = 0;
       const p = game.player;
-      Net.send({ t: 'pstate', x: round2(p.x), y: round2(p.y), a: round2(p.angle), hp: Math.round(p.hp) });
+      // Report HP 0 while downed so the host treats us as out-of-aggro even if a
+      // heal locally lifted our HP — getAllPlayers filters on hp>0.
+      const hp = p.downed ? 0 : Math.round(p.hp);
+      Net.send({ t: 'pstate', x: round2(p.x), y: round2(p.y), a: round2(p.angle), hp });
     }
     if (isHost()) {
       worldAccum += dt;
@@ -352,6 +356,11 @@ const MP = (() => {
         if (isGuest() && hooks.exitUpgrade) hooks.exitUpgrade(m.wave);
         break;
 
+      case 'cutscene':
+        // Guests: play the boss cutscene the host just started.
+        if (isGuest() && hooks.playCutscene) hooks.playCutscene(m.round);
+        break;
+
       case 'gameover':
         // Whole team wiped — everyone ends together.
         if (hooks.gameOverFromNet) hooks.gameOverFromNet();
@@ -464,10 +473,15 @@ const MP = (() => {
     Net.send({ t: 'ev', k: 'kill', to: id, head: !!headshot, boss: !!isBoss });
   }
 
+  // Host → all: a boss wave started; guests play the cutscene in sync.
+  function broadcastCutscene(round) {
+    Net.send({ t: 'ev', k: 'cutscene', round });
+  }
+
   return {
     init, joinRoom, leave, beginFrame, endFrame, reportHit, getRemotePlayers,
     getSpectateTarget, getAllPlayers, damageRemotePlayer, creditGuestKill,
-    beginUpgradeSync, notifyPicked, allDowned, broadcastGameOver,
+    broadcastCutscene, beginUpgradeSync, notifyPicked, allDowned, broadcastGameOver,
     isHost, isGuest,
     get active() { return state.active; },
     get role() { return state.role; },
