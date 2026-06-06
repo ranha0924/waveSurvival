@@ -150,6 +150,11 @@ const Raycaster = (() => {
   function drawRemotePlayer(player, rp, horizonOffset, theme) {
     const proj = projectSprite(player, rp.x, rp.y);
     if (!proj) return;
+    // Downed ally (HP 0, spectating): render faded so the team can see who's
+    // out without it reading as a live target.
+    const ghost = rp.hp <= 0;
+    ctx.save();
+    if (ghost) ctx.globalAlpha = 0.4;
     const horizon = H / 2 + horizonOffset;
     const baseH = H / proj.dist;
     const spriteH = Math.floor(baseH * 0.95);
@@ -183,7 +188,7 @@ const Raycaster = (() => {
     }
 
     const cx = Math.floor(proj.screenX);
-    if (cx < 0 || cx >= W || zBuffer[cx] < proj.dist) return;
+    if (cx < 0 || cx >= W || zBuffer[cx] < proj.dist) { ctx.restore(); return; }
     // Name tag + HP pip above the head, only when reasonably close.
     if (proj.dist < 22) {
       const tagY = Math.max(10, drawStartY - 6);
@@ -203,6 +208,7 @@ const Raycaster = (() => {
       ctx.fillStyle = '#5bd16a';
       ctx.fillRect(barX, barY, barW * Math.max(0, Math.min(1, rp.hp / 100)), barH);
     }
+    ctx.restore();
   }
 
   // Dim an `hsl(h,s%,l%)` string toward black by `light` (0..1). Cheap enough

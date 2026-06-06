@@ -112,6 +112,15 @@ const MP = (() => {
     Net.on('pstate', (m) => applyRemoteState(m));
     Net.on('world', (m) => { if (isGuest()) applyWorld(m); });
     Net.on('hit', (m) => { if (isHost() && hooks.applyGuestHit) hooks.applyGuestHit(m.id, m.dmg, m.head); });
+    // One-shot events. Currently: 'hurt' — the host telling a specific guest it
+    // took damage (enemies are host-authoritative, so guest HP loss originates
+    // there). Only the addressed client applies it.
+    Net.on('ev', (m) => {
+      if (m.k === 'hurt' && m.to === state.selfId && game && game.player && game.player.hp > 0) {
+        Player.takeDamage(game.player, m.dmg);
+        if (typeof UI !== 'undefined' && UI.flashHit) UI.flashHit();
+      }
+    });
     Net.on('host_left', () => { setStatus('방장이 나갔습니다 — 세션 종료'); leave(); });
     Net.on('close', () => { if (state.active) setStatus('연결이 끊어졌습니다'); });
   }
@@ -222,6 +231,16 @@ const MP = (() => {
     for (const id of [...ghostEnemies.keys()]) if (!seen.has(id)) ghostEnemies.delete(id);
 
     game.projectiles = (m.proj || []).map((p) => ({ x: p.x, y: p.y }));
+
+    // Revive a downed guest when the host advances to a new wave. We compare
+    // against the wave the player went down on (set in main.js), so a guest
+    // that dies mid-wave spectates until the host clears it, then respawns.
+    if (game.player && game.player.downed && m.wave > (game.player.downedAtWave || 0)) {
+      game.player.hp = game.player.maxHp;
+      game.player.downed = false;
+      if (typeof UI !== 'undefined' && UI.showWaveBanner) UI.showWaveBanner('부활!');
+    }
+
     game.wave.number = m.wave;
     game.wave.enemiesAlive = m.alive;
     game.score.score = m.score;
@@ -258,8 +277,28 @@ const MP = (() => {
 
   function getRemotePlayers() { return [...remotes.values()]; }
 
+  // Host-only: the full set of living players for enemy targeting — the host's
+  // own player plus every guest still alive. Guests are tagged isRemote so
+  // enemy.damagePlayer routes their damage over the network. A guest whose HP
+  // has hit 0 (downed / spectating) is excluded, so enemies stop chasing it.
+  function getAllPlayers() {
+    const list = [];
+    if (game && game.player && game.player.hp > 0 && !game.player.downed) list.push(game.player);
+    for (const r of remotes.values()) {
+      if (r.hp > 0) list.push({ id: r.id, x: r.x, y: r.y, hp: r.hp, isRemote: true });
+    }
+    return list;
+  }
+
+  // Host → a specific guest: "you took dmg". Relayed as a targeted event; only
+  // the addressed client applies it (see the 'ev' handler).
+  function damageRemotePlayer(id, dmg) {
+    Net.send({ t: 'ev', k: 'hurt', to: id, dmg: Math.round(dmg) });
+  }
+
   return {
     init, joinRoom, leave, beginFrame, endFrame, reportHit, getRemotePlayers,
+    getAllPlayers, damageRemotePlayer,
     isHost: () => state.role === 'host',
     isGuest: () => state.role === 'guest',
     get active() { return state.active; },

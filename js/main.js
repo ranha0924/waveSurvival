@@ -933,9 +933,10 @@
       // latest position, and (guest) rebuild game.enemies from the host snapshot.
       if (mpActive) MP.beginFrame(dt);
 
-      // Auto-shoot if held + auto weapons
+      // Auto-shoot if held + auto weapons. A downed (spectating) co-op guest
+      // can still look around but can't fire until it respawns.
       const inputReady = game.pointerLocked || game.touchMode;
-      if (game.mouseDown && inputReady) {
+      if (game.mouseDown && inputReady && !game.player.downed) {
         Player.shoot(game.player, game.enemies, game.particles, onScore);
       }
 
@@ -962,9 +963,19 @@
       // Wave spawning + completion are the host's job; guests follow snapshots.
       if (!coopGuest) spawnFromQueue(dt);
 
-      // Death check
+      // Death check. A co-op guest doesn't game-over on death: it goes "downed"
+      // and spectates (still rendered to allies, ignored by enemies since its
+      // HP is 0) until the host clears the wave, when MP.applyWorld revives it.
       if (game.player.hp <= 0) {
-        gameOver();
+        if (coopGuest) {
+          if (!game.player.downed) {
+            game.player.downed = true;
+            game.player.downedAtWave = game.wave.number;
+            if (UI.showWaveBanner) UI.showWaveBanner('쓰러짐 — 다음 웨이브에 부활');
+          }
+        } else {
+          gameOver();
+        }
       }
 
       if (!coopGuest) checkWaveComplete();

@@ -93,10 +93,50 @@ const Enemies = (() => {
   // Apply damage to the player and flash the screen vignette. Every site
   // that hits the player wants both, so this keeps the two from drifting
   // apart (e.g. silent damage with no feedback).
+  //
+  // Co-op: when the chosen target is a remote ally (a guest, seen from the
+  // host's authoritative sim), route the damage to that client over the network
+  // instead of mutating a local player object. The guest applies it to its own
+  // HP and echoes the new value back via pstate.
   function damagePlayer(player, dmg) {
+    if (player && player.isRemote) {
+      if (typeof MP !== 'undefined' && MP.damageRemotePlayer) MP.damageRemotePlayer(player.id, dmg);
+      return;
+    }
     Player.takeDamage(player, dmg);
     UI.flashHit();
   }
+
+  // The set of players an enemy can target. Single-player (and every guest,
+  // which never runs this AI) collapses to just the one passed-in player; the
+  // co-op host expands to itself + all living guests via MP.getAllPlayers().
+  // Gated on MP so the single-player path is unchanged.
+  function targetablePlayers(fallback) {
+    if (typeof MP !== 'undefined' && MP.active && MP.getAllPlayers) {
+      const list = MP.getAllPlayers();
+      if (list && list.length) return list;
+    }
+    return [fallback];
+  }
+
+  // Pick which player an enemy chases / attacks this frame: prefer a target it
+  // has line-of-sight to, and among equal visibility the nearest. Returns null
+  // only if every candidate is dead (caller then wanders). With one player this
+  // always returns that player, so behaviour is identical to before.
+  function pickTarget(e, players) {
+    let best = null, bestDist = Infinity, bestLOS = false;
+    for (const p of players) {
+      if (!p || (p.hp != null && p.hp <= 0)) continue;
+      const dx = p.x - e.x, dy = p.y - e.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      const los = GameMap.hasLineOfSight(e.x, e.y, p.x, p.y, 25);
+      if (best === null || (los && !bestLOS) || (los === bestLOS && d < bestDist)) {
+        best = p; bestDist = d; bestLOS = los;
+      }
+    }
+    return best;
+  }
+
 
   // ---------- Factory ----------
   function create(type, x, y, scale = 1) {
@@ -135,10 +175,15 @@ const Enemies = (() => {
       return;
     }
 
-    const dx = player.x - e.x;
-    const dy = player.y - e.y;
+    // Co-op: pick the player this enemy goes after (nearest visible). In
+    // single-player `target` is just `player`, so the rest of the AI is
+    // unchanged. If everyone targetable is dead, fall through with target =
+    // player so the existing wander / no-op behaviour still runs.
+    const target = pickTarget(e, targetablePlayers(player)) || player;
+    const dx = target.x - e.x;
+    const dy = target.y - e.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const hasLOS = GameMap.hasLineOfSight(e.x, e.y, player.x, player.y, 25);
+    const hasLOS = GameMap.hasLineOfSight(e.x, e.y, target.x, target.y, 25);
 
     if (hasLOS) e.seenPlayer = true;
 
@@ -146,7 +191,7 @@ const Enemies = (() => {
     // didn't earn the kill — they ate the explosion). Returns early so the
     // rest of the AI doesn't run on a corpse.
     if (e.type.explodeOnContact && dist < e.type.attackRange + 0.4 && hasLOS) {
-      detonateBomber(e, player, enemies, particles);
+      detonateBomber(e, target, enemies, particles);
       return;
     }
 
@@ -162,18 +207,18 @@ const Enemies = (() => {
         }
         // Attack only when LoS and in range
         if (hasLOS && dist < e.type.attackRange && e.attackTimer <= 0) {
-          fireProjectile(e, player, projectiles);
+          fireProjectile(e, target, projectiles);
           e.attackTimer = e.type.attackCooldown;
         }
       } else {
-        // Melee: ALWAYS chase player. Walls handled by tryMove sliding.
+        // Melee: ALWAYS chase the target. Walls handled by tryMove sliding.
         if (dist > e.type.attackRange * 0.85) {
           moveX = dx / dist;
           moveY = dy / dist;
         }
         // Attack only with LoS so they don't hit you through walls
         if (dist < e.type.attackRange && hasLOS && e.attackTimer <= 0) {
-          damagePlayer(player, e.type.damage * e.damageMult);
+          damagePlayer(target, e.type.damage * e.damageMult);
           e.attackTimer = e.type.attackCooldown;
         }
       }
@@ -245,8 +290,8 @@ const Enemies = (() => {
   }
 
   // ---------- Projectiles (ranged enemy bullets) ----------
-  function fireProjectile(e, player, projectiles) {
-    const dx = player.x - e.x, dy = player.y - e.y;
+  function fireProjectile(e, target, projectiles) {
+    const dx = target.x - e.x, dy = target.y - e.y;
     const d = Math.sqrt(dx * dx + dy * dy);
     if (d < 0.001) return;
     projectiles.push({
@@ -283,13 +328,19 @@ const Enemies = (() => {
         continue;
       }
       p.x = nx; p.y = ny;
-      // Player hit
-      const dx = player.x - p.x, dy = player.y - p.y;
-      if (dx * dx + dy * dy < 0.16) {
-        damagePlayer(player, p.damage);
-        projectiles.splice(i, 1);
-        continue;
+      // Player hit — in co-op check every living player; the first one within
+      // the hit radius eats it and the projectile is consumed.
+      let consumed = false;
+      for (const pl of targetablePlayers(player)) {
+        const dx = pl.x - p.x, dy = pl.y - p.y;
+        if (dx * dx + dy * dy < 0.16) {
+          damagePlayer(pl, p.damage);
+          projectiles.splice(i, 1);
+          consumed = true;
+          break;
+        }
       }
+      if (consumed) continue;
       if (p.life <= 0) projectiles.splice(i, 1);
     }
   }
@@ -344,9 +395,11 @@ const Enemies = (() => {
     const r = e.type.explodeRadius;
     const r2 = r * r;
     const dmg = e.type.damage * e.damageMult;
-    const dx = player.x - e.x, dy = player.y - e.y;
-    if (dx * dx + dy * dy < r2) {
-      damagePlayer(player, dmg);
+    // Catch every player in the blast (co-op), not just the one that triggered
+    // it — bombers should punish a clustered team.
+    for (const pl of targetablePlayers(player)) {
+      const dx = pl.x - e.x, dy = pl.y - e.y;
+      if (dx * dx + dy * dy < r2) damagePlayer(pl, dmg);
     }
     // Chain damage other enemies. We deal raw HP only — secondary deaths
     // don't trigger their own onDeath effects, otherwise a tight clump of
