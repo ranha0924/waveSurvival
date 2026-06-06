@@ -234,12 +234,35 @@
     if (typeof MP !== 'undefined') {
       MP.init(game, {
         startGame,
-        // Host applies a guest's reported hit through the normal damage path so
-        // combo / score / death side-effects all fire once, authoritatively.
-        applyGuestHit: (netId, dmg, headshot) => {
+        // Host applies a guest's reported hit authoritatively. The enemy + team
+        // score are mutated via the host's player (`game.player`), but combo /
+        // 굿판 attribution uses a transient carrying THAT guest's combo+굿판 so
+        // the host's own streak isn't polluted. On a kill, tell the guest so it
+        // can advance its own combo locally.
+        applyGuestHit: (netId, dmg, headshot, combo, gut, fromId) => {
           const e = game.enemies.find((en) => en.netId === netId && en.alive);
-          if (e) Player.damageEnemy(game.player, e, dmg, headshot, game.particles, game.enemies, onScore);
-        }
+          if (!e) return;
+          const wasAlive = e.alive;
+          const attacker = {
+            comboCount: combo | 0,
+            lastKillTime: performance.now() / 1000,   // recent → registerKill continues the streak
+            comboTimeoutBonus: 0,
+            maxComboReached: combo | 0,
+            gutpanActive: !!gut,
+            soulSiphon: false,
+            hp: 0, maxHp: 0, kills: 0, headshots: 0, bossKills: 0
+          };
+          Player.damageEnemy(game.player, e, dmg, headshot, game.particles, game.enemies, onScore, attacker);
+          if (wasAlive && !e.alive && fromId) MP.creditGuestKill(fromId, headshot, !!e.type.isBoss);
+        },
+        // Guest: a wave cleared — pause into our own upgrade menu.
+        enterUpgrade: (wave) => coopEnterUpgrade(wave),
+        // Guest: intermission over — resume play.
+        exitUpgrade: () => coopExitUpgrade(),
+        // Host: all players have picked (or timed out) — start the next wave.
+        hostStartNextWave: () => coopHostStartNextWave(),
+        // Whole team wiped — end the run on every client.
+        gameOverFromNet: () => { if (game.state !== STATE.GAMEOVER) gameOver(); }
       });
       setupCoopButtons();
     }
@@ -607,6 +630,12 @@
   }
 
   function startNextWave() {
+    // Co-op: revive the local player if it went down last wave (host path;
+    // guests revive in MP.applyWorld when the wave number advances).
+    if (game.player && game.player.downed) {
+      game.player.hp = game.player.maxHp;
+      game.player.downed = false;
+    }
     game.wave.number += 1;
     const composition = Enemies.buildWave(game.wave.number);
     game.wave.queue = composition;
@@ -737,16 +766,62 @@
       game.state = STATE.UPGRADE;
       if (!game.touchMode) document.exitPointerLock();
       if (game.touchMode) Mobile.hideControls();
+
+      const coopHost = (typeof MP !== 'undefined' && MP.active && MP.isHost());
+      // Co-op: tell guests to open their own menus and start tracking picks.
+      // The host doesn't start the next wave on its own pick — it waits until
+      // every player has chosen (MP.markPicked → coopHostStartNextWave).
+      if (coopHost) MP.beginUpgradeSync(game.wave.number);
+
       setTimeout(() => {
         UI.showUpgradeMenu(game.player, game.wave.number, () => {
           UI.hideUpgradeMenu();
-          startNextWave();
-          game.state = STATE.PLAYING;
-          if (game.touchMode) Mobile.showControls();
-          requestPointerLock();
+          if (coopHost) {
+            MP.notifyPicked();   // records host's pick; advances when all in
+          } else {
+            startNextWave();
+            game.state = STATE.PLAYING;
+            if (game.touchMode) Mobile.showControls();
+            requestPointerLock();
+          }
         });
       }, 800);
     }
+  }
+
+  // ---------- Co-op intermission helpers ----------
+  // Guest: the host cleared a wave — pause into our own upgrade menu. Each
+  // player picks independently (own build); we tell the host when done and wait
+  // for the host's wave_start to resume.
+  function coopEnterUpgrade(wave) {
+    if (game.state !== STATE.PLAYING) return;
+    game.state = STATE.UPGRADE;
+    if (!game.touchMode) document.exitPointerLock();
+    if (game.touchMode) Mobile.hideControls();
+    setTimeout(() => {
+      UI.showUpgradeMenu(game.player, wave, () => {
+        UI.hideUpgradeMenu();
+        MP.notifyPicked();   // → host
+        // stay in UPGRADE until the host signals wave_start
+      });
+    }, 400);
+  }
+
+  // Guest: host says the next wave is starting — close any open menu and play.
+  function coopExitUpgrade() {
+    UI.hideUpgradeMenu();
+    game.state = STATE.PLAYING;
+    if (game.touchMode) Mobile.showControls();
+    requestPointerLock();
+  }
+
+  // Host: everyone has picked (or timed out) — actually start the next wave.
+  function coopHostStartNextWave() {
+    UI.hideUpgradeMenu();
+    startNextWave();
+    game.state = STATE.PLAYING;
+    if (game.touchMode) Mobile.showControls();
+    requestPointerLock();
   }
 
   // ---------- 굿판 모드 ----------
@@ -963,11 +1038,12 @@
       // Wave spawning + completion are the host's job; guests follow snapshots.
       if (!coopGuest) spawnFromQueue(dt);
 
-      // Death check. A co-op guest doesn't game-over on death: it goes "downed"
-      // and spectates (still rendered to allies, ignored by enemies since its
-      // HP is 0) until the host clears the wave, when MP.applyWorld revives it.
+      // Death check. In co-op NOBODY game-overs alone: any dead player (host or
+      // guest) goes "downed" and spectates — still rendered to allies, ignored
+      // by enemies (HP 0) — until the next wave revives them. The host keeps
+      // simulating even while downed, so a surviving guest keeps the run going.
       if (game.player.hp <= 0) {
-        if (coopGuest) {
+        if (mpActive) {
           if (!game.player.downed) {
             game.player.downed = true;
             game.player.downedAtWave = game.wave.number;
@@ -976,6 +1052,13 @@
         } else {
           gameOver();
         }
+      }
+
+      // Team wipe: only when EVERYONE is down does the run actually end. The
+      // host detects it (it knows every player's HP) and ends the run for all.
+      if (mpActive && MP.isHost() && MP.allDowned() && game.state !== STATE.GAMEOVER) {
+        MP.broadcastGameOver();
+        gameOver();
       }
 
       if (!coopGuest) checkWaveComplete();

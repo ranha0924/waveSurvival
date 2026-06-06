@@ -40,6 +40,13 @@ const MP = (() => {
   let pstateAccum = 0;
   let worldAccum = 0;
 
+  // Upgrade-sync (host): which players have chosen a card this intermission,
+  // and a fallback timer so a slow / AFK player can't stall the run forever.
+  const pickedSet = new Set();
+  let upgradeWave = 0;
+  let upgradeTimer = null;
+  const UPGRADE_TIMEOUT_MS = 30000;
+
   // Stable per-player colour from the id so each ally reads as a distinct
   // figure without needing assigned slots.
   function colorFor(id) {
@@ -48,6 +55,11 @@ const MP = (() => {
     const hue = h % 360;
     return { body: `hsl(${hue},55%,42%)`, head: `hsl(${hue},45%,68%)` };
   }
+
+  // Role predicates — used throughout the module (and re-exported). Defined as
+  // real functions, not just object properties, so internal callers can use them.
+  function isHost() { return state.role === 'host'; }
+  function isGuest() { return state.role === 'guest'; }
 
   // ---------- Lifecycle ----------
   function init(gameRef, hookFns) {
@@ -95,6 +107,8 @@ const MP = (() => {
     state.role = null;
     remotes.clear();
     ghostEnemies.clear();
+    pickedSet.clear();
+    if (upgradeTimer) { clearTimeout(upgradeTimer); upgradeTimer = null; }
     setStatus('연결 종료');
   }
 
@@ -111,16 +125,18 @@ const MP = (() => {
     });
     Net.on('pstate', (m) => applyRemoteState(m));
     Net.on('world', (m) => { if (isGuest()) applyWorld(m); });
-    Net.on('hit', (m) => { if (isHost() && hooks.applyGuestHit) hooks.applyGuestHit(m.id, m.dmg, m.head); });
-    // One-shot events. Currently: 'hurt' — the host telling a specific guest it
-    // took damage (enemies are host-authoritative, so guest HP loss originates
-    // there). Only the addressed client applies it.
-    Net.on('ev', (m) => {
-      if (m.k === 'hurt' && m.to === state.selfId && game && game.player && game.player.hp > 0) {
-        Player.takeDamage(game.player, m.dmg);
-        if (typeof UI !== 'undefined' && UI.flashHit) UI.flashHit();
-      }
+    Net.on('hit', (m) => {
+      if (isHost() && hooks.applyGuestHit) hooks.applyGuestHit(m.id, m.dmg, m.head, m.combo, m.gut, m.from);
     });
+    // One-shot events, dispatched by `k`:
+    //   hurt       host → a guest: you took damage (M2)
+    //   kill       host → a guest: your reported hit killed an enemy — bump
+    //              your local combo so your personal 굿판 advances (M3)
+    //   wave_clear host → all guests: open your own upgrade menu (M3)
+    //   picked     a guest → host: I chose my upgrade
+    //   wave_start host → all guests: leave upgrade, next wave is starting
+    //   gameover   host → all: whole team is down (true wipe)
+    Net.on('ev', (m) => onEvent(m));
     Net.on('host_left', () => { setStatus('방장이 나갔습니다 — 세션 종료'); leave(); });
     Net.on('close', () => { if (state.active) setStatus('연결이 끊어졌습니다'); });
   }
@@ -256,9 +272,14 @@ const MP = (() => {
   // ---------- Guest → host hit report ----------
   // Called from Player.damageEnemy when this client is a guest, instead of
   // mutating the (authoritative) enemy locally.
-  function reportHit(enemy, dmg, headshot) {
+  function reportHit(enemy, dmg, headshot, combo, gut) {
     if (!isGuest() || enemy.netId == null) return;
-    Net.send({ t: 'hit', id: enemy.netId, dmg: Math.round(dmg), head: !!headshot });
+    // combo / gut ride along so the host scores a resulting kill with OUR combo
+    // and 굿판 multiplier (team score is host-authoritative, attribution isn't).
+    Net.send({
+      t: 'hit', id: enemy.netId, dmg: Math.round(dmg), head: !!headshot,
+      combo: combo | 0, gut: gut ? 1 : 0
+    });
   }
 
   // ---------- Helpers ----------
@@ -273,6 +294,103 @@ const MP = (() => {
     state.status = s;
     const el = document.getElementById('mp-status');
     if (el) el.textContent = s;
+  }
+
+  // ---------- Event dispatch (one-shot 'ev' messages) ----------
+  function onEvent(m) {
+    switch (m.k) {
+      case 'hurt':
+        if (m.to === state.selfId && game && game.player && game.player.hp > 0) {
+          Player.takeDamage(game.player, m.dmg);
+          if (typeof UI !== 'undefined' && UI.flashHit) UI.flashHit();
+        }
+        break;
+
+      case 'kill':
+        // Host told us our reported hit killed an enemy. Credit our own combo
+        // locally so our personal 굿판 advances; the team score was already
+        // added on the host. Boss / headshot flags refine combo + soul-siphon.
+        if (m.to === state.selfId && game && game.player) {
+          Player.registerKill(game.player, !!m.head, !!m.boss);
+          if (game.player.soulSiphon) {
+            game.player.hp = Math.min(game.player.maxHp, game.player.hp + (m.boss ? 25 : 5));
+          }
+        }
+        break;
+
+      case 'wave_clear':
+        // Guests: open your own upgrade menu for this wave.
+        if (isGuest() && hooks.enterUpgrade) hooks.enterUpgrade(m.wave);
+        break;
+
+      case 'picked':
+        // Host: a guest chose its card.
+        if (isHost() && m.from) markPicked(m.from);
+        break;
+
+      case 'wave_start':
+        // Guests: intermission over, resume play.
+        if (isGuest() && hooks.exitUpgrade) hooks.exitUpgrade(m.wave);
+        break;
+
+      case 'gameover':
+        // Whole team wiped — everyone ends together.
+        if (hooks.gameOverFromNet) hooks.gameOverFromNet();
+        break;
+    }
+  }
+
+  // ---------- Co-op upgrade sync (host-authoritative pacing) ----------
+  // Host: a wave cleared. Tell guests to open their menus and start tracking
+  // who has picked (the host counts once it picks via notifyPicked).
+  function beginUpgradeSync(wave) {
+    if (!isHost()) return;
+    upgradeWave = wave;
+    pickedSet.clear();
+    Net.send({ t: 'ev', k: 'wave_clear', wave });
+    if (upgradeTimer) clearTimeout(upgradeTimer);
+    upgradeTimer = setTimeout(() => proceedNextWave(true), UPGRADE_TIMEOUT_MS);
+  }
+
+  // Called when the LOCAL player finishes picking. Host records itself and
+  // checks for completion; a guest tells the host.
+  function notifyPicked() {
+    if (isHost()) markPicked(state.selfId);
+    else Net.send({ t: 'ev', k: 'picked', wave: upgradeWave });
+  }
+
+  function markPicked(id) {
+    if (!isHost()) return;
+    pickedSet.add(id);
+    // Everyone connected (host + current guests) chosen? Go. Disconnected /
+    // late-joined players are covered by the timeout.
+    const needed = new Set([state.selfId, ...remotes.keys()]);
+    let all = true;
+    for (const id2 of needed) if (!pickedSet.has(id2)) { all = false; break; }
+    if (all) proceedNextWave(false);
+  }
+
+  function proceedNextWave() {
+    if (!isHost()) return;
+    if (upgradeTimer) { clearTimeout(upgradeTimer); upgradeTimer = null; }
+    pickedSet.clear();
+    Net.send({ t: 'ev', k: 'wave_start', wave: upgradeWave + 1 });
+    if (hooks.hostStartNextWave) hooks.hostStartNextWave();
+  }
+
+  // ---------- Team-wipe (host) ----------
+  // True only when the host is down AND every connected guest is down too, so a
+  // lone surviving guest keeps the run alive.
+  function allDowned() {
+    if (!isHost()) return false;
+    const hostDown = !game || !game.player || game.player.hp <= 0 || game.player.downed;
+    if (!hostDown) return false;
+    for (const r of remotes.values()) if (r.hp > 0) return false;
+    return true;
+  }
+
+  function broadcastGameOver() {
+    Net.send({ t: 'ev', k: 'gameover' });
   }
 
   function getRemotePlayers() { return [...remotes.values()]; }
@@ -296,11 +414,17 @@ const MP = (() => {
     Net.send({ t: 'ev', k: 'hurt', to: id, dmg: Math.round(dmg) });
   }
 
+  // Host → a specific guest: "your reported hit just killed an enemy" so the
+  // guest can advance its own combo / 굿판 (team score was credited on the host).
+  function creditGuestKill(id, headshot, isBoss) {
+    Net.send({ t: 'ev', k: 'kill', to: id, head: !!headshot, boss: !!isBoss });
+  }
+
   return {
     init, joinRoom, leave, beginFrame, endFrame, reportHit, getRemotePlayers,
-    getAllPlayers, damageRemotePlayer,
-    isHost: () => state.role === 'host',
-    isGuest: () => state.role === 'guest',
+    getAllPlayers, damageRemotePlayer, creditGuestKill,
+    beginUpgradeSync, notifyPicked, allDowned, broadcastGameOver,
+    isHost, isGuest,
     get active() { return state.active; },
     get role() { return state.role; },
     getStatus: () => state.status,
