@@ -629,6 +629,7 @@
     UI.hideGameOver();
     UI.hidePause();
     UI.hideUpgradeMenu();
+    hideCoopWait();
     UI.showHud();
     game.state = STATE.PLAYING;
 
@@ -794,6 +795,7 @@
           UI.hideUpgradeMenu();
           if (coopHost) {
             MP.notifyPicked();   // records host's pick; advances when all in
+            showCoopWait();      // freeze on a clean wait screen until everyone picks
           } else {
             startNextWave();
             game.state = STATE.PLAYING;
@@ -806,6 +808,18 @@
   }
 
   // ---------- Co-op intermission helpers ----------
+  // The "다른 무당을 기다리는 중" wait screen, shown after a player picks their
+  // card while others are still choosing. The game is already frozen (STATE
+  // stays UPGRADE), this just makes the wait explicit instead of a blank scene.
+  function showCoopWait() {
+    const el = document.getElementById('coop-wait');
+    if (el) el.classList.remove('hidden');
+  }
+  function hideCoopWait() {
+    const el = document.getElementById('coop-wait');
+    if (el) el.classList.add('hidden');
+  }
+
   // Guest: the host cleared a wave — pause into our own upgrade menu. Each
   // player picks independently (own build); we tell the host when done and wait
   // for the host's wave_start to resume.
@@ -818,7 +832,7 @@
       UI.showUpgradeMenu(game.player, wave, () => {
         UI.hideUpgradeMenu();
         MP.notifyPicked();   // → host
-        // stay in UPGRADE until the host signals wave_start
+        showCoopWait();      // frozen wait screen until the host signals wave_start
       });
     }, 400);
   }
@@ -826,6 +840,7 @@
   // Guest: host says the next wave is starting — close any open menu and play.
   function coopExitUpgrade() {
     UI.hideUpgradeMenu();
+    hideCoopWait();
     game.state = STATE.PLAYING;
     if (game.touchMode) Mobile.showControls();
     requestPointerLock();
@@ -834,6 +849,7 @@
   // Host: everyone has picked (or timed out) — actually start the next wave.
   function coopHostStartNextWave() {
     UI.hideUpgradeMenu();
+    hideCoopWait();
     startNextWave();
     game.state = STATE.PLAYING;
     if (game.touchMode) Mobile.showControls();
@@ -991,6 +1007,12 @@
   }
 
   // ---------- Game loop + rendering ----------
+  // Hard cap on live particles. In co-op the host spawns death bursts for both
+  // its own AND every guest's kills, so a 4-player machine-gun wave could pile
+  // up enough particles to drag the host's frame rate; drop the oldest past the
+  // cap. 500 is well above what a normal burst needs.
+  const MAX_PARTICLES = 500;
+
   function updateParticles(dt) {
     for (let i = game.particles.length - 1; i >= 0; i--) {
       const p = game.particles[i];
@@ -1004,6 +1026,9 @@
       // arcing back down like blood/impact debris.
       if (!p.noGravity) p.vz -= dt * 6;
       if (p.life <= 0) game.particles.splice(i, 1);
+    }
+    if (game.particles.length > MAX_PARTICLES) {
+      game.particles.splice(0, game.particles.length - MAX_PARTICLES);
     }
   }
 
@@ -1024,8 +1049,8 @@
       // latest position, and (guest) rebuild game.enemies from the host snapshot.
       if (mpActive) MP.beginFrame(dt);
 
-      // Auto-shoot if held + auto weapons. A downed (spectating) co-op guest
-      // can still look around but can't fire until it respawns.
+      // Auto-shoot if held + auto weapons. A downed (spectating) player can't
+      // fire until it respawns.
       const inputReady = game.pointerLocked || game.touchMode;
       if (game.mouseDown && inputReady && !game.player.downed) {
         Player.shoot(game.player, game.enemies, game.particles, onScore);
@@ -1034,7 +1059,23 @@
       // Update player input mapping
       mapKeysToInput();
       const move = game.touchMode ? Mobile.getMove() : null;
-      Player.update(game.player, dt, { keys: game.keys, move });
+      if (mpActive && game.player.downed) {
+        // Spectator: ride a living teammate's camera instead of free-looking
+        // from our own corpse, so a downed player watches the action.
+        const mate = MP.getSpectateTarget();
+        if (mate) {
+          game.player.x = mate.x;
+          game.player.y = mate.y;
+          game.player.angle = mate.angle;
+          game.player.pitch = 0;
+          game.player.bobOffset = 0;
+          game.spectateName = mate.name;
+        }
+        // (skip Player.update — no self-movement while spectating)
+      } else {
+        game.spectateName = null;
+        Player.update(game.player, dt, { keys: game.keys, move });
+      }
 
       // Enemy AI / projectiles — host-authoritative, skipped on guests.
       if (!coopGuest) {
@@ -1136,6 +1177,23 @@
     // banner / talisman particles stay screen-locked even when the camera
     // is shaking from recoil.
     renderGutpan(ctx);
+
+    // Spectator label — we're downed and riding a teammate's camera.
+    if (game.spectateName) {
+      const W = game.canvas.width;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.font = '700 20px "Noto Serif KR", sans-serif';
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = 'rgba(255, 90, 90, 0.95)';
+      ctx.fillText('● 관전 중', W / 2, 14);
+      ctx.font = '500 14px "Noto Serif KR", sans-serif';
+      ctx.fillStyle = 'rgba(240, 230, 210, 0.9)';
+      ctx.fillText(`${game.spectateName} 시점 · 다음 웨이브에 부활`, W / 2, 40);
+      ctx.restore();
+    }
   }
 
   // ---------- 굿판 모드 render ----------
@@ -1322,6 +1380,8 @@
     if (game.touchMode) Mobile.hideControls();
     Audio.gutpanLoopStop && Audio.gutpanLoopStop();
     Audio.gameOver();
+    UI.hideUpgradeMenu();
+    hideCoopWait();
     UI.hideHud();
 
     const nick = game.nick || '익명';

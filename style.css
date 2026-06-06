@@ -2290,3 +2290,15 @@ html, body {
   color: #7fd18b;
   text-align: center;
 }
+
+/* ── 협동: 권능 선택 대기 화면 ─────────────────────────────────────────── */
+#coop-wait .coop-wait-spinner {
+  margin-top: 22px;
+  width: 38px;
+  height: 38px;
+  border: 4px solid rgba(216, 177, 58, 0.25);
+  border-top-color: #d8b13a;
+  border-radius: 50%;
+  animation: coop-wait-spin 0.9s linear infinite;
+}
+@keyframes coop-wait-spin { to { transform: rotate(360deg); } }

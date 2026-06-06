@@ -157,18 +157,22 @@ const MP = (() => {
   // top of the playing tick before local simulation.
   function beginFrame(dt) {
     if (!state.active) return;
-    const k = Math.min(1, dt * 14);   // smoothing toward network targets
+    // Allies stay smooth; enemies converge faster so a guest's crosshair lines
+    // up with where the host actually has them (reduces "hit a ghost that's
+    // really elsewhere" mismatch).
+    const kPlayers = Math.min(1, dt * 16);
+    const kEnemies = Math.min(1, dt * 26);
     for (const r of remotes.values()) {
       if (r.tx != null) {
-        r.x += (r.tx - r.x) * k;
-        r.y += (r.ty - r.y) * k;
-        r.angle = lerpAngle(r.angle, r.tangle, k);
+        r.x += (r.tx - r.x) * kPlayers;
+        r.y += (r.ty - r.y) * kPlayers;
+        r.angle = lerpAngle(r.angle, r.tangle, kPlayers);
       }
     }
     if (isGuest()) {
       for (const g of ghostEnemies.values()) {
-        g.x += (g.tx - g.x) * k;
-        g.y += (g.ty - g.y) * k;
+        g.x += (g.tx - g.x) * kEnemies;
+        g.y += (g.ty - g.y) * kEnemies;
         if (g.hitFlash > 0) g.hitFlash -= dt;
       }
       // Rebuild the array the renderer / local hitscan iterate over.
@@ -395,6 +399,13 @@ const MP = (() => {
 
   function getRemotePlayers() { return [...remotes.values()]; }
 
+  // A living teammate to spectate while downed (first one with HP). Returns the
+  // eased render position so the spectator camera is smooth.
+  function getSpectateTarget() {
+    for (const r of remotes.values()) if (r.hp > 0) return r;
+    return null;
+  }
+
   // Host-only: the full set of living players for enemy targeting — the host's
   // own player plus every guest still alive. Guests are tagged isRemote so
   // enemy.damagePlayer routes their damage over the network. A guest whose HP
@@ -422,7 +433,7 @@ const MP = (() => {
 
   return {
     init, joinRoom, leave, beginFrame, endFrame, reportHit, getRemotePlayers,
-    getAllPlayers, damageRemotePlayer, creditGuestKill,
+    getSpectateTarget, getAllPlayers, damageRemotePlayer, creditGuestKill,
     beginUpgradeSync, notifyPicked, allDowned, broadcastGameOver,
     isHost, isGuest,
     get active() { return state.active; },
