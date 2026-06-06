@@ -18,6 +18,17 @@
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;900&family=Black+Han+Sans&family=Gowun+Batang:wght@400;700&family=Gugi&family=Nanum+Brush+Script&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css" />
+<!-- Inline favicon (a 부적 red square) so the browser stops 404-ing /favicon.ico. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%23b71c1c'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%23f3d67b' font-family='serif'%3E符%3C/text%3E%3C/svg%3E" />
+<script>
+  // ── 협동(Co-op) 릴레이 서버 주소 ──────────────────────────────────────
+  // 이 게임은 정적 호스트(Vercel/GitHub Pages 등)에 올라가지만, 협동 모드는
+  // 별도의 WebSocket 릴레이 서버(server/ 디렉터리)가 필요합니다. Render 등에
+  // server/를 배포한 뒤, 그 주소를 아래에 넣으면 협동 로비 기본값으로 채워집니다.
+  //   예: window.COOP_RELAY_URL = 'wss://wavesurvival-relay.onrender.com';
+  // 비워두면 로비에서 직접 입력해야 하며, 한 번 입력하면 브라우저에 저장됩니다.
+  window.COOP_RELAY_URL = '';
+</script>
 </head>
 <body>
   <div id="game-container">

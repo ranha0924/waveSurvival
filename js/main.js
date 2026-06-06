@@ -425,11 +425,20 @@
     const urlInput = document.getElementById('coop-url');
     const roomInput = document.getElementById('coop-room');
 
-    // Default to a relay on the same host so local testing "just works"; a
-    // deployed game points this at its Render/Railway URL (wss://…).
-    const defaultUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') +
-                       (location.hostname || 'localhost') + ':8787';
-    if (urlInput && !urlInput.value) urlInput.value = defaultUrl;
+    // Resolve the relay URL. IMPORTANT: we do NOT default to the page's own
+    // host — a static host (Vercel / GitHub Pages) does not run the WebSocket
+    // relay, so `wss://<page-host>:8787` always fails. Precedence:
+    //   1. last URL the player successfully entered (localStorage)
+    //   2. a URL hardcoded in index.html via window.COOP_RELAY_URL
+    //   3. localhost for local dev
+    const RELAY_LS_KEY = 'wavesurvival_relay_url';
+    let savedUrl = '';
+    try { savedUrl = localStorage.getItem(RELAY_LS_KEY) || ''; } catch (e) {}
+    const fallbackUrl = (typeof window !== 'undefined' && window.COOP_RELAY_URL) || 'ws://localhost:8787';
+    if (urlInput) {
+      urlInput.placeholder = 'wss://your-relay.onrender.com';
+      if (!urlInput.value) urlInput.value = savedUrl || fallbackUrl;
+    }
 
     openBtn.addEventListener('click', () => { Audio.uiClick(); overlay.classList.remove('hidden'); });
     if (closeBtn) closeBtn.addEventListener('click', () => { Audio.uiClick(); overlay.classList.add('hidden'); });
@@ -438,7 +447,14 @@
       Audio.resume();
       Audio.uiClick();
       captureNick();
-      const url = (urlInput.value || defaultUrl).trim();
+      let url = (urlInput.value || fallbackUrl).trim();
+      // An https page can't open an insecure ws:// socket (mixed content) —
+      // auto-upgrade so a pasted ws:// URL isn't silently blocked.
+      if (location.protocol === 'https:' && url.startsWith('ws://')) {
+        url = 'wss://' + url.slice('ws://'.length);
+      }
+      // Remember it so the player only pastes their relay URL once.
+      try { localStorage.setItem(RELAY_LS_KEY, url); } catch (e) {}
       const room = ((roomInput.value || 'LOBBY').trim().toUpperCase()) || 'LOBBY';
       game.mode = 'free';   // co-op runs on the free (non-daily) ruleset
       MP.joinRoom(url, room, game.nick)
