@@ -22,6 +22,19 @@ const Raycaster = (() => {
   const tintBuf = document.createElement('canvas');
   const tintCtx = tintBuf.getContext('2d');
 
+  // 저승사자's thrown sickle (낫) used for ranged projectiles. Falls back to a
+  // glowing dot until the image loads. Projectiles are billboarded into the
+  // world like every other sprite so they recede with distance and clip behind
+  // walls — instead of floating at a fixed eye-line screen position.
+  const sickleImg = new Image();
+  let sickleLoaded = false;
+  sickleImg.onload = () => { sickleLoaded = true; };
+  sickleImg.src = 'assets/sickle.png';
+  // World height (above ground, in eye-line units) projectiles fly at, so they
+  // read as hurled through the air at body height rather than pinned to the
+  // horizon. 0 == eye level; positive sits below the eye line.
+  const PROJ_Z = 0.35;
+
   // Pre-baked decoration assets. Built lazily so script-load order doesn't
   // matter; seeded so positions stay stable run-to-run.
   let concreteTile = null;       // small repeating concrete texture
@@ -96,7 +109,7 @@ const Raycaster = (() => {
   function getQuality() { return qualityScale; }
 
   // ---------- Frame orchestration ----------
-  function render(player, enemies, particles, horizonOffset, theme) {
+  function render(player, enemies, particles, horizonOffset, theme, projectiles) {
     theme = theme || Environment.themeForWave(1);
 
     // Sky pass is fully detached from the player's pitch + bob so the
@@ -106,7 +119,7 @@ const Raycaster = (() => {
     drawSky(theme, player);
     drawFloor(player, theme, horizonOffset);
     castWalls(player, horizonOffset, theme);
-    drawSprites(player, enemies, particles, horizonOffset, theme);
+    drawSprites(player, enemies, particles, horizonOffset, theme, projectiles);
   }
 
   // Collect every billboarded thing in the world, sort far→near so closer
@@ -120,7 +133,7 @@ const Raycaster = (() => {
   const spritePool = [];
   const activeSprites = [];
 
-  function drawSprites(player, enemies, particles, horizonOffset, theme) {
+  function drawSprites(player, enemies, particles, horizonOffset, theme, projectiles) {
     activeSprites.length = 0;
     let n = 0;
     const push = (x, y, type, ref) => {
@@ -135,6 +148,7 @@ const Raycaster = (() => {
       if (e.alive) push(e.x, e.y, 'enemy', e);
     }
     for (const p of particles) push(p.x, p.y, 'particle', p);
+    if (projectiles) for (const pr of projectiles) push(pr.x, pr.y, 'proj', pr);
     if (typeof Pickups !== 'undefined') {
       for (const k of Pickups.getList()) push(k.x, k.y, 'pickup', k);
     }
@@ -169,6 +183,7 @@ const Raycaster = (() => {
       else if (s.type === 'flag') drawFlagSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'prop') drawPropSprite(player, s.ref, horizonOffset, theme);
       else if (s.type === 'rplayer') drawRemotePlayer(player, s.ref, horizonOffset, theme);
+      else if (s.type === 'proj') drawProjectileSprite(player, s.ref, horizonOffset, theme);
       else drawParticle(player, s.ref, horizonOffset, theme);
     }
   }
@@ -1425,6 +1440,51 @@ const Raycaster = (() => {
     const sz = Math.max(2, Math.floor(H / proj.dist * p.size * 0.05));
     ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.life * (1 - fog * 0.5)})`;
     ctx.fillRect(drawX - sz / 2, drawY - sz / 2, sz, sz);
+  }
+
+  // Enemy ranged projectile (저승사자 낫). Billboarded into the world: projected
+  // by distance, flown at body height, faded by fog, and hidden behind nearer
+  // walls — so it travels through the scene instead of floating at the eye line.
+  function drawProjectileSprite(player, pr, horizonOffset, theme) {
+    const proj = projectSprite(player, pr.x, pr.y);
+    if (!proj) return;
+    const cx = Math.floor(proj.screenX);
+    if (cx < 0 || cx >= W) return;
+    // A nearer opaque wall in this column hides the bolt entirely.
+    if (zBuffer[cx] < proj.dist) return;
+    const horizon = H / 2 + horizonOffset;
+    const drawY = Math.floor(horizon - PROJ_Z * H / proj.dist);
+    // A short see-over wall in front hides anything below the horizon line.
+    if (proj.dist > shortDist[cx] && drawY > horizon) return;
+    const fog = Math.min(1, proj.dist / theme.fogDist);
+    const alpha = Math.max(0.12, 1 - fog);
+
+    if (sickleLoaded && sickleImg.width) {
+      // Spinning sickle billboard, sized by distance, with a stable per-shot
+      // phase so they don't all rotate in lockstep.
+      const sz = Math.max(10, 64 / proj.dist);
+      const spin = performance.now() * 0.018;
+      const phase = (pr.x * 13.1 + pr.y * 7.7) % (Math.PI * 2);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(proj.screenX, drawY);
+      ctx.rotate(spin + phase);
+      const prev = ctx.imageSmoothingEnabled;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(sickleImg, -sz / 2, -sz / 2, sz, sz);
+      ctx.imageSmoothingEnabled = prev;
+      ctx.restore();
+    } else {
+      const sz = Math.max(3, 12 / proj.dist);
+      ctx.fillStyle = `rgba(120, 200, 255, ${(0.9 * alpha).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(proj.screenX, drawY, sz, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255, 255, 255, ${(0.6 * alpha).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(proj.screenX, drawY, sz * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function getDimensions() { return { W, H }; }
