@@ -340,13 +340,16 @@ const Player = (() => {
         impactX = p.x + dirX * candidates[0].proj;
         impactY = p.y + dirY * candidates[0].proj;
       }
-      const r = 1.5;
+      // Nerfed from r=1.5 / 0.6× — every shot AoE-ing the whole crowd for 60%
+      // was too strong. Tighter radius + lower splash keeps it useful for
+      // clustered kills without trivialising waves.
+      const r = 1.1;
       for (const e of enemies) {
         if (!e.alive) continue;
         const dx = e.x - impactX, dy = e.y - impactY;
         const d2 = dx * dx + dy * dy;
         if (d2 < r * r) {
-          const splash = damage * 0.6;
+          const splash = damage * 0.35;
           damageEnemy(p, e, splash, false, particles, enemies, scoreCallback);
         }
       }
