@@ -1598,10 +1598,21 @@
     // per-size co-op board (2/3/4인); solo runs to the all-time (+daily) board.
     if (typeof Leaderboard !== 'undefined') {
       const coopRun = (typeof MP !== 'undefined' && MP.active && game.coopPlayers >= 2);
-      const submit = coopRun
-        ? Leaderboard.submitCoop(stats, nick, game.coopPlayers)
-        : Leaderboard.submitRun(stats, nick, isDaily);
-      submit.then((ok) => { if (ok) refreshLeaderboard(); });
+      if (coopRun) {
+        // One row per team: only the host submits, listing every member (host
+        // first, then guests) so the run lands as a single entry with all the
+        // names together. Guests skip the write but still refresh so the new
+        // team row shows when they back out to the menu.
+        if (MP.isHost()) {
+          const members = [nick, ...MP.getRemotePlayers().map((r) => r.name)];
+          Leaderboard.submitCoop(stats, members, game.coopPlayers)
+            .then((ok) => { if (ok) refreshLeaderboard(); });
+        } else {
+          refreshLeaderboard();
+        }
+      } else {
+        Leaderboard.submitRun(stats, nick, isDaily).then((ok) => { if (ok) refreshLeaderboard(); });
+      }
     }
 
     // Co-op can't solo-restart, so the action button returns to the menu/lobby
