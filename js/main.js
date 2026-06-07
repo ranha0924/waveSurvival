@@ -425,7 +425,20 @@
     document.getElementById('restart-btn').addEventListener('click', () => {
       Audio.uiClick();
       UI.hideGameOver();
-      startGame();
+      // Co-op has no solo restart — "다시 도전" is relabelled "메뉴로" in
+      // gameOver(); leave the room and return to the title/lobby instead.
+      if (typeof MP !== 'undefined' && MP.active) {
+        UI.hideHud();
+        hideCoopWait();
+        if (game.touchMode) Mobile.hideControls();
+        MP.leave();
+        UI.updateTitleRecords(Records.load(), Records.loadDaily());
+        refreshLeaderboard();
+        UI.showTitle();
+        game.state = STATE.TITLE;
+      } else {
+        startGame();
+      }
     });
     document.getElementById('resume-btn').addEventListener('click', () => {
       Audio.uiClick();
@@ -923,6 +936,11 @@
 
   function pauseGame() {
     if (game.state !== STATE.PLAYING) return;
+    // Co-op can't pause — the simulation is shared/host-authoritative, so one
+    // client freezing would just desync (and a host pausing would stall every
+    // guest). ESC / losing pointer lock just frees the cursor; the loop keeps
+    // running and re-shows the "click to play" prompt so they can re-lock.
+    if (typeof MP !== 'undefined' && MP.active) return;
     game.state = STATE.PAUSED;
     Audio.gutpanLoopStop && Audio.gutpanLoopStop();
     if (!game.touchMode) document.exitPointerLock();
@@ -1602,6 +1620,13 @@
         ? Leaderboard.submitCoop(stats, nick, game.coopPlayers)
         : Leaderboard.submitRun(stats, nick, isDaily);
       submit.then((ok) => { if (ok) refreshLeaderboard(); });
+    }
+
+    // Co-op can't solo-restart, so the action button returns to the menu/lobby
+    // instead of saying "다시 도전".
+    const restartBtn = document.getElementById('restart-btn');
+    if (restartBtn) {
+      restartBtn.textContent = (typeof MP !== 'undefined' && MP.active) ? '메뉴로' : '다시 도전';
     }
 
     UI.showGameOver(resultStats, prev, broken, game.nick);
