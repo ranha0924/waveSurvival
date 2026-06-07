@@ -115,19 +115,29 @@ const Leaderboard = (() => {
   // with NO composite index — same constraint as the all-time/daily boards.
   const COOP = { 2: 'coop2', 3: 'coop3', 4: 'coop4' };
 
-  // A co-op run is a team result; every participant submits their own row
-  // (their nick + the shared team score/wave) so each player ranks on the board
-  // for the size they played. Co-op runs do NOT touch the solo all-time/daily
-  // boards — team scores aren't comparable to a solo run.
-  async function submitCoop(stats, nick, players) {
+  // A co-op run is a single team result. The host submits ONE row listing
+  // every member (host first, then guests) so the team lands as one ranked
+  // entry showing all names together — not N near-identical per-player rows.
+  // `names` is the roster array; we join it into the display `name` and also
+  // store the raw `members` list. Co-op runs do NOT touch the solo
+  // all-time/daily boards — team scores aren't comparable to a solo run.
+  async function submitCoop(stats, names, players) {
     const ok = await init();
     if (!ok || !db) return false;
     const coll = COOP[players];
     if (!coll) return false;
     try {
-      const row = clean(stats, nick);
+      // Clamp each member name (12 chars, fallback 익명), cap to the team size.
+      const members = (Array.isArray(names) ? names : [names])
+        .map((n) => (String(n || '익명').trim().slice(0, 12)) || '익명')
+        .slice(0, players);
+      if (members.length === 0) members.push('익명');
+      // Reuse clean() for the numeric clamping, then overwrite name with the
+      // full combined roster so every participant shows on the one entry.
+      const row = clean(stats, members[0]);
+      row.name = members.join(', ');
       if (row.score <= 0 && row.wave <= 0) return false;
-      await fs.addDoc(fs.collection(db, coll), { ...row, players, ts: fs.serverTimestamp() });
+      await fs.addDoc(fs.collection(db, coll), { ...row, members, players, ts: fs.serverTimestamp() });
       return true;
     } catch (e) {
       console.warn('[Leaderboard] 협동 기록 전송 실패', e);
