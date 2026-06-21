@@ -1,0 +1,51 @@
+{
+  "name": "wavesurvival",
+  "productName": "굿판 — Wave Survival",
+  "version": "1.0.0",
+  "description": "한국 무속 웨이브 서바이벌 FPS — Electron 데스크탑 빌드",
+  "private": true,
+  "author": "ranha0924",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.ranha0924.wavesurvival",
+    "productName": "Wave Survival",
+    "files": [
+      "electron/**/*",
+      "index.html",
+      "style.css",
+      "js/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/boss.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Wave Survival"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.games"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Game"
+    }
+  }
+}

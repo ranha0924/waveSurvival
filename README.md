@@ -11,6 +11,17 @@ python3 -m http.server 8080
 # 브라우저에서 http://localhost:8080 열기
 ```
 
+### 데스크탑 설치 파일 (Electron)
+
+Windows `.exe` / macOS `.dmg` / Linux `AppImage` 설치 파일로도 빌드할 수 있다.
+자세한 방법은 [`docs/DESKTOP_BUILD.md`](docs/DESKTOP_BUILD.md) 참고.
+
+```bash
+npm install
+npm start        # 개발 모드 실행
+npm run dist     # 현재 OS용 설치 파일 생성 → dist/
+```
+
 ## 조작법
 
 ### 데스크탑

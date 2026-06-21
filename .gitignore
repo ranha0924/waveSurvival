@@ -3,6 +3,9 @@ server/node_modules/
 node_modules/
 npm-debug.log*
 
+# Electron desktop build output
+dist/
+
 # OS / editor cruft
 .DS_Store
 *.swp
