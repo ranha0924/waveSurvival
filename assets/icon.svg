@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 32 32">
+  <!-- index.html 인라인 파비콘과 동일한 디자인: 붉은 부적 + 금색 符.
+       icon.png 는 이 SVG를 sharp 로 래스터화한 결과물. -->
+  <rect width="32" height="32" rx="5" fill="#b71c1c"/>
+  <text x="16" y="23" font-size="20" text-anchor="middle" fill="#f3d67b" font-family="IPAGothic, serif">符</text>
+</svg>

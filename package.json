@@ -29,7 +29,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/boss.png"
+      "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -41,10 +41,12 @@
     },
     "mac": {
       "target": "dmg",
+      "icon": "assets/icon.png",
       "category": "public.app-category.games"
     },
     "linux": {
       "target": "AppImage",
+      "icon": "assets/icon.png",
       "category": "Game"
     }
   }

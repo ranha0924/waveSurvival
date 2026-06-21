@@ -41,10 +41,14 @@ npm run dist:linux   # Linux    → dist/Wave Survival-x.y.z.AppImage
 > 것이 가장 안정적입니다. (크로스 빌드도 가능하지만 코드 서명 등 추가 설정이
 > 필요할 수 있습니다.)
 
-## 아이콘 교체
+## 앱 아이콘
 
-기본값은 `assets/boss.png`를 앱 아이콘으로 씁니다. 전용 아이콘을 쓰려면
-`package.json`의 `build.win.icon` / `build.mac.icon` 경로를 바꾸세요.
-- Windows: `.ico` (256×256 권장)
-- macOS: `.icns`
-- Linux: `.png` (512×512 권장)
+브라우저 파비콘과 동일한 디자인(붉은 부적 + 금색 符)을 그대로 앱 아이콘으로
+씁니다. `assets/icon.png`(512×512)가 그 아이콘이며, electron-builder가 빌드 시
+각 OS 포맷(Windows `.ico` / macOS `.icns`)으로 자동 변환합니다.
+
+원본은 `assets/icon.svg`이고, 수정 후 PNG를 다시 만들려면 SVG를 512×512 PNG로
+래스터화해 `assets/icon.png`를 덮어쓰면 됩니다 (CJK 글리프 포함 폰트 필요).
+
+다른 아이콘으로 바꾸려면 `package.json`의 `build.win.icon` /
+`build.mac.icon` / `build.linux.icon` 경로를 교체하세요.
